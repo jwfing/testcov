@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JSONArray.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.json</a> &gt; <span class="el_source">JSONArray.java</span></div><h1>JSONArray.java</h1><pre class="source lang-java linenums">package cn.leancloud.json;
+
+import cn.leancloud.core.AppConfiguration;
+
+import java.io.Serializable;
+import java.lang.reflect.Type;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.sql.Timestamp;
+import java.util.*;
+
+<span class="fc" id="L12">public abstract class JSONArray implements List&lt;Object&gt;, Cloneable, Serializable {</span>
+<span class="nc" id="L13">  public static class Builder {</span>
+    public static JSONArray create(List&lt;Object&gt; param) {
+<span class="fc" id="L15">      return AppConfiguration.getJsonParser().toJSONArray(param);</span>
+    }
+  }
+
+  public abstract JSONArray fluentAdd(Object a);
+  public abstract JSONArray fluentRemove(Object o);
+  public abstract JSONArray fluentAddAll(Collection&lt;? extends Object&gt; c);
+  public abstract JSONArray fluentAddAll(int index, Collection&lt;? extends Object&gt; c);
+  public abstract JSONArray fluentRemoveAll(Collection&lt;?&gt; c);
+  public abstract JSONArray fluentRetainAll(Collection&lt;?&gt; c);
+  public abstract JSONArray fluentClear();
+  public abstract JSONArray fluentRemove(int index);
+  public abstract JSONArray fluentSet(int index, Object element);
+  public abstract JSONArray fluentAdd(int index, Object element);
+
+  public abstract JSONObject getJSONObject(int index);
+
+  public abstract JSONArray getJSONArray(int index);
+
+  public abstract &lt;T&gt; T getObject(int index, Class&lt;T&gt; clazz);
+
+  public abstract &lt;T&gt; T getObject(int index, Type type);
+
+  public abstract Boolean getBoolean(int index);
+
+  public abstract boolean getBooleanValue(int index);
+
+  public abstract Byte getByte(int index);
+
+  public abstract byte getByteValue(int index);
+
+  public abstract Short getShort(int index);
+
+  public abstract short getShortValue(int index);
+
+  public abstract Integer getInteger(int index);
+
+  public abstract int getIntValue(int index);
+
+  public abstract Long getLong(int index);
+
+  public abstract long getLongValue(int index);
+
+  public abstract Float getFloat(int index);
+  public abstract float getFloatValue(int index);
+
+  public abstract Double getDouble(int index);
+
+  public abstract double getDoubleValue(int index);
+
+  public abstract BigDecimal getBigDecimal(int index);
+
+  public abstract BigInteger getBigInteger(int index);
+
+  public abstract String getString(int index);
+
+  public abstract Date getDate(int index);
+
+  public abstract java.sql.Date getSqlDate(int index);
+
+  public abstract Timestamp getTimestamp(int index);
+
+  public abstract &lt;T&gt; List&lt;T&gt; toJavaList(Class&lt;T&gt; clazz);
+  public abstract String toJSONString();
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

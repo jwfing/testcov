@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>QueryOperation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.query</a> &gt; <span class="el_source">QueryOperation.java</span></div><h1>QueryOperation.java</h1><pre class="source lang-java linenums">package cn.leancloud.query;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class QueryOperation {
+  public static final String EQUAL_OP = &quot;__eq&quot;;
+  public static final String OR_OP = &quot;$or&quot;;
+  public static final String AND_OP = &quot;$and&quot;;
+
+  private String key;
+  private Object value;
+  private String op;
+
+<span class="fc" id="L15">  public QueryOperation(String key, String op, Object value) {</span>
+<span class="fc" id="L16">    this.key = key;</span>
+<span class="fc" id="L17">    this.op = op;</span>
+<span class="fc" id="L18">    this.value = value;</span>
+<span class="fc" id="L19">  }</span>
+
+  public String getKey() {
+<span class="fc" id="L22">    return key;</span>
+  }
+
+  public Object getValue() {
+<span class="nc" id="L26">    return value;</span>
+  }
+
+  public String getOp() {
+<span class="nc" id="L30">    return op;</span>
+  }
+
+  public Object toResult() {
+    /*
+     * 当查询涉及到复合查询 比如 { &quot;$nearSphere&quot;: { &quot;__type&quot;:&quot;GeoPoint&quot;, &quot;latitude&quot;:41, &quot;longitude&quot;:-31 }
+     * &quot;maxDistanceInRadians&quot;:1000 } 此时op为空，直接返回value即可
+     */
+<span class="fc bfc" id="L38" title="All 6 branches covered.">    if (op == null || op.equals(EQUAL_OP) || op.equals(OR_OP)) {</span>
+<span class="fc" id="L39">      return value;</span>
+    } else {
+<span class="fc" id="L41">      Map&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L42">      map.put(op, value);</span>
+<span class="fc" id="L43">      return map;</span>
+    }
+  }
+
+  public Object toResult(String key) {
+<span class="nc" id="L48">    Map&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L49">    map.put(key, this.toResult());</span>
+<span class="nc" id="L50">    return map;</span>
+  }
+
+  public boolean sameOp(QueryOperation other) {
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">    if (null == other) {</span>
+<span class="nc" id="L55">      return false;</span>
+    }
+<span class="pc bpc" id="L57" title="2 of 4 branches missed.">    if (null != this.key &amp;&amp; null != other.key) {</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">      if (!this.key.equals(other.key)) {</span>
+<span class="nc" id="L59">        return false;</span>
+      }
+<span class="nc bnc" id="L61" title="All 4 branches missed.">    } else if (null != this.key || null != other.key) {</span>
+<span class="nc" id="L62">      return false;</span>
+    }
+<span class="pc bpc" id="L64" title="2 of 4 branches missed.">    if (null != this.op &amp;&amp; null != other.op) {</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">      if (!this.op.equals(other.op)) {</span>
+<span class="nc" id="L66">        return false;</span>
+      }
+<span class="nc bnc" id="L68" title="All 4 branches missed.">    } else if (null != this.op || null != other.op) {</span>
+<span class="nc" id="L69">      return false;</span>
+    }
+<span class="fc" id="L71">    return true;</span>
+  }
+
+  @Override
+  public int hashCode() {
+<span class="nc" id="L76">    final int prime = 31;</span>
+<span class="nc" id="L77">    int result = 1;</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">    result = prime * result + ((key == null) ? 0 : key.hashCode());</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">    result = prime * result + ((op == null) ? 0 : op.hashCode());</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">    result = prime * result + ((value == null) ? 0 : value.hashCode());</span>
+<span class="nc" id="L81">    return result;</span>
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">    if (this == obj) return true;</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">    if (obj == null) return false;</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">    if (getClass() != obj.getClass()) return false;</span>
+<span class="fc" id="L89">    QueryOperation other = (QueryOperation) obj;</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">    if (key == null) {</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">      if (other.key != null) return false;</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">    } else if (!key.equals(other.key)) return false;</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">    if (op == null) {</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">      if (other.op != null) return false;</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">    } else if (!op.equals(other.op)) return false;</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">    if (value == null) {</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">      if (other.value != null) return false;</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">    } else if (!value.equals(other.value)) return false;</span>
+<span class="nc" id="L99">    return true;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

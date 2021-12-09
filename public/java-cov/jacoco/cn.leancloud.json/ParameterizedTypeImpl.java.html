@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ParameterizedTypeImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.json</a> &gt; <span class="el_source">ParameterizedTypeImpl.java</span></div><h1>ParameterizedTypeImpl.java</h1><pre class="source lang-java linenums">package cn.leancloud.json;
+
+import java.lang.reflect.Type;
+import java.util.Arrays;
+import java.lang.reflect.ParameterizedType;
+
+public class ParameterizedTypeImpl implements ParameterizedType{
+  private final Type[] actualTypeArguments;
+  private final Type ownerType;
+  private final Type rawType;
+
+<span class="nc" id="L12">  public ParameterizedTypeImpl(Type[] actualTypeArguments, Type ownerType, Type rawType) {</span>
+<span class="nc" id="L13">    this.actualTypeArguments = actualTypeArguments;</span>
+<span class="nc" id="L14">    this.ownerType = ownerType;</span>
+<span class="nc" id="L15">    this.rawType = rawType;</span>
+<span class="nc" id="L16">  }</span>
+
+  public Type[] getActualTypeArguments() {
+<span class="nc" id="L19">    return this.actualTypeArguments;</span>
+  }
+
+  public Type getOwnerType() {
+<span class="nc" id="L23">    return this.ownerType;</span>
+  }
+
+  public Type getRawType() {
+<span class="nc" id="L27">    return this.rawType;</span>
+  }
+
+  public boolean equals(Object o) {
+<span class="nc bnc" id="L31" title="All 2 branches missed.">    if (this == o) {</span>
+<span class="nc" id="L32">      return true;</span>
+<span class="nc bnc" id="L33" title="All 4 branches missed.">    } else if (o != null &amp;&amp; this.getClass() == o.getClass()) {</span>
+<span class="nc" id="L34">      ParameterizedTypeImpl that = (ParameterizedTypeImpl)o;</span>
+<span class="nc bnc" id="L35" title="All 2 branches missed.">      if (!Arrays.equals(this.actualTypeArguments, that.actualTypeArguments)) {</span>
+<span class="nc" id="L36">        return false;</span>
+      } else {
+<span class="nc bnc" id="L38" title="All 2 branches missed.">        if (this.ownerType != null) {</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">          if (this.ownerType.equals(that.ownerType)) {</span>
+<span class="nc bnc" id="L40" title="All 4 branches missed.">            return this.rawType != null ? this.rawType.equals(that.rawType) : that.rawType == null;</span>
+          }
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        } else if (that.ownerType == null) {</span>
+<span class="nc bnc" id="L43" title="All 4 branches missed.">          return this.rawType != null ? this.rawType.equals(that.rawType) : that.rawType == null;</span>
+        }
+
+<span class="nc" id="L46">        return false;</span>
+      }
+    } else {
+<span class="nc" id="L49">      return false;</span>
+    }
+  }
+
+  public int hashCode() {
+<span class="nc bnc" id="L54" title="All 2 branches missed.">    int result = this.actualTypeArguments != null ? Arrays.hashCode(this.actualTypeArguments) : 0;</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">    result = 31 * result + (this.ownerType != null ? this.ownerType.hashCode() : 0);</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">    result = 31 * result + (this.rawType != null ? this.rawType.hashCode() : 0);</span>
+<span class="nc" id="L57">    return result;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

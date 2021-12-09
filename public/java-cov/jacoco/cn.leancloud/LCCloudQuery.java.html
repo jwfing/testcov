@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LCCloudQuery.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud</a> &gt; <span class="el_source">LCCloudQuery.java</span></div><h1>LCCloudQuery.java</h1><pre class="source lang-java linenums">package cn.leancloud;
+
+import cn.leancloud.core.PaasClient;
+import cn.leancloud.query.LCCloudQueryResult;
+import cn.leancloud.query.LCQueryResult;
+import cn.leancloud.utils.LCUtils;
+import cn.leancloud.utils.StringUtil;
+import io.reactivex.Observable;
+import io.reactivex.functions.Function;
+
+import java.util.*;
+
+public class LCCloudQuery {
+  private LCCloudQuery() {
+  }
+
+  /**
+   * execute cql query in background.
+   * @param cql cql statement.
+   * @return observable instance.
+   */
+  public static Observable&lt;LCCloudQueryResult&gt; executeInBackground(String cql) {
+<span class="nc" id="L23">    return executeInBackground(null, cql);</span>
+  }
+
+  /**
+   * execute cql query in background.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param cql cql statement.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public static Observable&lt;LCCloudQueryResult&gt; executeInBackground(LCUser asAuthenticatedUser, String cql) {
+<span class="nc" id="L35">    return executeInBackground(asAuthenticatedUser, cql, LCObject.class);</span>
+  }
+
+  /**
+   * execute cql query in background.
+   * @param cql cql statement.
+   * @param params query parameters.
+   * @return observable instance.
+   */
+  public static Observable&lt;LCCloudQueryResult&gt; executeInBackground(String cql, Object... params) {
+<span class="nc" id="L45">    return executeInBackground(null, cql, params);</span>
+  }
+
+  /**
+   * execute cql query in background.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param cql cql statement.
+   * @param params query parameters.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public static Observable&lt;LCCloudQueryResult&gt; executeInBackground(LCUser asAuthenticatedUser,
+                                                                   String cql, Object... params) {
+<span class="nc" id="L59">    return executeInBackground(asAuthenticatedUser, cql, LCObject.class, params);</span>
+  }
+
+  /**
+   * execute cql query in background.
+   * @param cql cql statement.
+   * @param clazz result class.
+   * @return observable instance.
+   */
+  public static Observable&lt;LCCloudQueryResult&gt; executeInBackground(String cql, Class&lt;? extends LCObject&gt; clazz) {
+<span class="fc" id="L69">    return executeInBackground(null, cql, clazz);</span>
+  }
+
+  /**
+   * execute cql query in background.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param cql cql statement.
+   * @param clazz result class.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public static Observable&lt;LCCloudQueryResult&gt; executeInBackground(LCUser asAuthenticatedUser,
+                                                                   String cql, Class&lt;? extends LCObject&gt; clazz) {
+<span class="fc" id="L83">    return executeInBackground(asAuthenticatedUser, cql, clazz, null);</span>
+  }
+
+  /**
+   * execute cql query in background.
+   * @param cql cql statement.
+   * @param clazz result class.
+   * @param params query parameters.
+   * @param &lt;T&gt; template type.
+   * @return observable instance.
+   */
+  public static &lt;T extends LCObject&gt; Observable&lt;LCCloudQueryResult&gt; executeInBackground(String cql, final Class&lt;T&gt; clazz, Object... params) {
+<span class="nc" id="L95">    return executeInBackground(null, cql, clazz, params);</span>
+  }
+
+  /**
+   * execute cql query in background.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param cql cql statement.
+   * @param clazz result class.
+   * @param params query parameters.
+   * @param &lt;T&gt; template type.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public static &lt;T extends LCObject&gt; Observable&lt;LCCloudQueryResult&gt; executeInBackground(LCUser asAuthenticatedUser,
+                                                                                        String cql, final Class&lt;T&gt; clazz,
+                                                                                        Object... params) {
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(cql)) {</span>
+<span class="nc" id="L113">      throw new IllegalArgumentException(&quot;cql is empty&quot;);</span>
+    }
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">    if (null == clazz) {</span>
+<span class="nc" id="L116">      throw new IllegalArgumentException(&quot;target class is null&quot;);</span>
+    }
+<span class="fc" id="L118">    List&lt;Object&gt; pValue = new LinkedList&lt;&gt;();</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">    if (null != params) {</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">      for (Object o: params) {</span>
+<span class="nc" id="L121">        pValue.add(o);</span>
+      }
+    }
+<span class="fc" id="L124">    Map&lt;String, String&gt; p = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L125">    p.put(&quot;cql&quot;, cql);</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">    if (!pValue.isEmpty()) {</span>
+<span class="nc" id="L127">      p.put(&quot;pvalues&quot;, LCUtils.jsonStringFromObjectWithNull(pValue));</span>
+    }
+<span class="fc" id="L129">    return PaasClient.getStorageClient().cloudQuery(asAuthenticatedUser, p).map(new Function&lt;LCQueryResult, LCCloudQueryResult&gt;() {</span>
+      public LCCloudQueryResult apply(LCQueryResult LCQueryResult) throws Exception {
+<span class="fc" id="L131">        LCCloudQueryResult finalResult = new LCCloudQueryResult();</span>
+<span class="fc" id="L132">        List&lt;T&gt; rawObjs = new ArrayList(LCQueryResult.getCount());</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (LCObject o : LCQueryResult.getResults()) {</span>
+<span class="fc" id="L134">          rawObjs.add((T) Transformer.transform(o, LCQueryResult.getClassName()));</span>
+<span class="fc" id="L135">        }</span>
+<span class="fc" id="L136">        finalResult.setResults(rawObjs);</span>
+<span class="fc" id="L137">        finalResult.setCount(LCQueryResult.getCount());</span>
+
+<span class="fc" id="L139">        return finalResult;</span>
+      }
+    });
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

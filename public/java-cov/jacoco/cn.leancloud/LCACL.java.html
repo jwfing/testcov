@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LCACL.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud</a> &gt; <span class="el_source">LCACL.java</span></div><h1>LCACL.java</h1><pre class="source lang-java linenums">package cn.leancloud;
+
+import cn.leancloud.utils.StringUtil;
+
+import cn.leancloud.json.JSON;
+import cn.leancloud.json.JSONObject;
+
+import java.util.*;
+
+public class LCACL {
+  private static final String PUBLIC_KEY = &quot;*&quot;;
+  private static final String ROLE_PREFIX = &quot;role:&quot;;
+  private static final String KEY_READ_PERMISSION = &quot;read&quot;;
+  private static final String KEY_WRITE_PERMISSION = &quot;write&quot;;
+
+  public static class Permissions extends HashMap&lt;String, Boolean&gt; {
+    public Permissions() {
+<span class="nc" id="L18">      super();</span>
+<span class="nc" id="L19">    }</span>
+
+    public Permissions(boolean read, boolean write) {
+<span class="fc" id="L22">      super();</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">      if (read) {</span>
+<span class="fc" id="L24">        put(KEY_READ_PERMISSION, read);</span>
+      }
+<span class="fc bfc" id="L26" title="All 2 branches covered.">      if (write) {</span>
+<span class="fc" id="L27">        put(KEY_WRITE_PERMISSION, write);</span>
+      }
+<span class="fc" id="L29">    }</span>
+
+    public Permissions(HashMap&lt;String, Object&gt; map) {
+<span class="fc" id="L32">      super();</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">      if (null == map) {</span>
+<span class="nc" id="L34">        return;</span>
+      }
+<span class="fc" id="L36">      Object readValue = map.get(KEY_READ_PERMISSION);</span>
+<span class="fc" id="L37">      Object writeValue = map.get(KEY_WRITE_PERMISSION);</span>
+<span class="pc bpc" id="L38" title="2 of 4 branches missed.">      if (null == readValue || !(readValue instanceof Boolean)) {</span>
+<span class="nc" id="L39">        put(KEY_READ_PERMISSION, false);</span>
+      } else {
+<span class="fc" id="L41">        put(KEY_READ_PERMISSION, (Boolean)readValue);</span>
+      }
+<span class="pc bpc" id="L43" title="2 of 4 branches missed.">      if (null == writeValue || !(writeValue instanceof Boolean)) {</span>
+<span class="nc" id="L44">        put(KEY_WRITE_PERMISSION, false);</span>
+      } else {
+<span class="fc" id="L46">        put(KEY_WRITE_PERMISSION, (Boolean)writeValue);</span>
+      }
+<span class="fc" id="L48">    }</span>
+
+    public Permissions(Permissions permissions) {
+<span class="nc" id="L51">      super();</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">      if (null == permissions) {</span>
+<span class="nc" id="L53">        return;</span>
+      }
+<span class="nc bnc" id="L55" title="All 2 branches missed.">      if (permissions.getReadPermission()) {</span>
+<span class="nc" id="L56">        put(KEY_READ_PERMISSION, true);</span>
+      }
+<span class="nc bnc" id="L58" title="All 2 branches missed.">      if (permissions.getWritePermission()) {</span>
+<span class="nc" id="L59">        put(KEY_WRITE_PERMISSION, true);</span>
+      }
+<span class="nc" id="L61">    }</span>
+
+    boolean getReadPermission() {
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">      if (containsKey(KEY_READ_PERMISSION)) {</span>
+<span class="fc" id="L65">        return get(KEY_READ_PERMISSION);</span>
+      }
+<span class="nc" id="L67">      return false;</span>
+    }
+
+    boolean getWritePermission() {
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">      if (containsKey(KEY_WRITE_PERMISSION)) {</span>
+<span class="fc" id="L72">        return get(KEY_WRITE_PERMISSION);</span>
+      }
+<span class="nc" id="L74">      return false;</span>
+    }
+  }
+
+<span class="pc" id="L78">  private final Map&lt;String, Permissions&gt; permissionsById = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L80">  public LCACL() {</span>
+<span class="fc" id="L81">  }</span>
+<span class="nc" id="L82">  public LCACL(JSONObject json) {</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">    if (null != json) {</span>
+<span class="nc" id="L84">      Set&lt;Map.Entry&lt;String, Object&gt;&gt; entries = json.entrySet();</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">      for (Map.Entry&lt;String, Object&gt; entry : entries) {</span>
+<span class="nc" id="L86">        Object v = entry.getValue();</span>
+<span class="nc bnc" id="L87" title="All 4 branches missed.">        if (null != v &amp;&amp; v instanceof HashMap) {</span>
+<span class="nc" id="L88">          permissionsById.put(entry.getKey(), new Permissions((HashMap&lt;String, Object&gt;) entry.getValue()));</span>
+        }
+<span class="nc" id="L90">      }</span>
+    }
+<span class="nc" id="L92">  }</span>
+
+  /**
+   * constructor
+   * @param data hash map for acl.
+   */
+<span class="fc" id="L98">  public LCACL(HashMap data) {</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">    if (null != data) {</span>
+<span class="fc" id="L100">      Set&lt;Map.Entry&lt;String, Object&gt;&gt; entries = data.entrySet();</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">      for (Map.Entry&lt;String, Object&gt; entry : entries) {</span>
+<span class="fc" id="L102">        Object v = entry.getValue();</span>
+<span class="pc bpc" id="L103" title="2 of 4 branches missed.">        if (null != v &amp;&amp; v instanceof HashMap) {</span>
+<span class="fc" id="L104">          permissionsById.put(entry.getKey(), new Permissions((HashMap&lt;String, Object&gt;) entry.getValue()));</span>
+        }
+<span class="fc" id="L106">      }</span>
+    }
+<span class="fc" id="L108">  }</span>
+
+  /**
+   * copy constructor
+   * @param other other instance
+   */
+<span class="nc" id="L114">  public LCACL(LCACL other) {</span>
+<span class="nc" id="L115">    permissionsById.putAll(other.permissionsById);</span>
+<span class="nc" id="L116">  }</span>
+
+  /**
+   * constructor
+   * @param owner owner with read/write permission.
+   */
+<span class="nc" id="L122">  public LCACL(LCUser owner) {</span>
+<span class="nc" id="L123">    setReadAccess(owner, true);</span>
+<span class="nc" id="L124">    setWriteAccess(owner, true);</span>
+<span class="nc" id="L125">  }</span>
+
+  /**
+   * get permissions by id.
+   * @return hash map for id and permission.
+   */
+  public Map&lt;String, Permissions&gt; getPermissionsById() {
+<span class="fc" id="L132">    return permissionsById;</span>
+  }
+
+  @Override
+  public boolean equals(Object o) {
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">    if (this == o) return true;</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">    if (!(o instanceof LCACL)) return false;</span>
+<span class="fc" id="L139">    LCACL realACL = (LCACL) o;</span>
+<span class="fc" id="L140">    return Objects.equals(getPermissionsById(), realACL.getPermissionsById());</span>
+  }
+
+  @Override
+  public int hashCode() {
+<span class="fc" id="L145">    return Objects.hash(getPermissionsById());</span>
+  }
+
+  /**
+   * get json object.
+   * @return json object.
+   */
+  public JSONObject toJSONObject() {
+<span class="fc" id="L153">    String jsonStr = JSON.toJSONString(this.permissionsById);</span>
+<span class="fc" id="L154">    return JSON.parseObject(jsonStr);</span>
+  }
+
+  private void setPermissionsIfNonEmpty(String userId, boolean readPermission, boolean writePermission) {
+<span class="fc bfc" id="L158" title="All 4 branches covered.">    if (!(readPermission || writePermission)) {</span>
+<span class="fc" id="L159">      permissionsById.remove(userId);</span>
+    } else {
+<span class="fc" id="L161">      permissionsById.put(userId, new Permissions(readPermission, writePermission));</span>
+    }
+<span class="fc" id="L163">  }</span>
+
+  /**
+   * Set whether the public is allowed to read this object.
+   * @param allowed flag to allow.
+   */
+  public void setPublicReadAccess(boolean allowed) {
+<span class="fc" id="L170">    setReadAccess(PUBLIC_KEY, allowed);</span>
+<span class="fc" id="L171">  }</span>
+
+  /**
+   * Get whether the public is allowed to read this object.
+   * @return public read permission.
+   */
+  public boolean getPublicReadAccess() {
+<span class="nc" id="L178">    return getReadAccess(PUBLIC_KEY);</span>
+  }
+
+  /**
+   * Set whether the public is allowed to write this object.
+   * @param allowed flag to allow
+   */
+  public void setPublicWriteAccess(boolean allowed) {
+<span class="fc" id="L186">    setWriteAccess(PUBLIC_KEY, allowed);</span>
+<span class="fc" id="L187">  }</span>
+
+  /**
+   * Set whether the public is allowed to write this object.
+   * @return public write permission.
+   */
+  public boolean getPublicWriteAccess() {
+<span class="nc" id="L194">    return getWriteAccess(PUBLIC_KEY);</span>
+  }
+
+  /**
+   * Set whether the given user id is allowed to read this object.
+   * @param userId target user id.
+   * @param allowed flag to allow
+   */
+  public void setReadAccess(String userId, boolean allowed) {
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(userId)) {</span>
+<span class="nc" id="L204">      throw new IllegalArgumentException(&quot;cannot setRead/WriteAccess for null userId&quot;);</span>
+    }
+<span class="fc" id="L206">    boolean writePermission = getWriteAccess(userId);</span>
+<span class="fc" id="L207">    setPermissionsIfNonEmpty(userId, allowed, writePermission);</span>
+<span class="fc" id="L208">  }</span>
+
+  /**
+   * Get whether the given user id is *explicitly* allowed to read this object. Even if this returns
+   * {@code false}, the user may still be able to access it if getPublicReadAccess returns
+   * {@code true} or a role  that the user belongs to has read access.
+   * @param userId target user id.
+   * @return result whether has read permission for specified userId.
+   */
+  public boolean getReadAccess(String userId) {
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(userId)) {</span>
+<span class="nc" id="L219">      return false;</span>
+    }
+<span class="fc" id="L221">    Permissions permissions = permissionsById.get(userId);</span>
+<span class="pc bpc" id="L222" title="1 of 4 branches missed.">    return permissions != null &amp;&amp; permissions.getReadPermission();</span>
+  }
+
+  /**
+   * Set whether the given user id is allowed to write this object.
+   * @param userId target user id.
+   * @param allowed  flag to allow.
+   */
+  public void setWriteAccess(String userId, boolean allowed) {
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(userId)) {</span>
+<span class="nc" id="L232">      throw new IllegalArgumentException(&quot;cannot setRead/WriteAccess for null userId&quot;);</span>
+    }
+<span class="fc" id="L234">    boolean readPermission = getReadAccess(userId);</span>
+<span class="fc" id="L235">    setPermissionsIfNonEmpty(userId, readPermission, allowed);</span>
+<span class="fc" id="L236">  }</span>
+
+  /**
+   * Get whether the given user id is *explicitly* allowed to write this object. Even if this
+   * returns {@code false}, the user may still be able to write it if getPublicWriteAccess returns
+   * {@code true} or a role that the user belongs to has write access.
+   * @param userId target user id.
+   * @return result whether has write permission for specified userId.
+   */
+  public boolean getWriteAccess(String userId) {
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(userId)) {</span>
+<span class="nc" id="L247">      return false;</span>
+    }
+<span class="fc" id="L249">    Permissions permissions = permissionsById.get(userId);</span>
+<span class="pc bpc" id="L250" title="1 of 4 branches missed.">    return permissions != null &amp;&amp; permissions.getWritePermission();</span>
+  }
+
+  /**
+   * Set whether the given user is allowed to read this object.
+   * @param user target user.
+   * @param allowed flag to allow
+   */
+  public void setReadAccess(LCUser user, boolean allowed) {
+<span class="nc bnc" id="L259" title="All 4 branches missed.">    if (null == user || StringUtil.isEmpty(user.getObjectId())) {</span>
+<span class="nc" id="L260">      throw new IllegalArgumentException(&quot;cannot setRead/WriteAccess for a user with null id&quot;);</span>
+    }
+<span class="nc" id="L262">    setReadAccess(user.getObjectId(), allowed);</span>
+<span class="nc" id="L263">  }</span>
+
+  /**
+   * Get whether the given user is *explicitly* allowed to read this object. Even if this returns
+   * {@code false}, the user may still be able to access it if getPublicReadAccess returns
+   * {@code true} or a role  that the user belongs to has read access.
+   *
+   * @param user target user.
+   * @return result whether has read permission for specified user.
+   */
+  public boolean getReadAccess(LCUser user) {
+<span class="nc bnc" id="L274" title="All 4 branches missed.">    if (null == user || StringUtil.isEmpty(user.getObjectId())) {</span>
+<span class="nc" id="L275">      return false;</span>
+    }
+<span class="nc" id="L277">    return this.getReadAccess(user.getObjectId());</span>
+  }
+
+  /**
+   * Set whether the given user is allowed to write this object.
+   * @param user target user.
+   * @param allowed flag to allow
+   */
+  public void setWriteAccess(LCUser user, boolean allowed) {
+<span class="nc bnc" id="L286" title="All 4 branches missed.">    if (null == user || StringUtil.isEmpty(user.getObjectId())) {</span>
+<span class="nc" id="L287">      throw new IllegalArgumentException(&quot;cannot setRead/WriteAccess for a user with null id&quot;);</span>
+    }
+<span class="nc" id="L289">    setWriteAccess(user.getObjectId(), allowed);</span>
+<span class="nc" id="L290">  }</span>
+
+  /**
+   * Get whether the given user is *explicitly* allowed to write this object. Even if this returns
+   * {@code false}, the user may still be able to access it if getPublicWriteAccess returns
+   * {@code true} or a role  that the user belongs to has write access.
+   *
+   * @param user target user.
+   * @return result whether has write permission for specified user.
+   */
+  public boolean getWriteAccess(LCUser user) {
+<span class="nc bnc" id="L301" title="All 4 branches missed.">    if (null == user || StringUtil.isEmpty(user.getObjectId())) {</span>
+<span class="nc" id="L302">      return false;</span>
+    }
+<span class="nc" id="L304">    return this.getWriteAccess(user.getObjectId());</span>
+  }
+
+  /**
+   * Set whether the given role is allowed to read this object.
+   * @param role target role.
+   * @param allowed flat to allow.
+   */
+  public void setRoleReadAccess(String role, boolean allowed) {
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(role)) {</span>
+<span class="nc" id="L314">      throw new IllegalArgumentException(&quot;cannot setRead/WriteAccess to a empty role&quot;);</span>
+    }
+<span class="fc" id="L316">    this.setReadAccess(ROLE_PREFIX + role, allowed);</span>
+<span class="fc" id="L317">  }</span>
+
+  /**
+   * Get whether the given role is *explicitly* allowed to read this object. Even if this returns
+   * {@code false}, the role may still be able to access it if getPublicReadAccess returns
+   *
+   * @param role target role.
+   * @return result whether has read permission for specified role.
+   */
+  public boolean getRoleReadAccess(String role) {
+<span class="nc bnc" id="L327" title="All 2 branches missed.">    if (StringUtil.isEmpty(role)) {</span>
+<span class="nc" id="L328">      return false;</span>
+    }
+<span class="nc" id="L330">    return getReadAccess(ROLE_PREFIX + role);</span>
+  }
+
+  /**
+   * Set whether the given role is allowed to write this object.
+   * @param role target role.
+   * @param allowed flat to allow.
+   */
+  public void setRoleWriteAccess(String role, boolean allowed) {
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(role)) {</span>
+<span class="nc" id="L340">      throw new IllegalArgumentException(&quot;cannot setRead/WriteAccess to a empty role&quot;);</span>
+    }
+<span class="fc" id="L342">    this.setWriteAccess(ROLE_PREFIX + role, allowed);</span>
+<span class="fc" id="L343">  }</span>
+
+  /**
+   * Get whether the given role is *explicitly* allowed to write this object. Even if this returns
+   * {@code false}, the role may still be able to access it if getPublicWriteAccess returns
+   *
+   * @param role target role.
+   * @return result whether has write permission for specified role.
+   */
+  public boolean getRoleWriteAccess(String role) {
+<span class="nc bnc" id="L353" title="All 2 branches missed.">    if (StringUtil.isEmpty(role)) {</span>
+<span class="nc" id="L354">      return false;</span>
+    }
+<span class="nc" id="L356">    return getWriteAccess(ROLE_PREFIX + role);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

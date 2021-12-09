@@ -1,0 +1,490 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>QueryConditions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.query</a> &gt; <span class="el_source">QueryConditions.java</span></div><h1>QueryConditions.java</h1><pre class="source lang-java linenums">package cn.leancloud.query;
+
+import cn.leancloud.LCObject;
+import cn.leancloud.ops.Utils;
+import cn.leancloud.types.LCGeoPoint;
+import cn.leancloud.utils.LCUtils;
+import cn.leancloud.utils.StringUtil;
+
+import java.util.*;
+
+public class QueryConditions implements Cloneable {
+  Map&lt;String, List&lt;QueryOperation&gt;&gt; where;
+  private List&lt;String&gt; include;
+  private Set&lt;String&gt; selectedKeys;
+  private int limit;
+  private boolean trace;
+<span class="fc" id="L17">  private int skip = -1;</span>
+  private String order;
+  private Map&lt;String, String&gt; parameters;
+<span class="fc" id="L20">  private boolean includeACL = false;</span>
+
+<span class="fc" id="L22">  public QueryConditions() {</span>
+<span class="fc" id="L23">    where = new HashMap&lt;String, List&lt;QueryOperation&gt;&gt;();</span>
+<span class="fc" id="L24">    include = new LinkedList&lt;String&gt;();</span>
+<span class="fc" id="L25">    includeACL = false;</span>
+<span class="fc" id="L26">    parameters = new HashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L27">  }</span>
+
+  // It’s also legal to implement clone() without using Object.clone(),
+  // by manually constructing a new object and copying fields.
+  public QueryConditions clone() {
+<span class="fc" id="L32">    QueryConditions condition = new QueryConditions();</span>
+<span class="fc" id="L33">    condition.where.putAll(this.where);</span>
+<span class="fc" id="L34">    condition.include.addAll(this.include);</span>
+<span class="fc" id="L35">    condition.parameters.putAll(this.parameters);</span>
+<span class="fc" id="L36">    condition.selectKeys(this.selectedKeys);</span>
+<span class="fc" id="L37">    condition.setLimit(this.limit);</span>
+<span class="fc" id="L38">    condition.setTrace(this.trace);</span>
+<span class="fc" id="L39">    condition.setSkip(this.skip);</span>
+<span class="fc" id="L40">    condition.setOrder(this.order);</span>
+<span class="fc" id="L41">    condition.includeACL(this.includeACL);</span>
+<span class="fc" id="L42">    return condition;</span>
+  }
+
+  public int getLimit() {
+<span class="fc" id="L46">    return limit;</span>
+  }
+
+  public void setLimit(int limit) {
+<span class="fc" id="L50">    this.limit = limit;</span>
+<span class="fc" id="L51">  }</span>
+
+  public int getSkip() {
+<span class="fc" id="L54">    return skip;</span>
+  }
+
+  public void setSkip(int skip) {
+<span class="fc" id="L58">    this.skip = skip;</span>
+<span class="fc" id="L59">  }</span>
+
+  public String getOrder() {
+<span class="fc" id="L62">    return order;</span>
+  }
+
+  public void setOrder(String order) {
+<span class="fc" id="L66">    this.order = order;</span>
+<span class="fc" id="L67">  }</span>
+
+  public List&lt;String&gt; getInclude() {
+<span class="fc" id="L70">    return include;</span>
+  }
+
+  public void setInclude(List&lt;String&gt; include) {
+<span class="nc" id="L74">    this.include = include;</span>
+<span class="nc" id="L75">  }</span>
+
+  public Set&lt;String&gt; getSelectedKeys() {
+<span class="nc" id="L78">    return selectedKeys;</span>
+  }
+
+  public void setSelectedKeys(Set&lt;String&gt; selectedKeys) {
+<span class="nc" id="L82">    this.selectedKeys = selectedKeys;</span>
+<span class="nc" id="L83">  }</span>
+
+  public Map&lt;String, List&lt;QueryOperation&gt;&gt; getWhere() {
+<span class="nc" id="L86">    return where;</span>
+  }
+
+  public void setWhere(Map&lt;String, List&lt;QueryOperation&gt;&gt; where) {
+<span class="nc" id="L90">    this.where = where;</span>
+<span class="nc" id="L91">  }</span>
+
+  public Map&lt;String, String&gt; getParameters() {
+<span class="fc" id="L94">    return new HashMap&lt;String, String&gt;(parameters);</span>
+  }
+
+  public void setParameters(Map&lt;String, String&gt; parameters) {
+<span class="nc" id="L98">    this.parameters = parameters;</span>
+<span class="nc" id="L99">  }</span>
+
+  public boolean isTrace() {
+<span class="nc" id="L102">    return trace;</span>
+  }
+
+  public void setTrace(boolean trace) {
+<span class="fc" id="L106">    this.trace = trace;</span>
+<span class="fc" id="L107">  }</span>
+
+  public void addAscendingOrder(String key) {
+<span class="nc bnc" id="L110" title="All 2 branches missed.">    if (StringUtil.isEmpty(order)) {</span>
+<span class="nc" id="L111">      this.orderByAscending(key);</span>
+<span class="nc" id="L112">      return;</span>
+    }
+
+<span class="nc" id="L115">    order = String.format(&quot;%s,%s&quot;, order, key);</span>
+<span class="nc" id="L116">  }</span>
+
+  public void orderByAscending(String key) {
+<span class="nc" id="L119">    order = String.format(&quot;%s&quot;, key);</span>
+<span class="nc" id="L120">  }</span>
+
+  public void addDescendingOrder(String key) {
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(order)) {</span>
+<span class="fc" id="L124">      orderByDescending(key);</span>
+<span class="fc" id="L125">      return;</span>
+    }
+
+<span class="nc" id="L128">    order = String.format(&quot;%s,-%s&quot;, order, key);</span>
+<span class="nc" id="L129">  }</span>
+
+  public void orderByDescending(String key) {
+<span class="fc" id="L132">    order = String.format(&quot;-%s&quot;, key);</span>
+<span class="fc" id="L133">  }</span>
+
+  public void include(String key) {
+<span class="fc" id="L136">    include.add(key);</span>
+<span class="fc" id="L137">  }</span>
+
+  public void selectKeys(Collection&lt;String&gt; keys) {
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">    if (selectedKeys == null) {</span>
+<span class="fc" id="L141">      selectedKeys = new HashSet&lt;String&gt;();</span>
+    }
+<span class="fc bfc" id="L143" title="All 2 branches covered.">    if (null != keys) {</span>
+<span class="fc" id="L144">      selectedKeys.addAll(keys);</span>
+    }
+<span class="fc" id="L146">  }</span>
+
+  /**
+   * Flag to indicate need ACL returned in result.
+   * @return include flag.
+   */
+  public boolean isIncludeACL() {
+<span class="nc" id="L153">    return includeACL;</span>
+  }
+
+  /**
+   * set include ACL or not.
+   * @param includeACL Flag to indicate need ACL returned in result.
+   */
+  public void includeACL(boolean includeACL) {
+<span class="fc" id="L161">    this.includeACL = includeACL;</span>
+<span class="fc" id="L162">  }</span>
+
+  public Map&lt;String, Object&gt; compileWhereOperationMap() {
+<span class="fc" id="L165">    Map&lt;String, Object&gt; result = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">    for (Map.Entry&lt;String, List&lt;QueryOperation&gt;&gt; entry : where.entrySet()) {</span>
+<span class="fc" id="L167">      List&lt;QueryOperation&gt; ops = entry.getValue();</span>
+<span class="fc" id="L168">      final String key = entry.getKey();</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">      if (key.equals(QueryOperation.OR_OP)) {</span>
+<span class="fc" id="L170">        List&lt;Object&gt; opList = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        for (QueryOperation op : ops) {</span>
+<span class="fc" id="L172">          opList.add(op.toResult());</span>
+<span class="fc" id="L173">        }</span>
+<span class="fc" id="L174">        List&lt;Object&gt; existsOr = (List&lt;Object&gt;) result.get(QueryOperation.OR_OP);</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        if (existsOr != null) {</span>
+<span class="nc" id="L176">          existsOr.addAll(opList);</span>
+        } else {
+<span class="fc" id="L178">          result.put(QueryOperation.OR_OP, opList);</span>
+        }
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">      } else if (key.equals(QueryOperation.AND_OP)) {</span>
+<span class="nc" id="L181">        List&lt;Object&gt; opList = new ArrayList&lt;Object&gt;();</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        for (QueryOperation op : ops) {</span>
+<span class="nc" id="L183">          opList.add(op.getValue());</span>
+<span class="nc" id="L184">        }</span>
+<span class="nc" id="L185">        List&lt;Object&gt; existsAnd = (List&lt;Object&gt;) result.get(QueryOperation.AND_OP);</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        if (existsAnd != null) {</span>
+<span class="nc" id="L187">          existsAnd.addAll(opList);</span>
+        } else {
+<span class="nc" id="L189">          result.put(QueryOperation.AND_OP, opList);</span>
+        }
+<span class="nc" id="L191">      } else {</span>
+<span class="pc bpc" id="L192" title="2 of 3 branches missed.">        switch (ops.size()) {</span>
+          case 0:
+<span class="nc" id="L194">            break;</span>
+          case 1:
+<span class="fc" id="L196">            Iterator&lt;QueryOperation&gt; iterator = ops.iterator();</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">            while (iterator.hasNext()) {</span>
+<span class="fc" id="L198">              QueryOperation op = iterator.next();</span>
+<span class="fc" id="L199">              result.put(key, op.toResult());</span>
+<span class="fc" id="L200">            }</span>
+            break;
+          default:
+<span class="nc" id="L203">            List&lt;Object&gt; opList = new ArrayList&lt;Object&gt;();</span>
+<span class="nc" id="L204">            Map&lt;String, Object&gt; opMap = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L205">            boolean hasEqual = false;</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            for (QueryOperation op : ops) {</span>
+<span class="nc" id="L207">              opList.add(op.toResult(key));</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">              if (QueryOperation.EQUAL_OP.equals(op.getOp())) {</span>
+<span class="nc" id="L209">                hasEqual = true;</span>
+              }
+<span class="nc bnc" id="L211" title="All 2 branches missed.">              if (!hasEqual) {</span>
+<span class="nc" id="L212">                opMap.putAll((Map) op.toResult());</span>
+              }
+<span class="nc" id="L214">            }</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">            if (hasEqual) {</span>
+<span class="nc" id="L216">              List&lt;Object&gt; existsAnd = (List&lt;Object&gt;) result.get(&quot;$and&quot;);</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">              if (existsAnd != null) {</span>
+<span class="nc" id="L218">                existsAnd.addAll(opList);</span>
+              } else {
+<span class="nc" id="L220">                result.put(&quot;$and&quot;, opList);</span>
+              }
+<span class="nc" id="L222">            } else {</span>
+<span class="nc" id="L223">              result.put(key, opMap);</span>
+            }
+            break;
+        }
+      }
+
+<span class="fc" id="L229">    }</span>
+<span class="fc" id="L230">    return result;</span>
+  }
+
+  public Map&lt;String, Object&gt; assembleJsonParam() {
+<span class="fc" id="L234">    Map&lt;String, Object&gt; result = new HashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">    if (where.keySet().size() &gt; 0) {</span>
+<span class="fc" id="L236">      Map&lt;String, Object&gt; whereMaps = compileWhereOperationMap();</span>
+<span class="fc" id="L237">      result.put(&quot;where&quot;, whereMaps);</span>
+    }
+<span class="fc bfc" id="L239" title="All 2 branches covered.">    if (limit &gt; 0) {</span>
+<span class="fc" id="L240">      result.put(&quot;limit&quot;, limit);</span>
+    }
+<span class="fc bfc" id="L242" title="All 2 branches covered.">    if (skip &gt;= 0) {</span>
+<span class="fc" id="L243">      result.put(&quot;skip&quot;,  skip);</span>
+    }
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">    if (includeACL) {</span>
+<span class="nc" id="L246">      result.put(&quot;returnACL&quot;, &quot;true&quot;);</span>
+    }
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(order)) {</span>
+<span class="nc" id="L249">      result.put(&quot;order&quot;, order);</span>
+    }
+<span class="pc bpc" id="L251" title="2 of 4 branches missed.">    if (null !=include &amp;&amp; include.size() &gt; 0) {</span>
+<span class="nc" id="L252">      String value = StringUtil.join(&quot;,&quot;, include);</span>
+<span class="nc" id="L253">      result.put(&quot;include&quot;, value);</span>
+    }
+<span class="pc bpc" id="L255" title="1 of 4 branches missed.">    if (selectedKeys != null &amp;&amp; selectedKeys.size() &gt; 0) {</span>
+<span class="fc" id="L256">      String keys = StringUtil.join(&quot;,&quot;, selectedKeys);</span>
+<span class="fc" id="L257">      result.put(&quot;keys&quot;, keys);</span>
+    }
+<span class="fc" id="L259">    return result;</span>
+  }
+
+  public Map&lt;String, String&gt; assembleParameters() {
+<span class="fc bfc" id="L263" title="All 2 branches covered.">    if (where.keySet().size() &gt; 0) {</span>
+<span class="fc" id="L264">      Map&lt;String, Object&gt; whereMaps = compileWhereOperationMap();</span>
+<span class="fc" id="L265">      String whereValue = LCUtils.jsonStringFromMapWithNull(Utils.getParsedMap(whereMaps));</span>
+<span class="fc" id="L266">      parameters.put(&quot;where&quot;, whereValue);</span>
+    }
+<span class="fc bfc" id="L268" title="All 2 branches covered.">    if (limit &gt; 0) {</span>
+<span class="fc" id="L269">      parameters.put(&quot;limit&quot;, Integer.toString(limit));</span>
+    }
+<span class="fc bfc" id="L271" title="All 2 branches covered.">    if (skip &gt;= 0) {</span>
+<span class="fc" id="L272">      parameters.put(&quot;skip&quot;, Integer.toString(skip));</span>
+    }
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">    if (includeACL) {</span>
+<span class="nc" id="L275">      parameters.put(&quot;returnACL&quot;, &quot;true&quot;);</span>
+    }
+<span class="fc bfc" id="L277" title="All 2 branches covered.">    if (!StringUtil.isEmpty(order)) {</span>
+<span class="fc" id="L278">      parameters.put(&quot;order&quot;, order);</span>
+    }
+<span class="pc bpc" id="L280" title="1 of 4 branches missed.">    if (null !=include &amp;&amp; include.size() &gt; 0) {</span>
+<span class="fc" id="L281">      String value = StringUtil.join(&quot;,&quot;, include);</span>
+<span class="fc" id="L282">      parameters.put(&quot;include&quot;, value);</span>
+    }
+<span class="pc bpc" id="L284" title="1 of 4 branches missed.">    if (selectedKeys != null &amp;&amp; selectedKeys.size() &gt; 0) {</span>
+<span class="fc" id="L285">      String keys = StringUtil.join(&quot;,&quot;, selectedKeys);</span>
+<span class="fc" id="L286">      parameters.put(&quot;keys&quot;, keys);</span>
+    }
+
+<span class="fc" id="L289">    return parameters;</span>
+  }
+
+  public void addWhereItem(QueryOperation op) {
+<span class="fc" id="L293">    List&lt;QueryOperation&gt; ops = where.get(op.getKey());</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">    if (ops == null) {</span>
+<span class="fc" id="L295">      ops = new LinkedList&lt;QueryOperation&gt;();</span>
+<span class="fc" id="L296">      where.put(op.getKey(), ops);</span>
+    }
+<span class="fc" id="L298">    removeDuplications(op, ops);</span>
+<span class="fc" id="L299">    ops.add(op);</span>
+<span class="fc" id="L300">  }</span>
+
+  public void addWhereItem(String key, String op, Object value) {
+<span class="fc" id="L303">    addWhereItem(new QueryOperation(key, op, value));</span>
+<span class="fc" id="L304">  }</span>
+
+  private void removeDuplications(QueryOperation op, List&lt;QueryOperation&gt; ops) {
+<span class="fc" id="L307">    Iterator&lt;QueryOperation&gt; it = ops.iterator();</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">    while (it.hasNext()) {</span>
+<span class="fc" id="L309">      QueryOperation o = it.next();</span>
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">      if (o.sameOp(op)) {</span>
+<span class="fc" id="L311">        it.remove();</span>
+      }
+<span class="fc" id="L313">    }</span>
+<span class="fc" id="L314">  }</span>
+
+  public void addOrItems(QueryOperation op) {
+<span class="fc" id="L317">    List&lt;QueryOperation&gt; ops = where.get(QueryOperation.OR_OP);</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">    if (ops == null) {</span>
+<span class="fc" id="L319">      ops = new LinkedList&lt;QueryOperation&gt;();</span>
+<span class="fc" id="L320">      where.put(QueryOperation.OR_OP, ops);</span>
+    }
+
+<span class="fc" id="L323">    Iterator&lt;QueryOperation&gt; it = ops.iterator();</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">    while (it.hasNext()) {</span>
+<span class="fc" id="L325">      QueryOperation o = it.next();</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">      if (o.equals(op)) {</span>
+<span class="nc" id="L327">        it.remove();</span>
+      }
+<span class="fc" id="L329">    }</span>
+
+<span class="fc" id="L331">    ops.add(op);</span>
+<span class="fc" id="L332">  }</span>
+
+  public void addAndItems(QueryConditions conditions) {
+<span class="nc" id="L335">    Map&lt;String, Object&gt; queryOperationMap = conditions</span>
+<span class="nc" id="L336">            .compileWhereOperationMap();</span>
+<span class="nc" id="L337">    QueryOperation op = new QueryOperation(&quot;$and&quot;, &quot;$and&quot;, queryOperationMap);</span>
+
+<span class="nc" id="L339">    List&lt;QueryOperation&gt; ops = where.get(QueryOperation.AND_OP);</span>
+<span class="nc bnc" id="L340" title="All 2 branches missed.">    if (ops == null) {</span>
+<span class="nc" id="L341">      ops = new LinkedList&lt;QueryOperation&gt;();</span>
+<span class="nc" id="L342">      where.put(QueryOperation.AND_OP, ops);</span>
+    }
+
+<span class="nc" id="L345">    Iterator&lt;QueryOperation&gt; it = ops.iterator();</span>
+<span class="nc bnc" id="L346" title="All 2 branches missed.">    while (it.hasNext()) {</span>
+<span class="nc" id="L347">      QueryOperation o = it.next();</span>
+<span class="nc bnc" id="L348" title="All 2 branches missed.">      if (o.equals(op)) {</span>
+<span class="nc" id="L349">        it.remove();</span>
+      }
+<span class="nc" id="L351">    }</span>
+<span class="nc" id="L352">    ops.add(op);</span>
+<span class="nc" id="L353">  }</span>
+
+  public void whereWithinRadians(String key, LCGeoPoint point, double maxDistance) {
+<span class="nc" id="L356">    this.whereWithinRadians(key, point, maxDistance, -1);</span>
+<span class="nc" id="L357">  }</span>
+
+  public void whereWithinRadians(String key, LCGeoPoint point, double maxDistance,
+                                 double minDistance) {
+<span class="nc" id="L361">    Map&lt;String, Object&gt; map = LCUtils.createMap(&quot;$nearSphere&quot;, Utils.mapFromGeoPoint(point));</span>
+<span class="nc bnc" id="L362" title="All 2 branches missed.">    if (maxDistance &gt;= 0) {</span>
+<span class="nc" id="L363">      map.put(&quot;$maxDistanceInRadians&quot;, maxDistance);</span>
+    }
+<span class="nc bnc" id="L365" title="All 2 branches missed.">    if (minDistance &gt;= 0) {</span>
+<span class="nc" id="L366">      map.put(&quot;$minDistanceInRadians&quot;, minDistance);</span>
+    }
+<span class="nc" id="L368">    addWhereItem(new QueryOperation(key, null, map));</span>
+<span class="nc" id="L369">  }</span>
+
+  public void whereGreaterThanOrEqualTo(String key, Object value) {
+<span class="fc" id="L372">    addWhereItem(new QueryOperation(key, &quot;$gte&quot;, value));</span>
+<span class="fc" id="L373">  }</span>
+
+  public void whereContainedIn(String key, Collection&lt;? extends Object&gt; values) {
+<span class="fc" id="L376">    this.addWhereItem(key, &quot;$in&quot;, values);</span>
+<span class="fc" id="L377">  }</span>
+
+  public void whereExists(String key) {
+<span class="fc" id="L380">    addWhereItem(key, &quot;$exists&quot;, true);</span>
+<span class="fc" id="L381">  }</span>
+
+  public void whereGreaterThan(String key, Object value) {
+<span class="fc" id="L384">    addWhereItem(key, &quot;$gt&quot;, value);</span>
+<span class="fc" id="L385">  }</span>
+
+  public void whereLessThan(String key, Object value) {
+<span class="fc" id="L388">    addWhereItem(key, &quot;$lt&quot;, value);</span>
+<span class="fc" id="L389">  }</span>
+
+  public void whereLessThanOrEqualTo(String key, Object value) {
+<span class="fc" id="L392">    addWhereItem(key, &quot;$lte&quot;, value);</span>
+<span class="fc" id="L393">  }</span>
+
+  public void whereMatches(String key, String regex) {
+<span class="fc" id="L396">    addWhereItem(key, &quot;$regex&quot;, regex);</span>
+<span class="fc" id="L397">  }</span>
+
+  public void whereMatches(String key, String regex, String modifiers) {
+<span class="nc" id="L400">    addWhereItem(key, &quot;$regex&quot;, regex);</span>
+<span class="nc" id="L401">    addWhereItem(key, &quot;$options&quot;, modifiers);</span>
+<span class="nc" id="L402">  }</span>
+
+  public void whereNear(String key, LCGeoPoint point) {
+<span class="nc" id="L405">    this.addWhereItem(key, &quot;$nearSphere&quot;, Utils.mapFromGeoPoint(point));</span>
+<span class="nc" id="L406">  }</span>
+
+  public void whereNotContainedIn(String key, Collection&lt;? extends Object&gt; values) {
+<span class="fc" id="L409">    this.addWhereItem(key, &quot;$nin&quot;, values);</span>
+<span class="fc" id="L410">  }</span>
+
+  public void whereNotEqualTo(String key, Object value) {
+<span class="fc" id="L413">    this.addWhereItem(key, &quot;$ne&quot;, value);</span>
+<span class="fc" id="L414">  }</span>
+
+  public void whereEqualTo(String key, Object value) {
+<span class="fc bfc" id="L417" title="All 2 branches covered.">    if (value instanceof LCObject) {</span>
+<span class="fc" id="L418">      addWhereItem(key, QueryOperation.EQUAL_OP, Utils.mapFromPointerObject((LCObject) value));</span>
+    } else {
+<span class="fc" id="L420">      addWhereItem(key, QueryOperation.EQUAL_OP, value);</span>
+    }
+<span class="fc" id="L422">  }</span>
+
+  public void whereStartsWith(String key, String prefix) {
+<span class="fc" id="L425">    this.whereMatches(key, String.format(&quot;^%s.*&quot;, prefix));</span>
+<span class="fc" id="L426">  }</span>
+
+  public void whereWithinGeoBox(String key, LCGeoPoint southwest, LCGeoPoint northeast) {
+<span class="nc" id="L429">    List&lt;Map&lt;String, Object&gt;&gt; box = new LinkedList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="nc" id="L430">    box.add(Utils.mapFromGeoPoint(southwest));</span>
+<span class="nc" id="L431">    box.add(Utils.mapFromGeoPoint(northeast));</span>
+<span class="nc" id="L432">    Map&lt;String, Object&gt; map = LCUtils.createMap(&quot;$box&quot;, box);</span>
+<span class="nc" id="L433">    this.addWhereItem(key, &quot;$within&quot;, map);</span>
+<span class="nc" id="L434">  }</span>
+
+  public void whereWithinKilometers(String key, LCGeoPoint point, double maxDistance) {
+<span class="nc" id="L437">    this.whereWithinKilometers(key, point, maxDistance, -1);</span>
+<span class="nc" id="L438">  }</span>
+
+  public void whereWithinKilometers(String key, LCGeoPoint point, double maxDistance,
+                                    double minDistance) {
+<span class="nc" id="L442">    Map&lt;String, Object&gt; map = LCUtils.createMap(&quot;$nearSphere&quot;, Utils.mapFromGeoPoint(point));</span>
+<span class="nc bnc" id="L443" title="All 2 branches missed.">    if (maxDistance &gt;= 0) {</span>
+<span class="nc" id="L444">      map.put(&quot;$maxDistanceInKilometers&quot;, maxDistance);</span>
+    }
+<span class="nc bnc" id="L446" title="All 2 branches missed.">    if (minDistance &gt;= 0) {</span>
+<span class="nc" id="L447">      map.put(&quot;$minDistanceInKilometers&quot;, minDistance);</span>
+    }
+<span class="nc" id="L449">    addWhereItem(key, null, map);</span>
+<span class="nc" id="L450">  }</span>
+
+  public void whereWithinMiles(String key, LCGeoPoint point, double maxDistance) {
+<span class="nc" id="L453">    this.whereWithinMiles(key, point, maxDistance, -1);</span>
+<span class="nc" id="L454">  }</span>
+
+
+  public void whereWithinMiles(String key, LCGeoPoint point, double maxDistance,
+                               double minDistance) {
+<span class="nc" id="L459">    Map&lt;String, Object&gt; map = LCUtils.createMap(&quot;$nearSphere&quot;, Utils.mapFromGeoPoint(point));</span>
+<span class="nc bnc" id="L460" title="All 2 branches missed.">    if (maxDistance &gt;= 0) {</span>
+<span class="nc" id="L461">      map.put(&quot;$maxDistanceInMiles&quot;, maxDistance);</span>
+    }
+<span class="nc bnc" id="L463" title="All 2 branches missed.">    if (minDistance &gt;= 0) {</span>
+<span class="nc" id="L464">      map.put(&quot;$minDistanceInMiles&quot;, minDistance);</span>
+    }
+<span class="nc" id="L466">    addWhereItem(key, null, map);</span>
+<span class="nc" id="L467">  }</span>
+
+  public void whereEndsWith(String key, String suffix) {
+<span class="fc" id="L470">    this.whereMatches(key, String.format(&quot;.*%s$&quot;, suffix));</span>
+<span class="fc" id="L471">  }</span>
+
+  public void whereContains(String key, String substring) {
+<span class="fc" id="L474">    String regex = String.format(&quot;.*%s.*&quot;, substring);</span>
+<span class="fc" id="L475">    whereMatches(key, regex);</span>
+<span class="fc" id="L476">  }</span>
+
+  public void whereSizeEqual(String key, int size) {
+<span class="fc" id="L479">    this.addWhereItem(key, &quot;$size&quot;, size);</span>
+<span class="fc" id="L480">  }</span>
+
+  public void whereContainsAll(String key, Collection&lt;?&gt; values) {
+<span class="fc" id="L483">    addWhereItem(key, &quot;$all&quot;, values);</span>
+<span class="fc" id="L484">  }</span>
+
+  public void whereDoesNotExist(String key) {
+<span class="fc" id="L487">    addWhereItem(key, &quot;$exists&quot;, false);</span>
+<span class="fc" id="L488">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

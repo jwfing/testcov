@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Base64Decoder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.codec</a> &gt; <span class="el_source">Base64Decoder.java</span></div><h1>Base64Decoder.java</h1><pre class="source lang-java linenums">package cn.leancloud.codec;
+
+import java.io.*;
+
+/***
+ * A class to decode Base64 streams and strings. See RFC 1521 section 5.2 for details of the Base64
+ * algorithm.
+ * &lt;p&gt;
+ * This class can be used for decoding strings: &lt;blockquote&gt;
+ *
+ * &lt;pre&gt;
+ * String encoded = &amp;quot;d2VibWFzdGVyOnRyeTJndWVTUw&amp;quot;;
+ * String decoded = Base64Decoder.decode(encoded);
+ * &lt;/pre&gt;
+ *
+ * &lt;/blockquote&gt; or for decoding streams: &lt;blockquote&gt;
+ *
+ * &lt;pre&gt;
+ * InputStream in = new Base64Decoder(System.in);
+ * &lt;/pre&gt;
+ *
+ * &lt;/blockquote&gt;
+ *
+ * @author &lt;b&gt;Jason Hunter&lt;/b&gt;, Copyright &amp;#169; 2000
+ * @version 1.1, 2002/11/01, added decodeToBytes() to better handle binary data (thanks to Sean
+ *          Graham)
+ * @version 1.0, 2000/06/11
+ */
+public class Base64Decoder extends FilterInputStream {
+
+<span class="fc" id="L31">  private static final char[] chars = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L',</span>
+          'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd',
+          'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
+          'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/'};
+
+  // A mapping between char values and six-bit integers
+<span class="fc" id="L37">  private static final int[] ints = new int[128];</span>
+  static {
+<span class="fc bfc" id="L39" title="All 2 branches covered.">    for (int i = 0; i &lt; 64; i++) {</span>
+<span class="fc" id="L40">      ints[chars[i]] = i;</span>
+    }
+<span class="fc" id="L42">  }</span>
+
+  private int charCount;
+  private int carryOver;
+
+  /***
+   * Constructs a new Base64 decoder that reads input from the given InputStream.
+   *
+   * @param in the input stream
+   */
+  public Base64Decoder(InputStream in) {
+<span class="fc" id="L53">    super(in);</span>
+<span class="fc" id="L54">  }</span>
+
+  /***
+   * Returns the next decoded character from the stream, or -1 if end of stream was reached.
+   *
+   * @return the decoded character, or -1 if the end of the input stream is reached
+   * @exception IOException if an I/O error occurs
+   */
+  public int read() throws IOException {
+    // Read the next non-whitespace character
+    int x;
+    do {
+<span class="fc" id="L66">      x = in.read();</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">      if (x == -1) {</span>
+<span class="nc" id="L68">        return -1;</span>
+      }
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">    } while (Character.isWhitespace((char) x));</span>
+<span class="fc" id="L71">    charCount++;</span>
+
+    // The '=' sign is just padding
+<span class="fc bfc" id="L74" title="All 2 branches covered.">    if (x == '=') {</span>
+<span class="fc" id="L75">      return -1; // effective end of stream</span>
+    }
+
+    // Convert from raw form to 6-bit form
+<span class="fc" id="L79">    x = ints[x];</span>
+
+    // Calculate which character we're decoding now
+<span class="fc" id="L82">    int mode = (charCount - 1) % 4;</span>
+
+    // First char save all six bits, go for another
+<span class="fc bfc" id="L85" title="All 2 branches covered.">    if (mode == 0) {</span>
+<span class="fc" id="L86">      carryOver = x &amp; 63;</span>
+<span class="fc" id="L87">      return read();</span>
+    }
+    // Second char use previous six bits and first two new bits,
+    // save last four bits
+<span class="fc bfc" id="L91" title="All 2 branches covered.">    else if (mode == 1) {</span>
+<span class="fc" id="L92">      int decoded = ((carryOver &lt;&lt; 2) + (x &gt;&gt; 4)) &amp; 255;</span>
+<span class="fc" id="L93">      carryOver = x &amp; 15;</span>
+<span class="fc" id="L94">      return decoded;</span>
+    }
+    // Third char use previous four bits and first four new bits,
+    // save last two bits
+<span class="fc bfc" id="L98" title="All 2 branches covered.">    else if (mode == 2) {</span>
+<span class="fc" id="L99">      int decoded = ((carryOver &lt;&lt; 4) + (x &gt;&gt; 2)) &amp; 255;</span>
+<span class="fc" id="L100">      carryOver = x &amp; 3;</span>
+<span class="fc" id="L101">      return decoded;</span>
+    }
+    // Fourth char use previous two bits and all six new bits
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">    else if (mode == 3) {</span>
+<span class="fc" id="L105">      int decoded = ((carryOver &lt;&lt; 6) + x) &amp; 255;</span>
+<span class="fc" id="L106">      return decoded;</span>
+    }
+<span class="nc" id="L108">    return -1; // can't actually reach this line</span>
+  }
+
+  /***
+   * Reads decoded data into an array of bytes and returns the actual number of bytes read, or -1 if
+   * end of stream was reached.
+   *
+   * @param buf the buffer into which the data is read
+   * @param off the start offset of the data
+   * @param len the maximum number of bytes to read
+   * @return the actual number of bytes read, or -1 if the end of the input stream is reached
+   * @exception IOException if an I/O error occurs
+   */
+  public int read(byte[] buf, int off, int len) throws IOException {
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">    if (buf.length &lt; (len + off - 1)) {</span>
+<span class="nc" id="L123">      throw new IOException(&quot;The input buffer is too small: &quot; + len</span>
+              + &quot; bytes requested starting at offset &quot; + off + &quot; while the buffer &quot; + &quot; is only &quot;
+              + buf.length + &quot; bytes long.&quot;);
+    }
+
+    // This could of course be optimized
+    int i;
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">    for (i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L131">      int x = read();</span>
+<span class="fc bfc" id="L132" title="All 4 branches covered.">      if (x == -1 &amp;&amp; i == 0) { // an immediate -1 returns -1</span>
+<span class="fc" id="L133">        return -1;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">      } else if (x == -1) { // a later -1 returns the chars read so far</span>
+<span class="fc" id="L135">        break;</span>
+      }
+<span class="fc" id="L137">      buf[off + i] = (byte) x;</span>
+    }
+<span class="fc" id="L139">    return i;</span>
+  }
+
+  /***
+   * Returns the decoded form of the given encoded string, as a String. Note that not all binary
+   * data can be represented as a String, so this method should only be used for encoded String
+   * data. Use decodeToBytes() otherwise.
+   *
+   * @param encoded the string to decode
+   * @return the decoded form of the encoded string
+   */
+  public static String decode(String encoded) {
+<span class="fc" id="L151">    return new String(decodeToBytes(encoded));</span>
+  }
+
+  /***
+   * Returns the decoded form of the given encoded string, as bytes.
+   *
+   * @param encoded the string to decode
+   * @return the decoded form of the encoded string
+   */
+  public static byte[] decodeToBytes(String encoded) {
+    try {
+<span class="fc" id="L162">      byte[] bytes = encoded.getBytes(&quot;UTF-8&quot;);</span>
+<span class="fc" id="L163">      Base64Decoder in = new Base64Decoder(new ByteArrayInputStream(bytes));</span>
+
+<span class="fc" id="L165">      ByteArrayOutputStream out = new ByteArrayOutputStream((int) (bytes.length * 0.67));</span>
+
+      try {
+<span class="fc" id="L168">        byte[] buf = new byte[4 * 1024]; // 4K buffer</span>
+        int bytesRead;
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        while ((bytesRead = in.read(buf)) != -1) {</span>
+<span class="fc" id="L171">          out.write(buf, 0, bytesRead);</span>
+        }
+<span class="fc" id="L173">        out.close();</span>
+
+<span class="fc" id="L175">        return out.toByteArray();</span>
+<span class="nc" id="L176">      } catch (IOException ignored) {</span>
+<span class="nc" id="L177">        return null;</span>
+      }
+<span class="nc" id="L179">    } catch (UnsupportedEncodingException ignored) {</span>
+<span class="nc" id="L180">      return null;</span>
+    }
+  }
+
+  public static void main(String[] args) throws Exception {
+<span class="nc bnc" id="L185" title="All 2 branches missed.">    if (args.length != 1) {</span>
+<span class="nc" id="L186">      System.err.println(&quot;Usage: java Base64Decoder fileToDecode&quot;);</span>
+<span class="nc" id="L187">      return;</span>
+    }
+
+<span class="nc" id="L190">    Base64Decoder decoder = null;</span>
+    try {
+<span class="nc" id="L192">      decoder = new Base64Decoder(new BufferedInputStream(new FileInputStream(args[0])));</span>
+<span class="nc" id="L193">      byte[] buf = new byte[4 * 1024]; // 4K buffer</span>
+      int bytesRead;
+<span class="nc bnc" id="L195" title="All 2 branches missed.">      while ((bytesRead = decoder.read(buf)) != -1) {</span>
+<span class="nc" id="L196">        System.out.write(buf, 0, bytesRead);</span>
+      }
+    } finally {
+<span class="nc bnc" id="L199" title="All 2 branches missed.">      if (decoder != null) decoder.close();</span>
+    }
+<span class="nc" id="L201">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

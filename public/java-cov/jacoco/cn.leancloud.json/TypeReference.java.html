@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TypeReference.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.json</a> &gt; <span class="el_source">TypeReference.java</span></div><h1>TypeReference.java</h1><pre class="source lang-java linenums">package cn.leancloud.json;
+
+import java.lang.reflect.GenericArrayType;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+public class TypeReference&lt;T&gt; {
+<span class="fc" id="L11">  static ConcurrentMap&lt;Type, Type&gt; classTypeCache = new ConcurrentHashMap(16, 0.75F, 1);</span>
+  protected final Type type;
+
+<span class="fc" id="L14">  protected TypeReference() {</span>
+<span class="fc" id="L15">    Type superClass = this.getClass().getGenericSuperclass();</span>
+<span class="fc" id="L16">    Type type = ((ParameterizedType)superClass).getActualTypeArguments()[0];</span>
+<span class="fc" id="L17">    Type cachedType = (Type)classTypeCache.get(type);</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">    if (cachedType == null) {</span>
+<span class="fc" id="L19">      classTypeCache.putIfAbsent(type, type);</span>
+<span class="fc" id="L20">      cachedType = (Type)classTypeCache.get(type);</span>
+    }
+
+<span class="fc" id="L23">    this.type = cachedType;</span>
+<span class="fc" id="L24">  }</span>
+
+<span class="nc" id="L26">  protected TypeReference(Type... actualTypeArguments) {</span>
+<span class="nc" id="L27">    Class&lt;?&gt; thisClass = this.getClass();</span>
+<span class="nc" id="L28">    Type superClass = thisClass.getGenericSuperclass();</span>
+<span class="nc" id="L29">    ParameterizedType argType = (ParameterizedType)((ParameterizedType)superClass).getActualTypeArguments()[0];</span>
+<span class="nc" id="L30">    Type rawType = argType.getRawType();</span>
+<span class="nc" id="L31">    Type[] argTypes = argType.getActualTypeArguments();</span>
+<span class="nc" id="L32">    int actualIndex = 0;</span>
+
+<span class="nc bnc" id="L34" title="All 2 branches missed.">    for(int i = 0; i &lt; argTypes.length; ++i) {</span>
+<span class="nc bnc" id="L35" title="All 4 branches missed.">      if (argTypes[i] instanceof TypeVariable &amp;&amp; actualIndex &lt; actualTypeArguments.length) {</span>
+<span class="nc" id="L36">        argTypes[i] = actualTypeArguments[actualIndex++];</span>
+      }
+
+<span class="nc bnc" id="L39" title="All 2 branches missed.">      if (argTypes[i] instanceof GenericArrayType) {</span>
+<span class="nc" id="L40">        argTypes[i] = checkPrimitiveArray((GenericArrayType)argTypes[i]);</span>
+      }
+
+<span class="nc bnc" id="L43" title="All 2 branches missed.">      if (argTypes[i] instanceof ParameterizedType) {</span>
+<span class="nc" id="L44">        argTypes[i] = this.handlerParameterizedType((ParameterizedType)argTypes[i], actualTypeArguments, actualIndex);</span>
+      }
+    }
+
+<span class="nc" id="L48">    Type key = new ParameterizedTypeImpl(argTypes, thisClass, rawType);</span>
+<span class="nc" id="L49">    Type cachedType = classTypeCache.get(key);</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">    if (cachedType == null) {</span>
+<span class="nc" id="L51">      classTypeCache.put(key, key);</span>
+<span class="nc" id="L52">      cachedType = classTypeCache.get(key);</span>
+    }
+
+<span class="nc" id="L55">    this.type = cachedType;</span>
+<span class="nc" id="L56">  }</span>
+
+  public static Type checkPrimitiveArray(GenericArrayType genericArrayType) {
+<span class="nc" id="L59">    Type clz = genericArrayType;</span>
+<span class="nc" id="L60">    Type genericComponentType = genericArrayType.getGenericComponentType();</span>
+
+    String prefix;
+<span class="nc bnc" id="L63" title="All 2 branches missed.">    for(prefix = &quot;[&quot;; genericComponentType instanceof GenericArrayType; prefix = prefix + prefix) {</span>
+<span class="nc" id="L64">      genericComponentType = ((GenericArrayType)genericComponentType).getGenericComponentType();</span>
+    }
+
+<span class="nc bnc" id="L67" title="All 2 branches missed.">    if (genericComponentType instanceof Class) {</span>
+<span class="nc" id="L68">      Class&lt;?&gt; ck = (Class)genericComponentType;</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">      if (ck.isPrimitive()) {</span>
+        try {
+<span class="nc bnc" id="L71" title="All 2 branches missed.">          if (ck == Boolean.TYPE) {</span>
+<span class="nc" id="L72">            clz = Class.forName(prefix + &quot;Z&quot;);</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">          } else if (ck == Character.TYPE) {</span>
+<span class="nc" id="L74">            clz = Class.forName(prefix + &quot;C&quot;);</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">          } else if (ck == Byte.TYPE) {</span>
+<span class="nc" id="L76">            clz = Class.forName(prefix + &quot;B&quot;);</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">          } else if (ck == Short.TYPE) {</span>
+<span class="nc" id="L78">            clz = Class.forName(prefix + &quot;S&quot;);</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">          } else if (ck == Integer.TYPE) {</span>
+<span class="nc" id="L80">            clz = Class.forName(prefix + &quot;I&quot;);</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">          } else if (ck == Long.TYPE) {</span>
+<span class="nc" id="L82">            clz = Class.forName(prefix + &quot;J&quot;);</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">          } else if (ck == Float.TYPE) {</span>
+<span class="nc" id="L84">            clz = Class.forName(prefix + &quot;F&quot;);</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">          } else if (ck == Double.TYPE) {</span>
+<span class="nc" id="L86">            clz = Class.forName(prefix + &quot;D&quot;);</span>
+          }
+<span class="nc" id="L88">        } catch (ClassNotFoundException var6) {</span>
+<span class="nc" id="L89">        }</span>
+      }
+    }
+
+<span class="nc" id="L93">    return (Type)clz;</span>
+  }
+
+  private Type handlerParameterizedType(ParameterizedType type, Type[] actualTypeArguments, int actualIndex) {
+<span class="nc" id="L97">    Class&lt;?&gt; thisClass = this.getClass();</span>
+<span class="nc" id="L98">    Type rawType = type.getRawType();</span>
+<span class="nc" id="L99">    Type[] argTypes = type.getActualTypeArguments();</span>
+
+<span class="nc bnc" id="L101" title="All 2 branches missed.">    for(int i = 0; i &lt; argTypes.length; ++i) {</span>
+<span class="nc bnc" id="L102" title="All 4 branches missed.">      if (argTypes[i] instanceof TypeVariable &amp;&amp; actualIndex &lt; actualTypeArguments.length) {</span>
+<span class="nc" id="L103">        argTypes[i] = actualTypeArguments[actualIndex++];</span>
+      }
+
+<span class="nc bnc" id="L106" title="All 2 branches missed.">      if (argTypes[i] instanceof GenericArrayType) {</span>
+<span class="nc" id="L107">        argTypes[i] = checkPrimitiveArray((GenericArrayType)argTypes[i]);</span>
+      }
+
+<span class="nc bnc" id="L110" title="All 2 branches missed.">      if (argTypes[i] instanceof ParameterizedType) {</span>
+<span class="nc" id="L111">        return this.handlerParameterizedType((ParameterizedType)argTypes[i], actualTypeArguments, actualIndex);</span>
+      }
+    }
+
+<span class="nc" id="L115">    Type key = new ParameterizedTypeImpl(argTypes, thisClass, rawType);</span>
+<span class="nc" id="L116">    return key;</span>
+  }
+
+  public Type getType() {
+<span class="fc" id="L120">    return this.type;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

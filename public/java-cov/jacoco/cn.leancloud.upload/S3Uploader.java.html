@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>S3Uploader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.upload</a> &gt; <span class="el_source">S3Uploader.java</span></div><h1>S3Uploader.java</h1><pre class="source lang-java linenums">package cn.leancloud.upload;
+
+import cn.leancloud.LCException;
+import cn.leancloud.LCFile;
+import cn.leancloud.callback.ProgressCallback;
+import cn.leancloud.utils.FileUtil;
+import okhttp3.*;
+
+import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+class S3Uploader extends HttpClientUploader {
+<span class="nc" id="L14">  private static String DEFAULT_HEADER_CACHE_CONTROL = &quot;Cache-Control&quot;;</span>
+<span class="nc" id="L15">  private static String DEFAULT_HEADER_CACHE_CONTROL_VALUE = &quot;public, max-age=31536000&quot;;</span>
+
+  private Call call;
+  private String uploadUrl;
+<span class="nc" id="L19">  private int retryTimes = DEFAULT_RETRY_TIMES;</span>
+
+  /**
+   * 默认的最小写操作时间，单位为秒
+   */
+  private static final int DEFAULT_MIN_WRITE_TIMEOUT = 30;
+
+  /**
+   * 默认的最大写操作时间，单位为秒
+   */
+  private static final int DEFAULT_MAX_WRITE_TIMEOUT = 4 * 60;
+
+  /**
+   * 默认最小的上传速率，50kb 每秒
+   */
+  private static final int DEFAULT_MIN_UPLOAD_RATE = 50 * 1024;
+
+  /**
+   * 写操作时间
+   */
+<span class="nc" id="L39">  private static int writeTimeout = 0;</span>
+
+  S3Uploader(LCFile avFile, String uploadUrl, ProgressCallback progressCallback) {
+<span class="nc" id="L42">    super(avFile, progressCallback);</span>
+<span class="nc" id="L43">    this.uploadUrl = uploadUrl;</span>
+<span class="nc" id="L44">  }</span>
+
+  public LCException execute() {
+    try {
+<span class="nc" id="L48">      byte[] bytes = avFile.getData();</span>
+
+<span class="nc" id="L50">      return executeWithRetry(bytes);</span>
+<span class="nc" id="L51">    } catch (Exception e) {</span>
+<span class="nc" id="L52">      return new LCException(e.getCause());</span>
+    }
+  }
+
+  private LCException executeWithRetry(byte[] data){
+<span class="nc bnc" id="L57" title="All 4 branches missed.">    if (null != data &amp;&amp; data.length &gt; 0) {</span>
+<span class="nc" id="L58">      OkHttpClient.Builder okhttpBuilder = getOKHttpClient().newBuilder();</span>
+
+<span class="nc bnc" id="L60" title="All 2 branches missed.">      int timeout = (writeTimeout &gt; 0 ? writeTimeout : getWriteTimeoutByLength(data.length));</span>
+<span class="nc" id="L61">      okhttpBuilder.writeTimeout(timeout, TimeUnit.SECONDS);</span>
+
+<span class="nc" id="L63">      final OkHttpClient httpClient = okhttpBuilder.build();</span>
+
+<span class="nc" id="L65">      Response response = null;</span>
+<span class="nc" id="L66">      String serverResponse = null;</span>
+      try{
+        // decide file mimetype.
+<span class="nc" id="L69">        String mimeType = FileUtil.getFileMimeType(avFile);</span>
+
+        // upload to s3
+<span class="nc" id="L72">        Request.Builder builder = new Request.Builder();</span>
+<span class="nc" id="L73">        builder.url(uploadUrl);</span>
+        // ================================================================================
+        // setup multi part
+        // ================================================================================
+
+        // support file for future
+
+<span class="nc" id="L80">        RequestBody requestBody = RequestBody.create(MediaType.parse(mimeType), data);</span>
+
+<span class="nc" id="L82">        builder.put(requestBody);</span>
+<span class="nc" id="L83">        builder.addHeader(&quot;Content-Type&quot;, mimeType);</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (!FileUploader.UPLOAD_HEADERS.containsKey(DEFAULT_HEADER_CACHE_CONTROL)) {</span>
+<span class="nc" id="L85">          builder.addHeader(DEFAULT_HEADER_CACHE_CONTROL, DEFAULT_HEADER_CACHE_CONTROL_VALUE);</span>
+        }
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        for (Map.Entry&lt;String, String&gt; entry : FileUploader.UPLOAD_HEADERS.entrySet()) {</span>
+<span class="nc" id="L88">          builder.addHeader(entry.getKey(), entry.getValue());</span>
+<span class="nc" id="L89">        }</span>
+
+        // Send it
+<span class="nc" id="L92">        call = httpClient.newCall(builder.build());</span>
+
+<span class="nc" id="L94">        response = call.execute();</span>
+        // The 204 status code implies no response is needed
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (2 != (response.code() / 100)) {</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">          if(retryTimes&gt;0){</span>
+<span class="nc" id="L98">            retryTimes -- ;</span>
+<span class="nc" id="L99">            executeWithRetry(data);</span>
+          }else {
+<span class="nc" id="L101">            return new LCException(LCException.OTHER_CAUSE, &quot;upload file failure:&quot; + response.code());</span>
+          }
+        }
+<span class="nc" id="L104">      }catch (IOException exception){</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        if(retryTimes &gt;0){</span>
+<span class="nc" id="L106">          retryTimes -- ;</span>
+<span class="nc" id="L107">          return executeWithRetry(data);</span>
+        }else {
+<span class="nc" id="L109">          return new LCException(exception.getCause());</span>
+        }
+<span class="nc" id="L111">      }</span>
+    }
+<span class="nc" id="L113">    return null;</span>
+  }
+
+  /**
+   * 根据文件长度获取写操作超时时间，默认按照 50kb 的速率计算
+   * 最小不超过 30s，最大不超过 240s
+   * @param dataLength
+   * @return
+   */
+  private int getWriteTimeoutByLength(int dataLength) {
+<span class="nc" id="L123">    int writeSecond = dataLength / DEFAULT_MIN_UPLOAD_RATE;</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">    if (writeSecond &lt; DEFAULT_MIN_WRITE_TIMEOUT) {</span>
+<span class="nc" id="L125">      writeSecond = DEFAULT_MIN_WRITE_TIMEOUT;</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">    } else if (writeSecond &gt; DEFAULT_MAX_WRITE_TIMEOUT) {</span>
+<span class="nc" id="L127">      writeSecond = DEFAULT_MAX_WRITE_TIMEOUT;</span>
+    }
+<span class="nc" id="L129">    return writeSecond;</span>
+  }
+
+  /**
+   * Sets the write timeout for s3
+   * @param seconds
+   * @throws LCException
+   */
+  public static void setWriteTimeout(int seconds) throws LCException {
+<span class="nc bnc" id="L138" title="All 2 branches missed.">    if (seconds &lt;= 0) {</span>
+<span class="nc" id="L139">      throw new LCException(new IllegalArgumentException(&quot;Timeout too small&quot;));</span>
+    }
+<span class="nc bnc" id="L141" title="All 2 branches missed.">    if (seconds &gt; 60 * 60) {</span>
+<span class="nc" id="L142">      throw new LCException(new IllegalArgumentException(&quot;Timeout too large&quot;));</span>
+    }
+<span class="nc" id="L144">    writeTimeout = seconds;</span>
+<span class="nc" id="L145">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

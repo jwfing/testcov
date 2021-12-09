@@ -1,0 +1,510 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LCLeaderboard.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud</a> &gt; <span class="el_source">LCLeaderboard.java</span></div><h1>LCLeaderboard.java</h1><pre class="source lang-java linenums">package cn.leancloud;
+
+import cn.leancloud.core.PaasClient;
+import cn.leancloud.utils.StringUtil;
+import io.reactivex.Observable;
+import io.reactivex.functions.Function;
+
+import java.util.*;
+
+public class LCLeaderboard {
+    public static final int INVALID_VERSION = -1;
+    public static final String MEMBER_TYPE_USER = &quot;_User&quot;;
+    public static final String MEMBER_TYPE_ENTITY = &quot;_Entity&quot;;
+
+    static final String ATTR_STATISTIC_NAME = &quot;statisticName&quot;;
+    static final String ATTR_MEMBER_TYPE = &quot;memberType&quot;;
+    static final String ATTR_UPDATE_STRATEGY = &quot;updateStrategy&quot;;
+    static final String ATTR_ORDER = &quot;order&quot;;
+    static final String ATTR_VERSION_CHANGE_INTERVAL = &quot;versionChangeInterval&quot;;
+    static final String ATTR_VERSION = &quot;version&quot;;
+    static final String ATTR_EXPIRED_AT = &quot;expiredAt&quot;;
+
+    // leaderboard order
+<span class="nc" id="L24">    public enum LCLeaderboardOrder {</span>
+<span class="nc" id="L25">        Ascending,</span>
+<span class="nc" id="L26">        Descending</span>
+    }
+<span class="nc" id="L28">    public enum LCLeaderboardUpdateStrategy {</span>
+<span class="nc" id="L29">        Better,</span>
+<span class="nc" id="L30">        Last,</span>
+<span class="nc" id="L31">        Sum</span>
+    }
+<span class="nc" id="L33">    public enum LCLeaderboardVersionChangeInterval {</span>
+<span class="nc" id="L34">        Never,</span>
+<span class="nc" id="L35">        Day,</span>
+<span class="nc" id="L36">        Week,</span>
+<span class="nc" id="L37">        Month</span>
+    }
+<span class="nc" id="L39">    private String memberType = MEMBER_TYPE_USER;</span>
+<span class="nc" id="L40">    private String statisticName = null;</span>
+<span class="nc" id="L41">    private LCLeaderboardOrder order = LCLeaderboardOrder.Ascending;</span>
+<span class="nc" id="L42">    private LCLeaderboardUpdateStrategy updateStrategy = LCLeaderboardUpdateStrategy.Better;</span>
+<span class="nc" id="L43">    private LCLeaderboardVersionChangeInterval versionChangeInterval = LCLeaderboardVersionChangeInterval.Never;</span>
+<span class="nc" id="L44">    private int version = INVALID_VERSION;</span>
+<span class="nc" id="L45">    private Date nextResetAt = null;</span>
+<span class="nc" id="L46">    private Date createdAt = null;</span>
+
+    /**
+     * get statistic name
+     * @return statistic name
+     */
+    public String getStatisticName() {
+<span class="nc" id="L53">        return statisticName;</span>
+    }
+
+    /**
+     * get leaderboard order
+     * @return leaderboard order
+     */
+    public LCLeaderboardOrder getOrder() {
+<span class="nc" id="L61">        return order;</span>
+    }
+
+    /**
+     * get leaderboard update strategy
+     * @return update strategy
+     */
+    public LCLeaderboardUpdateStrategy getUpdateStrategy() {
+<span class="nc" id="L69">        return updateStrategy;</span>
+    }
+
+    /**
+     * get version change interval
+     * @return version change interval
+     */
+    public LCLeaderboardVersionChangeInterval getVersionChangeInterval() {
+<span class="nc" id="L77">        return versionChangeInterval;</span>
+    }
+
+    /**
+     * get version
+     * @return version number
+     */
+    public int getVersion() {
+<span class="nc" id="L85">        return version;</span>
+    }
+
+    /**
+     * get next reset timestamp
+     * @return next reset timestamp
+     */
+    public Date getNextResetAt() {
+<span class="nc" id="L93">        return (Date) nextResetAt.clone();</span>
+    }
+
+    /**
+     * get create timestamp
+     * @return create timestamp
+     */
+    public Date getCreatedAt() {
+<span class="nc" id="L101">        return (Date) createdAt.clone();</span>
+    }
+
+    void setOrder(LCLeaderboardOrder order) {
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        if (null != order) {</span>
+<span class="nc" id="L106">            this.order = order;</span>
+        }
+<span class="nc" id="L108">    }</span>
+
+    void setUpdateStrategy(LCLeaderboardUpdateStrategy updateStrategy) {
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        if (null != updateStrategy) {</span>
+<span class="nc" id="L112">            this.updateStrategy = updateStrategy;</span>
+        }
+<span class="nc" id="L114">    }</span>
+
+    void setVersionChangeInterval(LCLeaderboardVersionChangeInterval versionChangeInterval) {
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        if (null != versionChangeInterval) {</span>
+<span class="nc" id="L118">            this.versionChangeInterval = versionChangeInterval;</span>
+        }
+<span class="nc" id="L120">    }</span>
+
+    public void setVersion(int version) {
+<span class="nc" id="L123">        this.version = version;</span>
+<span class="nc" id="L124">    }</span>
+
+    void setNextResetAt(Date nextResetAt) {
+<span class="nc" id="L127">        this.nextResetAt = nextResetAt;</span>
+<span class="nc" id="L128">    }</span>
+
+    void setCreatedAt(Date createdAt) {
+<span class="nc" id="L131">        this.createdAt = createdAt;</span>
+<span class="nc" id="L132">    }</span>
+
+<span class="nc" id="L134">    private LCLeaderboard(String name) {</span>
+<span class="nc" id="L135">        this.statisticName = name;</span>
+<span class="nc" id="L136">    }</span>
+
+<span class="nc" id="L138">    private LCLeaderboard(String name, String memberType) {</span>
+<span class="nc" id="L139">        this.statisticName = name;</span>
+<span class="nc" id="L140">        this.memberType = memberType;</span>
+<span class="nc" id="L141">    }</span>
+
+    protected static &lt;T extends Enum&lt;T&gt;&gt; T lookup(Class&lt;T&gt; enumType, String name) {
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        for (T item : enumType.getEnumConstants()) {</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">            if (item.name().equalsIgnoreCase(name)) {</span>
+<span class="nc" id="L146">                return item;</span>
+            }
+        }
+<span class="nc" id="L149">        return null;</span>
+    }
+
+<span class="nc" id="L152">    protected LCLeaderboard(LCObject object) {</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        if (null == object) {</span>
+<span class="nc" id="L154">            return;</span>
+        }
+<span class="nc" id="L156">        this.memberType = object.getString(ATTR_MEMBER_TYPE);</span>
+<span class="nc" id="L157">        this.statisticName = object.getString(ATTR_STATISTIC_NAME);</span>
+<span class="nc" id="L158">        String order = object.getString(ATTR_ORDER);</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (!StringUtil.isEmpty(order)) {</span>
+<span class="nc" id="L160">            setOrder(lookup(LCLeaderboardOrder.class, order));</span>
+        }
+<span class="nc" id="L162">        String updateStrategy = object.getString(ATTR_UPDATE_STRATEGY);</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (!StringUtil.isEmpty(updateStrategy)) {</span>
+<span class="nc" id="L164">            setUpdateStrategy(lookup(LCLeaderboardUpdateStrategy.class, updateStrategy));</span>
+        }
+<span class="nc" id="L166">        String versionUpdateInterval = object.getString(ATTR_VERSION_CHANGE_INTERVAL);</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        if (!StringUtil.isEmpty(versionUpdateInterval)) {</span>
+<span class="nc" id="L168">            setVersionChangeInterval(lookup(LCLeaderboardVersionChangeInterval.class, versionUpdateInterval));</span>
+        }
+<span class="nc" id="L170">        int version = object.getInt(ATTR_VERSION);</span>
+<span class="nc" id="L171">        setVersion(version);</span>
+<span class="nc" id="L172">        setNextResetAt(object.getDate(ATTR_EXPIRED_AT));</span>
+<span class="nc" id="L173">        setCreatedAt(object.getCreatedAt());</span>
+<span class="nc" id="L174">    }</span>
+
+    /**
+     * create instance with leaderboard name
+     * @param name leaderboard name
+     * @return instance
+     */
+    public static LCLeaderboard createWithoutData(String name) {
+<span class="nc" id="L182">        return new LCLeaderboard(name);</span>
+    }
+
+    /**
+     * create instance with leaderboard name and type.
+     * @param name leaderboard name
+     * @param memberType leaderboard member type:
+     *                   MEMBER_TYPE_USER(&quot;_User&quot;): leaderboard target is LCUser
+     *                   MEMBER_TYPE_ENTITY(&quot;_Entity&quot;): leaderboard target is any entity
+     *                   LCObject Name: leaderboard target is LCObject
+     * @return
+     */
+    public static LCLeaderboard createWithoutData(String name, String memberType) {
+<span class="nc" id="L195">        return new LCLeaderboard(name, memberType);</span>
+    }
+
+    /**
+     * update user's statistic
+     * @param user user instance
+     * @param values statistics
+     * @return observable instance.
+     */
+    public static Observable&lt;LCStatisticResult&gt; updateStatistic(LCUser user, Map&lt;String, Double&gt; values) {
+<span class="nc" id="L205">        return updateStatistic(user, values, false);</span>
+    }
+
+    /**
+     * update user's statistic
+     * @param user user instance
+     * @param params statistics
+     * @param overwrite overwrite flag
+     * @return observable instance.
+     */
+    public static Observable&lt;LCStatisticResult&gt; updateStatistic(LCUser user, Map&lt;String, Double&gt; params, boolean overwrite) {
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        if (null == user) {</span>
+<span class="nc" id="L217">            return Observable.error(new IllegalArgumentException(&quot;user is null&quot;));</span>
+        }
+<span class="nc bnc" id="L219" title="All 4 branches missed.">        if (null == params || params.size() &lt; 1) {</span>
+<span class="nc" id="L220">            return Observable.error(new IllegalArgumentException(&quot;params is empty&quot;));</span>
+        }
+<span class="nc" id="L222">        List&lt;Map&lt;String, Object&gt;&gt; statistics = new ArrayList&lt;&gt;(params.size());</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        for (Map.Entry entry: params.entrySet()) {</span>
+<span class="nc" id="L224">            Map&lt;String, Object&gt; statistic = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L225">            statistic.put(&quot;statisticName&quot;, entry.getKey());</span>
+<span class="nc" id="L226">            statistic.put(&quot;statisticValue&quot;, entry.getValue());</span>
+<span class="nc" id="L227">            statistics.add(statistic);</span>
+<span class="nc" id="L228">        }</span>
+<span class="nc" id="L229">        return PaasClient.getStorageClient().updateUserStatistics(user, statistics, overwrite);</span>
+    }
+
+    /**
+     * get user's statistics
+     * @param user user instance
+     * @return observable instance.
+     */
+    public static Observable&lt;LCStatisticResult&gt; getUserStatistics(LCUser user) {
+<span class="nc" id="L238">        return getUserStatistics(user, null);</span>
+    }
+
+    /**
+     * get user's statistics
+     * @param user user instance
+     * @param statisticNames statistic names
+     * @return observable instance.
+     */
+    public static Observable&lt;LCStatisticResult&gt; getUserStatistics(LCUser user, List&lt;String&gt; statisticNames) {
+<span class="nc bnc" id="L248" title="All 4 branches missed.">        if (null == user || StringUtil.isEmpty(user.getObjectId())) {</span>
+<span class="nc" id="L249">            return Observable.error(new IllegalArgumentException(&quot;user is invalid.&quot;));</span>
+        }
+<span class="nc" id="L251">        return PaasClient.getStorageClient().getUserStatistics(user.getObjectId(), statisticNames);</span>
+    }
+
+    /**
+     * get member statistics.
+     * @param memberType member type
+     *                   MEMBER_TYPE_USER(&quot;_User&quot;): leaderboard target is LCUser
+     *                   MEMBER_TYPE_ENTITY(&quot;_Entity&quot;): leaderboard target is any entity
+     *                   LCObject Name: leaderboard target is LCObject
+     * @param memberId member objectId
+     * @return observable instance.
+     */
+    public static Observable&lt;LCStatisticResult&gt; getMemberStatistics(String memberType, String memberId) {
+<span class="nc" id="L264">        return getMemberStatistics(memberType, memberId, null);</span>
+    }
+
+    /**
+     * get member statistics
+     * @param memberType member type
+     *                   MEMBER_TYPE_USER(&quot;_User&quot;): leaderboard target is LCUser
+     *                   MEMBER_TYPE_ENTITY(&quot;_Entity&quot;): leaderboard target is any entity
+     *                   LCObject Name: leaderboard target is LCObject
+     * @param memberId member objectId
+     * @param statisticNames statistic names
+     * @return observable instance.
+     */
+    public static Observable&lt;LCStatisticResult&gt; getMemberStatistics(String memberType, String memberId,
+                                                                    List&lt;String&gt; statisticNames) {
+<span class="nc bnc" id="L279" title="All 4 branches missed.">        if (StringUtil.isEmpty(memberType) || StringUtil.isEmpty(memberId)) {</span>
+<span class="nc" id="L280">            return Observable.error(new IllegalArgumentException(&quot;memberType or memberId is invalid.&quot;));</span>
+        }
+<span class="nc bnc" id="L282" title="All 2 branches missed.">        if (MEMBER_TYPE_USER.equalsIgnoreCase(memberType)) {</span>
+<span class="nc" id="L283">            return PaasClient.getStorageClient().getUserStatistics(memberId, statisticNames);</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">        } else if (MEMBER_TYPE_ENTITY.equalsIgnoreCase(memberType)) {</span>
+<span class="nc" id="L285">            return PaasClient.getStorageClient().getEntityStatistics(memberId, statisticNames);</span>
+        } else {
+<span class="nc" id="L287">            return PaasClient.getStorageClient().getObjectStatistics(memberId, statisticNames);</span>
+        }
+    }
+
+    static String convertLeaderboardType(String memberType) {
+<span class="nc" id="L292">        String leaderboardType = null;</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">        if (MEMBER_TYPE_USER.equalsIgnoreCase(memberType)) {</span>
+<span class="nc" id="L294">            leaderboardType = &quot;user&quot;;</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">        } else if (MEMBER_TYPE_ENTITY.equalsIgnoreCase(memberType)) {</span>
+<span class="nc" id="L296">            leaderboardType = &quot;entity&quot;;</span>
+        } else {
+<span class="nc" id="L298">            leaderboardType = &quot;object&quot;;</span>
+        }
+<span class="nc" id="L300">        return leaderboardType;</span>
+    }
+
+    /**
+     * get leaderboard results.
+     * @param skip query offset
+     * @param limit query limit
+     * @param selectMemberKeys select member(user or object) keys(optional)
+     * @param includeStatistics include other statistics(optional)
+     * @return observable instance.
+     */
+    public Observable&lt;LCLeaderboardResult&gt; getResults(int skip, int limit, List&lt;String&gt; selectMemberKeys,
+                                                      List&lt;String&gt; includeStatistics) {
+<span class="nc" id="L313">        return getResults(skip, limit, selectMemberKeys, includeStatistics, false);</span>
+    }
+
+    /**
+     * get leaderboard results.
+     * @param skip query offset
+     * @param limit query limit
+     * @param selectMemberKeys select member(user or object) keys(optional)
+     * @param includeStatistics include other statistics(optional)
+     * @param withCount need count flag(optional)
+     * @return observable instance.
+     */
+    public Observable&lt;LCLeaderboardResult&gt; getResults(int skip, int limit, List&lt;String&gt; selectMemberKeys,
+                                                      List&lt;String&gt; includeStatistics,
+                                                      boolean withCount) {
+<span class="nc bnc" id="L328" title="All 2 branches missed.">        if (StringUtil.isEmpty(this.statisticName)) {</span>
+<span class="nc" id="L329">            return Observable.error(new IllegalArgumentException(&quot;name is empty&quot;));</span>
+        }
+<span class="nc" id="L331">        String leaderboardType = convertLeaderboardType(this.memberType);</span>
+<span class="nc" id="L332">        return PaasClient.getStorageClient().getLeaderboardResults(leaderboardType, this.statisticName,</span>
+                skip, limit, selectMemberKeys, null, includeStatistics, this.version, withCount);
+    }
+
+    /**
+     * get leaderboard results around target id(user, object or entity).
+     * @param targetId target objectId
+     * @param skip query offset
+     * @param limit query limit
+     * @param selectMemberKeys select object keys(optional)
+     * @param includeStatistics include other statistics(optional)
+     * @return observable instance.
+     */
+    public Observable&lt;LCLeaderboardResult&gt; getAroundResults(String targetId, int skip, int limit,
+                                                            List&lt;String&gt; selectMemberKeys,
+                                                            List&lt;String&gt; includeStatistics) {
+<span class="nc bnc" id="L348" title="All 2 branches missed.">        if (StringUtil.isEmpty(this.statisticName)) {</span>
+<span class="nc" id="L349">            return Observable.error(new IllegalArgumentException(&quot;name is empty&quot;));</span>
+        }
+<span class="nc" id="L351">        String leaderboardType = convertLeaderboardType(this.memberType);</span>
+<span class="nc" id="L352">        return PaasClient.getStorageClient().getLeaderboardAroundResults(leaderboardType, this.statisticName, targetId,</span>
+                skip, limit, selectMemberKeys, null, includeStatistics, this.version);
+    }
+
+    /**
+     * create leaderboard with default member type(User).
+     * @param name name
+     * @param order order
+     * @param updateStrategy update strategy.
+     * @param versionChangeInterval version change interval.
+     * @return leaderboard observer.
+     */
+    public static Observable&lt;LCLeaderboard&gt; create(String name, LCLeaderboardOrder order,
+                                                   LCLeaderboardUpdateStrategy updateStrategy,
+                                                   LCLeaderboardVersionChangeInterval versionChangeInterval) {
+<span class="nc" id="L367">        return createWithMemberType(MEMBER_TYPE_USER, name, order, updateStrategy, versionChangeInterval);</span>
+    }
+
+    /**
+     * create leaderboard with customized member type
+     * @param memberType member type
+     * @param name name
+     * @param order order
+     * @param updateStrategy update strategy.
+     * @param versionChangeInterval version change interval.
+     * @return leaderboard observer.
+     */
+    public static Observable&lt;LCLeaderboard&gt; createWithMemberType(String memberType, String name, LCLeaderboardOrder order,
+                                                   LCLeaderboardUpdateStrategy updateStrategy,
+                                                   LCLeaderboardVersionChangeInterval versionChangeInterval) {
+<span class="nc bnc" id="L382" title="All 2 branches missed.">        if (StringUtil.isEmpty(name)) {</span>
+<span class="nc" id="L383">            return Observable.error(new IllegalArgumentException(&quot;name is empty&quot;));</span>
+        }
+<span class="nc" id="L385">        Map&lt;String, Object&gt; params = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L386">        params.put(ATTR_STATISTIC_NAME, name);</span>
+<span class="nc" id="L387">        params.put(ATTR_MEMBER_TYPE, memberType);</span>
+<span class="nc bnc" id="L388" title="All 2 branches missed.">        if (null != order) {</span>
+<span class="nc" id="L389">            params.put(ATTR_ORDER, order.toString().toLowerCase(Locale.ROOT));</span>
+        } else {
+<span class="nc" id="L391">            params.put(ATTR_ORDER, &quot;descending&quot;);</span>
+        }
+<span class="nc bnc" id="L393" title="All 2 branches missed.">        if (null != updateStrategy) {</span>
+<span class="nc" id="L394">            params.put(ATTR_UPDATE_STRATEGY, updateStrategy.toString().toLowerCase(Locale.ROOT));</span>
+        } else {
+<span class="nc" id="L396">            params.put(ATTR_UPDATE_STRATEGY, &quot;better&quot;);</span>
+        }
+<span class="nc bnc" id="L398" title="All 2 branches missed.">        if (null != versionChangeInterval) {</span>
+<span class="nc" id="L399">            params.put(ATTR_VERSION_CHANGE_INTERVAL, versionChangeInterval.toString().toLowerCase(Locale.ROOT));</span>
+        } else {
+<span class="nc" id="L401">            params.put(ATTR_VERSION_CHANGE_INTERVAL, &quot;week&quot;);</span>
+        }
+<span class="nc" id="L403">        return PaasClient.getStorageClient().createLeaderboard(params).map(new Function&lt;LCObject, LCLeaderboard&gt;() {</span>
+            @Override
+            public LCLeaderboard apply(LCObject object) throws Exception {
+<span class="nc" id="L406">                return new LCLeaderboard(object);</span>
+            }
+        });
+    }
+
+    /**
+     * fetch leaderboard with name
+     * @param name leaderboard name
+     * @return leaderboard observer.
+     */
+    public static Observable&lt;LCLeaderboard&gt; fetchByName(String name) {
+<span class="nc bnc" id="L417" title="All 2 branches missed.">        if (StringUtil.isEmpty(name)) {</span>
+<span class="nc" id="L418">            return Observable.error(new IllegalArgumentException(&quot;name is empty&quot;));</span>
+        }
+<span class="nc" id="L420">        return PaasClient.getStorageClient().fetchLeaderboard(name).map(new Function&lt;LCObject, LCLeaderboard&gt;() {</span>
+            @Override
+            public LCLeaderboard apply(LCObject object) throws Exception {
+<span class="nc" id="L423">                return new LCLeaderboard(object);</span>
+            }
+        });
+    }
+
+    /**
+     * reset current leaderboard.
+     * @return boolean observer that always emits true.
+     */
+    public Observable&lt;Boolean&gt; reset() {
+<span class="nc bnc" id="L433" title="All 2 branches missed.">        if (StringUtil.isEmpty(this.statisticName)) {</span>
+<span class="nc" id="L434">            return Observable.error(new IllegalStateException(&quot;statistic name is empty.&quot;));</span>
+        }
+<span class="nc" id="L436">        return PaasClient.getStorageClient().resetLeaderboard(this.statisticName).map(new Function&lt;LCObject, Boolean&gt;() {</span>
+            @Override
+            public Boolean apply(LCObject object) throws Exception {
+<span class="nc" id="L439">                LCLeaderboard.this.setVersion(object.getInt(ATTR_VERSION));</span>
+<span class="nc" id="L440">                Date nextReset = object.getDate(ATTR_EXPIRED_AT);</span>
+<span class="nc bnc" id="L441" title="All 2 branches missed.">                if (null != nextReset) {</span>
+<span class="nc" id="L442">                    LCLeaderboard.this.setNextResetAt(nextReset);</span>
+                }
+<span class="nc" id="L444">                return true;</span>
+            }
+        });
+    }
+
+    /**
+     * update current leaderboard's change interval
+     * @param interval new change interval
+     * @return boolean observer that always emits true.
+     */
+    public Observable&lt;Boolean&gt; updateVersionChangeInterval(final LCLeaderboardVersionChangeInterval interval) {
+<span class="nc bnc" id="L455" title="All 2 branches missed.">        if (StringUtil.isEmpty(this.statisticName)) {</span>
+<span class="nc" id="L456">            return Observable.error(new IllegalStateException(&quot;statistic name is empty.&quot;));</span>
+        }
+<span class="nc bnc" id="L458" title="All 2 branches missed.">        if (null == interval) {</span>
+<span class="nc" id="L459">            return Observable.error(new IllegalArgumentException(&quot;interval is null.&quot;));</span>
+        }
+<span class="nc" id="L461">        Map&lt;String, Object&gt; params = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L462">        params.put(ATTR_VERSION_CHANGE_INTERVAL, interval.toString().toLowerCase(Locale.ROOT));</span>
+<span class="nc" id="L463">        return PaasClient.getStorageClient().updateLeaderboard(this.statisticName, params).map(new Function&lt;LCObject, Boolean&gt;() {</span>
+            @Override
+            public Boolean apply(LCObject object) throws Exception {
+<span class="nc" id="L466">                LCLeaderboard.this.setVersionChangeInterval(interval);</span>
+<span class="nc" id="L467">                Date nextReset = object.getDate(ATTR_EXPIRED_AT);</span>
+<span class="nc bnc" id="L468" title="All 2 branches missed.">                if (null != nextReset) {</span>
+<span class="nc" id="L469">                    LCLeaderboard.this.setNextResetAt(nextReset);</span>
+                }
+<span class="nc" id="L471">                return true;</span>
+            }
+        });
+    }
+
+    /**
+     * update current leaderboard's update strategy.
+     * @param strategy new update strategy.
+     * @return boolean observer that always emits true.
+     */
+    public Observable&lt;Boolean&gt; updateUpdateStrategy(final LCLeaderboardUpdateStrategy strategy) {
+<span class="nc bnc" id="L482" title="All 2 branches missed.">        if (StringUtil.isEmpty(this.statisticName)) {</span>
+<span class="nc" id="L483">            return Observable.error(new IllegalStateException(&quot;statistic name is empty.&quot;));</span>
+        }
+<span class="nc bnc" id="L485" title="All 2 branches missed.">        if (null == strategy) {</span>
+<span class="nc" id="L486">            return Observable.error(new IllegalArgumentException(&quot;strategy is null.&quot;));</span>
+        }
+<span class="nc" id="L488">        Map&lt;String, Object&gt; params = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L489">        params.put(ATTR_UPDATE_STRATEGY, strategy.toString().toLowerCase(Locale.ROOT));</span>
+<span class="nc" id="L490">        return PaasClient.getStorageClient().updateLeaderboard(this.statisticName, params).map(new Function&lt;LCObject, Boolean&gt;() {</span>
+            @Override
+            public Boolean apply(LCObject object) throws Exception {
+<span class="nc" id="L493">                LCLeaderboard.this.setUpdateStrategy(strategy);</span>
+<span class="nc bnc" id="L494" title="All 2 branches missed.">                return null != object;</span>
+            }
+        });
+    }
+
+    /**
+     * destroy current leaderboard.
+     * @return boolean observer that always emits true.
+     */
+    public Observable&lt;Boolean&gt; destroy() {
+<span class="nc bnc" id="L504" title="All 2 branches missed.">        if (StringUtil.isEmpty(this.statisticName)) {</span>
+<span class="nc" id="L505">            return Observable.error(new IllegalStateException(&quot;statistic name is empty.&quot;));</span>
+        }
+<span class="nc" id="L507">        return PaasClient.getStorageClient().destroyLeaderboard(this.statisticName);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

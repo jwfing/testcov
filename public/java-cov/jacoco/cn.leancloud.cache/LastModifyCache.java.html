@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LastModifyCache.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.cache</a> &gt; <span class="el_source">LastModifyCache.java</span></div><h1>LastModifyCache.java</h1><pre class="source lang-java linenums">package cn.leancloud.cache;
+
+import java.util.Collections;
+import java.util.Map;
+import java.util.WeakHashMap;
+
+public class LastModifyCache {
+<span class="nc" id="L8">  private static LastModifyCache INSTANCE = null;</span>
+  public static synchronized LastModifyCache getInstance() {
+<span class="nc bnc" id="L10" title="All 2 branches missed.">    if (null == INSTANCE) {</span>
+<span class="nc" id="L11">      INSTANCE = new LastModifyCache();</span>
+    }
+<span class="nc" id="L13">    return INSTANCE;</span>
+  }
+
+<span class="nc" id="L16">  private boolean lastModifyEnabled = false;</span>
+<span class="nc" id="L17">  private Map&lt;String, String&gt; lastModifyMap = Collections</span>
+<span class="nc" id="L18">          .synchronizedMap(new WeakHashMap&lt;String, String&gt;());</span>
+
+<span class="nc" id="L20">  private LastModifyCache() {</span>
+<span class="nc" id="L21">  }</span>
+
+  public boolean isLastModifyEnabled() {
+<span class="nc" id="L24">    return lastModifyEnabled;</span>
+  }
+
+  public void setLastModifyEnabled(boolean lastModifyEnabled) {
+<span class="nc" id="L28">    this.lastModifyEnabled = lastModifyEnabled;</span>
+<span class="nc" id="L29">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

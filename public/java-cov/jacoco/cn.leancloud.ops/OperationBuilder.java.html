@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OperationBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.ops</a> &gt; <span class="el_source">OperationBuilder.java</span></div><h1>OperationBuilder.java</h1><pre class="source lang-java linenums">package cn.leancloud.ops;
+
+public class OperationBuilder {
+<span class="fc" id="L4">  public enum OperationType {</span>
+<span class="fc" id="L5">    Set,            // 增加属性</span>
+<span class="fc" id="L6">    Delete,         // 删除属性</span>
+<span class="fc" id="L7">    Add,            // 在数组末尾添加对象</span>
+<span class="fc" id="L8">    AddUnique,      // 在数组末尾添加不会重复的对象</span>
+<span class="fc" id="L9">    Remove,         // 从数组中删除对象</span>
+<span class="fc" id="L10">    AddRelation,    // 添加一个关系</span>
+<span class="fc" id="L11">    RemoveRelation, // 删除一个关系</span>
+<span class="fc" id="L12">    Increment,      // 递增</span>
+<span class="fc" id="L13">    Decrement,      // 递减</span>
+<span class="fc" id="L14">    BitAnd,         // 与运算</span>
+<span class="fc" id="L15">    BitOr,          // 或运算</span>
+<span class="fc" id="L16">    BitXor,         // 异或运算</span>
+<span class="fc" id="L17">    Compound,       // 复合运算</span>
+  }
+<span class="fc" id="L19">  public static final OperationBuilder gBuilder = new OperationBuilder();</span>
+  private OperationBuilder() {
+
+  }
+  public BaseOperation create(OperationType type, String field, Object value) {
+<span class="fc" id="L24">    BaseOperation operation = null;</span>
+<span class="pc bpc" id="L25" title="2 of 14 branches missed.">    switch (type) {</span>
+      case Add:
+<span class="fc" id="L27">        operation = new AddOperation(field, value);</span>
+<span class="fc" id="L28">        break;</span>
+      case Set:
+<span class="fc" id="L30">        operation = new SetOperation(field, value);</span>
+<span class="fc" id="L31">        break;</span>
+      case Delete:
+<span class="fc" id="L33">        operation = new DeleteOperation(field);</span>
+<span class="fc" id="L34">        break;</span>
+      case AddRelation:
+<span class="fc" id="L36">        operation = new AddRelationOperation(field, value);</span>
+<span class="fc" id="L37">        break;</span>
+      case AddUnique:
+<span class="fc" id="L39">        operation = new AddUniqueOperation(field, value);</span>
+<span class="fc" id="L40">        break;</span>
+      case Remove:
+<span class="fc" id="L42">        operation = new RemoveOperation(field, value);</span>
+<span class="fc" id="L43">        break;</span>
+      case RemoveRelation:
+<span class="nc" id="L45">        operation = new RemoveRelationOperation(field, value);</span>
+<span class="nc" id="L46">        break;</span>
+      case Increment:
+<span class="fc" id="L48">        operation = new IncrementOperation(field, value);</span>
+<span class="fc" id="L49">        break;</span>
+      case Decrement:
+<span class="fc" id="L51">        operation = new DecrementOperation(field, value);</span>
+<span class="fc" id="L52">        break;</span>
+      case BitAnd:
+<span class="fc" id="L54">        operation = new BitAndOperation(field, value);</span>
+<span class="fc" id="L55">        break;</span>
+      case BitOr:
+<span class="fc" id="L57">        operation = new BitOrOperation(field, value);</span>
+<span class="fc" id="L58">        break;</span>
+      case BitXor:
+<span class="fc" id="L60">        operation = new BitXOROperation(field, value);</span>
+<span class="fc" id="L61">        break;</span>
+      case Compound:
+<span class="fc" id="L63">        operation = new CompoundOperation(field);</span>
+<span class="fc" id="L64">        break;</span>
+      default:
+<span class="nc" id="L66">        operation = new NullOperation(field, value);</span>
+        break;
+    }
+<span class="fc" id="L69">    return operation;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

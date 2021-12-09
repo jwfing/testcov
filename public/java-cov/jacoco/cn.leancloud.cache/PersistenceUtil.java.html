@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PersistenceUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.cache</a> &gt; <span class="el_source">PersistenceUtil.java</span></div><h1>PersistenceUtil.java</h1><pre class="source lang-java linenums">package cn.leancloud.cache;
+
+import cn.leancloud.LCLogger;
+import cn.leancloud.utils.LogUtil;
+import cn.leancloud.utils.StringUtil;
+
+import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+public class PersistenceUtil {
+<span class="fc" id="L16">  private static final LCLogger gLogger = LogUtil.getLogger(PersistenceUtil.class);</span>
+
+<span class="fc" id="L18">  private static PersistenceUtil INSTANCE = new PersistenceUtil();</span>
+  public static final int MAX_FILE_BUF_SIZE = 1024*1024*2;
+
+<span class="fc" id="L21">  private ConcurrentMap&lt;String, ReentrantReadWriteLock&gt; fileLocks =</span>
+          new ConcurrentHashMap&lt;String, ReentrantReadWriteLock&gt;();
+
+<span class="fc" id="L24">  private PersistenceUtil() {</span>
+<span class="fc" id="L25">  }</span>
+
+  public static PersistenceUtil sharedInstance() {
+<span class="fc" id="L28">    return INSTANCE;</span>
+  }
+
+  public ReentrantReadWriteLock getLock(String path) {
+<span class="fc" id="L32">    ReentrantReadWriteLock lock = fileLocks.get(path);</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">    if (lock == null) {</span>
+<span class="fc" id="L34">      lock = new ReentrantReadWriteLock();</span>
+<span class="fc" id="L35">      ReentrantReadWriteLock oldLock = fileLocks.putIfAbsent(path, lock);</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">      if (oldLock != null) {</span>
+<span class="nc" id="L37">        lock = oldLock;</span>
+      }
+    }
+<span class="fc" id="L40">    return lock;</span>
+  }
+
+  public void removeLock(String path) {
+<span class="fc" id="L44">    fileLocks.remove(path);</span>
+<span class="fc" id="L45">  }</span>
+
+  static void closeQuietly(Closeable closeable) {
+    try {
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">      if (closeable != null) closeable.close();</span>
+<span class="nc" id="L50">    } catch (IOException e) {</span>
+      //do nothing
+<span class="nc" id="L52">      gLogger.w(&quot;failed to close &quot; + closeable + &quot;, cause: &quot; + e.getMessage());</span>
+<span class="fc" id="L53">    }</span>
+<span class="fc" id="L54">  }</span>
+  public boolean saveContentToFile(String content, File fileForSave) {
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">    if (null == fileForSave) {</span>
+<span class="nc" id="L57">      return false;</span>
+    }
+    try {
+<span class="fc" id="L60">      return saveContentToFile(content.getBytes(&quot;utf-8&quot;), fileForSave);</span>
+<span class="nc" id="L61">    } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L62">      return false;</span>
+    }
+  }
+
+  public boolean saveContentToFile(byte[] content, File fileForSave) {
+<span class="fc" id="L67">    boolean succeed = true;</span>
+<span class="fc" id="L68">    FileOutputStream out = null;</span>
+<span class="fc" id="L69">    Lock writeLock = getLock(fileForSave.getAbsolutePath()).writeLock();</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">    if (writeLock.tryLock()) {</span>
+<span class="fc" id="L71">      gLogger.d(&quot;obtained writeLock for file: &quot; + fileForSave.getAbsolutePath());</span>
+      try {
+<span class="fc" id="L73">        out = new FileOutputStream(fileForSave, false);</span>
+<span class="fc" id="L74">        out.write(content);</span>
+<span class="fc" id="L75">        out.flush();</span>
+<span class="nc" id="L76">      } catch (Exception e) {</span>
+<span class="nc" id="L77">        succeed = false;</span>
+      } finally {
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (out != null) {</span>
+<span class="fc" id="L80">          closeQuietly(out);</span>
+        }
+<span class="fc" id="L82">        writeLock.unlock();</span>
+<span class="fc" id="L83">        gLogger.d(&quot;release writeLock for file: &quot; + fileForSave.getAbsolutePath());</span>
+<span class="fc" id="L84">      }</span>
+    } else {
+<span class="nc" id="L86">      gLogger.w(&quot;failed to lock writeLocker, skip save content to file:&quot; + fileForSave.getAbsolutePath());</span>
+    }
+
+<span class="fc" id="L89">    return succeed;</span>
+  }
+
+  public String readContentFromFile(File fileForRead) {
+<span class="fc" id="L93">    byte[] data = this.readContentBytesFromFile(fileForRead);</span>
+<span class="pc bpc" id="L94" title="2 of 4 branches missed.">    if (null == data || data.length &lt; 1) {</span>
+<span class="nc" id="L95">      return &quot;&quot;;</span>
+    } else {
+<span class="fc" id="L97">      return StringUtil.stringFromBytes(data);</span>
+    }
+  }
+
+  public byte[] readContentBytesFromFile(File fileForRead) {
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">    if (fileForRead == null) {</span>
+<span class="nc" id="L103">      return null;</span>
+    };
+<span class="pc bpc" id="L105" title="1 of 4 branches missed.">    if (!fileForRead.exists() || !fileForRead.isFile()) {</span>
+<span class="fc" id="L106">      return null;</span>
+    }
+<span class="fc" id="L108">    InputStream input = null;</span>
+<span class="fc" id="L109">    Lock readLock = getLock(fileForRead.getAbsolutePath()).readLock();</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">    if (readLock.tryLock()) {</span>
+<span class="fc" id="L111">      gLogger.d(&quot;obtained read lock for file: &quot; +fileForRead.getAbsolutePath());</span>
+      try {
+<span class="fc" id="L113">        byte[] data = null;</span>
+<span class="fc" id="L114">        data = new byte[(int) fileForRead.length()];</span>
+<span class="fc" id="L115">        int totalBytesRead = 0;</span>
+<span class="fc" id="L116">        input = new BufferedInputStream(new FileInputStream(fileForRead), 8192);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        while (totalBytesRead &lt; data.length) {</span>
+<span class="fc" id="L118">          int bytesRemaining = data.length - totalBytesRead;</span>
+<span class="fc" id="L119">          int bytesRead = input.read(data, totalBytesRead, bytesRemaining);</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">          if (bytesRead &gt; 0) {</span>
+<span class="fc" id="L121">            totalBytesRead = totalBytesRead + bytesRead;</span>
+          }
+<span class="fc" id="L123">        }</span>
+<span class="fc" id="L124">        return data;</span>
+<span class="nc" id="L125">      } catch (IOException e) {</span>
+<span class="nc" id="L126">        gLogger.w(e);</span>
+      } finally {
+<span class="fc" id="L128">        closeQuietly(input);</span>
+<span class="fc" id="L129">        readLock.unlock();</span>
+<span class="fc" id="L130">        gLogger.d(&quot;release read lock for file: &quot; +fileForRead.getAbsolutePath());</span>
+<span class="nc" id="L131">      }</span>
+    } else {
+<span class="nc" id="L133">      gLogger.w(&quot;failed to lock readLocker, return empty result.&quot;);</span>
+    }
+<span class="nc" id="L135">    return new byte[0];</span>
+  }
+
+  public boolean deleteFile(String localPath) {
+<span class="fc" id="L139">    return deleteFile(new File(localPath));</span>
+  }
+
+  public boolean forceDeleteFile(File localFile) {
+<span class="pc bpc" id="L143" title="2 of 4 branches missed.">    if (null == localFile || !localFile.exists()) {</span>
+<span class="nc" id="L144">      return false;</span>
+    }
+<span class="fc" id="L146">    return localFile.delete();</span>
+  }
+
+  public boolean deleteFile(File localFile) {
+<span class="pc bpc" id="L150" title="1 of 4 branches missed.">    if (null == localFile || !localFile.exists()) {</span>
+<span class="fc" id="L151">      return false;</span>
+    }
+<span class="fc" id="L153">    boolean result = true;</span>
+<span class="fc" id="L154">    Lock writeLock = getLock(localFile.getAbsolutePath()).writeLock();</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">    if (writeLock.tryLock()) {</span>
+<span class="fc" id="L156">      result = localFile.delete();</span>
+<span class="fc" id="L157">      writeLock.unlock();</span>
+<span class="fc" id="L158">      gLogger.d(&quot;succeed to obtain writeLock, and delete file: &quot; + localFile.getAbsolutePath() + &quot;, ret: &quot; + result);</span>
+    } else {
+<span class="nc" id="L160">      gLogger.w(&quot;failed to lock writeLocker, skip to delete file:&quot; + localFile.getAbsolutePath());</span>
+<span class="nc" id="L161">      result = false;</span>
+    }
+<span class="fc" id="L163">    return result;</span>
+  }
+
+  public boolean saveFileToLocal(String localPath, File inputFile) {
+<span class="nc" id="L167">    boolean succeed = false;</span>
+<span class="nc" id="L168">    FileOutputStream os = null;</span>
+<span class="nc" id="L169">    InputStream is = null;</span>
+
+<span class="nc" id="L171">    Lock writeLock = getLock(localPath).writeLock();</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">    if (writeLock.tryLock()) {</span>
+      try {
+<span class="nc" id="L174">        is = getInputStreamFromFile(inputFile);</span>
+<span class="nc" id="L175">        os = getOutputStreamForFile(new File(localPath), false);</span>
+<span class="nc" id="L176">        byte buf[] = new byte[MAX_FILE_BUF_SIZE];</span>
+<span class="nc" id="L177">        int len  = 0;</span>
+<span class="nc bnc" id="L178" title="All 4 branches missed.">        if (null != is &amp;&amp; null != os) {</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">          while ((len = is.read(buf)) != -1) {</span>
+<span class="nc" id="L180">            os.write(buf, 0, len);</span>
+          }
+<span class="nc" id="L182">          succeed = true;</span>
+        }
+<span class="nc" id="L184">      } catch (Exception ex) {</span>
+<span class="nc" id="L185">        succeed = false;</span>
+      } finally {
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        if (null != is) {</span>
+<span class="nc" id="L188">          closeQuietly(is);</span>
+        }
+<span class="nc bnc" id="L190" title="All 2 branches missed.">        if (null != os) {</span>
+<span class="nc" id="L191">          closeQuietly(os);</span>
+        }
+      }
+<span class="nc" id="L194">      writeLock.unlock();</span>
+    } else {
+<span class="nc" id="L196">      gLogger.w(&quot;failed to lock writeLocker, skip save content to file:&quot; + localPath);</span>
+    }
+
+<span class="nc" id="L199">    return succeed;</span>
+  }
+
+  public static FileOutputStream getOutputStreamForFile(File fileForWrite, boolean append) throws IOException {
+<span class="nc bnc" id="L203" title="All 2 branches missed.">    if (null == fileForWrite) {</span>
+<span class="nc" id="L204">      return null;</span>
+    }
+<span class="nc" id="L206">    return new FileOutputStream(fileForWrite, append);</span>
+  }
+
+  public static InputStream getInputStreamFromFile(File fileForRead) throws IOException{
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">    if (fileForRead == null) {</span>
+<span class="nc" id="L211">      return null;</span>
+    };
+<span class="pc bpc" id="L213" title="2 of 4 branches missed.">    if (!fileForRead.exists() || !fileForRead.isFile()) {</span>
+<span class="nc" id="L214">      return null;</span>
+    }
+<span class="fc" id="L216">    return new BufferedInputStream(new FileInputStream(fileForRead), 8192);</span>
+  }
+
+  public static List&lt;File&gt; listFiles(String dirPath) {
+<span class="fc" id="L220">    List&lt;File&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L221">    File dir = new File(dirPath);</span>
+<span class="pc bpc" id="L222" title="2 of 4 branches missed.">    if (!dir.exists() || !dir.isDirectory()) {</span>
+<span class="nc" id="L223">      return result;</span>
+    }
+<span class="fc" id="L225">    File[] files = dir.listFiles();</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">    if (null != files) {</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">      for (File f: files) {</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">        if (!f.isFile()) {</span>
+<span class="nc" id="L229">          continue;</span>
+        }
+<span class="nc" id="L231">        result.add(f);</span>
+      }
+    }
+<span class="fc" id="L234">    return result;</span>
+  }
+
+  public void clearDir(String dirPath, long lastModified) {
+<span class="fc" id="L238">    File dir = new File(dirPath);</span>
+<span class="pc bpc" id="L239" title="2 of 4 branches missed.">    if (!dir.exists() || !dir.isDirectory()) {</span>
+<span class="nc" id="L240">      return;</span>
+    }
+<span class="fc" id="L242">    File[] files = dir.listFiles();</span>
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">    if (null != files) {</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">      for (File f: files) {</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        if (f.isFile()) {</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">          if (f.lastModified() &lt; lastModified) {</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">            if (deleteFile(f)) {</span>
+<span class="fc" id="L248">              gLogger.d(&quot;succeed to delete file: &quot; + f.getAbsolutePath());</span>
+            } else {
+<span class="nc" id="L250">              gLogger.d(&quot;failed to delete file: &quot; + f.getAbsolutePath());</span>
+            }
+          } else {
+<span class="nc" id="L253">            gLogger.d(&quot;skip cache file: &quot; + f.getAbsolutePath());</span>
+          }
+<span class="nc bnc" id="L255" title="All 2 branches missed.">        } else if (f.isDirectory()) {</span>
+<span class="nc" id="L256">          clearDir(f.getAbsolutePath(), lastModified);</span>
+        }
+      }
+    }
+<span class="fc" id="L260">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

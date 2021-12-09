@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LCSearchSortBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.search</a> &gt; <span class="el_source">LCSearchSortBuilder.java</span></div><h1>LCSearchSortBuilder.java</h1><pre class="source lang-java linenums">package cn.leancloud.search;
+
+import cn.leancloud.types.LCGeoPoint;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+<span class="fc" id="L10">public class LCSearchSortBuilder {</span>
+<span class="fc" id="L11">  private final List&lt;Object&gt; sortFields = new ArrayList&lt;Object&gt;();</span>
+
+  public static LCSearchSortBuilder newBuilder() {
+<span class="fc" id="L14">    return new LCSearchSortBuilder();</span>
+  }
+
+  /**
+   * 按照key升序排序
+   *
+   * @param key     排序的key
+   * @param mode    数组或者多值字段的排序模式，min表示取最小值，max取最大值，sum取综合，avg取平均值，默认值是avg。
+   * @param missing 当搜索匹配的文档没有排序的key的时候，设置本选项决定文档放在开头还是末尾，取值是&quot;last&quot;或者&quot;first&quot;，
+   *                默认是&quot;last&quot;表示在末尾。
+   * @return Returns current object, so you can chain this call.
+   */
+  public LCSearchSortBuilder orderByAscending(String key, String mode, String missing) {
+<span class="fc" id="L27">    return addField(key, &quot;asc&quot;, mode, missing);</span>
+  }
+
+  /**
+   * @param key sort key
+   * @param mode sort mode
+   * @return Returns current object, so you can chain this call.
+   * @see #orderByAscending(String, String, String)
+   */
+  public LCSearchSortBuilder orderByAscending(String key, String mode) {
+<span class="fc" id="L37">    return orderByAscending(key, mode, &quot;last&quot;);</span>
+  }
+
+  /**
+   * @param key sort key
+   * @return Returns current object, so you can chain this call.
+   * @see #orderByAscending(String, String, String)
+   */
+  public LCSearchSortBuilder orderByAscending(String key) {
+<span class="fc" id="L46">    return orderByAscending(key, &quot;avg&quot;);</span>
+  }
+
+  /**
+   * 按照key降序排序
+   *
+   * @param key     排序的key
+   * @param mode    数组或者多值字段的排序模式，min表示取最小值，max取最大值，sum取综合，avg取平均值，默认值是avg。
+   * @param missing 当搜索匹配的文档没有排序的key的时候，设置本选项决定文档放在开头还是末尾，取值是&quot;last&quot;或者&quot;first&quot;，
+   *                默认是&quot;last&quot;表示在末尾。
+   * @return Returns current object, so you can chain this call.
+   */
+  public LCSearchSortBuilder orderByDescending(String key, String mode, String missing) {
+<span class="nc" id="L59">    return addField(key, &quot;desc&quot;, mode, missing);</span>
+  }
+
+  /**
+   * @param key sort key
+   * @param mode sort mode
+   * @return Returns current object, so you can chain this call.
+   * @see #orderByDescending(String, String, String)
+   */
+  public LCSearchSortBuilder orderByDescending(String key, String mode) {
+<span class="nc" id="L69">    return orderByDescending(key, mode, &quot;last&quot;);</span>
+  }
+
+  /**
+   * @param key sort key
+   * @return Returns current object, so you can chain this call.
+   * @see #orderByDescending(String, String, String)
+   */
+  public LCSearchSortBuilder orderByDescending(String key) {
+<span class="nc" id="L78">    return orderByDescending(key, &quot;avg&quot;);</span>
+  }
+
+  private LCSearchSortBuilder addField(String key, String order, String mode, String missing) {
+<span class="fc" id="L82">    Map&lt;String, Map&lt;String, String&gt;&gt; field = new HashMap&lt;String, Map&lt;String, String&gt;&gt;();</span>
+<span class="fc" id="L83">    Map&lt;String, String&gt; map = new HashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L84">    map.put(&quot;order&quot;, order);</span>
+<span class="fc" id="L85">    map.put(&quot;mode&quot;, mode);</span>
+<span class="fc" id="L86">    map.put(&quot;missing&quot;, &quot;_&quot; + missing);</span>
+<span class="fc" id="L87">    field.put(key, map);</span>
+<span class="fc" id="L88">    sortFields.add(field);</span>
+<span class="fc" id="L89">    return this;</span>
+  }
+
+  public LCSearchSortBuilder whereNear(String key, LCGeoPoint point) {
+<span class="fc" id="L93">    return this.whereNear(key, point, &quot;asc&quot;);</span>
+  }
+
+  public LCSearchSortBuilder whereNear(String key, LCGeoPoint point, String order) {
+<span class="fc" id="L97">    return this.whereNear(key, point, order, &quot;avg&quot;, &quot;km&quot;);</span>
+  }
+
+  /**
+   * 按照地理位置信息远近排序,key对应的字段类型必须是GeoPoint。
+   *
+   * @param key   排序的字段key
+   * @param point GeoPoint经纬度对象
+   * @param order 排序顺序，升序&quot;asc&quot;，降序&quot;desc&quot;，默认升序，也就是从近到远。
+   * @param mode  数组或者多值字段的排序模式，min表示取最小值，max取最大值，avg取平均值，默认值是avg。
+   * @param unit  距离单位，&quot;m&quot;表示米，&quot;cm&quot;表示厘米，&quot;mm&quot;表示毫米，&quot;km&quot;表示公里，&quot;mi&quot;表示英里，&quot;in&quot;表示英寸，&quot;yd&quot;表示英亩，默认&quot;km&quot;。
+   * @return Returns current object, so you can chain this call.
+   */
+  public LCSearchSortBuilder whereNear(String key, LCGeoPoint point, String order, String mode,
+                                       String unit) {
+<span class="fc" id="L112">    Map&lt;String, Map&lt;String, Object&gt;&gt; field = new HashMap&lt;String, Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc" id="L113">    Map&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L114">    Map&lt;String, Double&gt; geoMap = new HashMap&lt;String, Double&gt;();</span>
+<span class="fc" id="L115">    geoMap.put(&quot;lat&quot;, point.getLatitude());</span>
+<span class="fc" id="L116">    geoMap.put(&quot;lon&quot;, point.getLongitude());</span>
+<span class="fc" id="L117">    map.put(key, geoMap);</span>
+<span class="fc" id="L118">    map.put(&quot;unit&quot;, unit);</span>
+<span class="fc" id="L119">    map.put(&quot;mode&quot;, mode);</span>
+<span class="fc" id="L120">    map.put(&quot;order&quot;, order);</span>
+<span class="fc" id="L121">    field.put(&quot;_geo_distance&quot;, map);</span>
+<span class="fc" id="L122">    sortFields.add(field);</span>
+<span class="fc" id="L123">    return this;</span>
+  }
+
+  public List&lt;Object&gt; getSortFields() {
+<span class="fc" id="L127">    return sortFields;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

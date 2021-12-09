@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileUploader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.upload</a> &gt; <span class="el_source">FileUploader.java</span></div><h1>FileUploader.java</h1><pre class="source lang-java linenums">package cn.leancloud.upload;
+
+import cn.leancloud.*;
+import cn.leancloud.LCFile;
+import cn.leancloud.callback.ProgressCallback;
+import cn.leancloud.core.PaasClient;
+import cn.leancloud.utils.LogUtil;
+import cn.leancloud.utils.StringUtil;
+import cn.leancloud.json.JSONObject;
+
+import java.util.*;
+
+public class FileUploader extends HttpClientUploader {
+<span class="fc" id="L14">  private static LCLogger logger = LogUtil.getLogger(FileUploader.class);</span>
+
+  static final int gProgressGotToken = 10;
+  static final int gProgressUploadedFile = 90;
+  static final int gProgressComplete = 100;
+  static final String gProviderQCloud = &quot;qcloud&quot;;
+  static final String gProviderS3 = &quot;s3&quot;;
+
+  private String token;
+  private String bucket;
+  private String uploadUrl;
+  private String provider;
+
+  public FileUploader(LCFile avFile, FileUploadToken uploadToken, ProgressCallback progressCallback) {
+<span class="fc" id="L28">    super(avFile, progressCallback);</span>
+<span class="fc" id="L29">    this.token = uploadToken.getToken();</span>
+<span class="fc" id="L30">    this.bucket = uploadToken.getBucket();</span>
+<span class="fc" id="L31">    this.uploadUrl = uploadToken.getUploadUrl();</span>
+<span class="fc" id="L32">    this.provider = uploadToken.getProvider();</span>
+<span class="fc" id="L33">  }</span>
+
+  public LCException execute() {
+<span class="fc" id="L36">    publishProgress(gProgressGotToken);</span>
+<span class="fc" id="L37">    Uploader uploader = getUploaderImplementation();</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">    if (null == uploader) {</span>
+<span class="nc" id="L39">      return new LCException(new Throwable(&quot;Uploader can not be instantiated.&quot;));</span>
+    }
+
+<span class="fc" id="L42">    LCException uploadException = uploader.execute();</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">    if (uploadException == null) {</span>
+<span class="fc" id="L44">      publishProgress(gProgressComplete);</span>
+<span class="fc" id="L45">      completeFileUpload(true);</span>
+<span class="fc" id="L46">      return null;</span>
+    } else {
+<span class="nc" id="L48">      completeFileUpload(false);</span>
+<span class="nc" id="L49">      return uploadException;</span>
+    }
+  }
+
+  private Uploader getUploaderImplementation() {
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(provider)) {</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">      if (gProviderQCloud.equalsIgnoreCase(provider)) {</span>
+<span class="nc" id="L56">        return new QCloudUploader(avFile, token, uploadUrl, progressCallback);</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">      } else if (gProviderS3.equalsIgnoreCase(provider)) {</span>
+<span class="nc" id="L58">        return new S3Uploader(avFile, uploadUrl, progressCallback);</span>
+      } else {
+<span class="fc" id="L60">        return new QiniuSlicingUploader(avFile, token, uploadUrl, progressCallback);</span>
+      }
+    } else {
+<span class="nc" id="L63">      logger.w(&quot;provider doesnot exist, cannot upload any file.&quot;);</span>
+<span class="nc" id="L64">      return null;</span>
+    }
+  }
+
+  private void completeFileUpload(boolean success){
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(token)) {</span>
+      try {
+<span class="fc" id="L71">        JSONObject completeResult = JSONObject.Builder.create(null);</span>
+<span class="fc" id="L72">        completeResult.put(&quot;result&quot;,success);</span>
+<span class="fc" id="L73">        completeResult.put(&quot;token&quot;,this.token);</span>
+<span class="fc" id="L74">        PaasClient.getStorageClient().fileCallback (null, completeResult);</span>
+<span class="nc" id="L75">      } catch (Exception e) {</span>
+        // ignore
+<span class="fc" id="L77">      }</span>
+    }
+<span class="fc" id="L79">  }</span>
+
+  protected static class ProgressCalculator {
+<span class="fc" id="L82">    Map&lt;Integer, Integer&gt; blockProgress = new HashMap&lt;Integer, Integer&gt;();</span>
+    FileUploadProgressCallback callback;
+<span class="fc" id="L84">    int fileBlockCount = 0;</span>
+
+<span class="fc" id="L86">    public ProgressCalculator(int blockCount, FileUploadProgressCallback callback) {</span>
+<span class="fc" id="L87">      this.callback = callback;</span>
+<span class="fc" id="L88">      this.fileBlockCount = blockCount;</span>
+<span class="fc" id="L89">    }</span>
+
+    public synchronized void publishProgress(int offset, int progress) {
+<span class="fc" id="L92">      blockProgress.put(offset, progress);</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">      if (callback != null) {</span>
+<span class="fc" id="L94">        int progressSum = 0;</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        for (Map.Entry&lt;Integer, Integer&gt; entry: blockProgress.entrySet()) {</span>
+<span class="fc" id="L96">          progressSum += entry.getValue();</span>
+<span class="fc" id="L97">        }</span>
+<span class="fc" id="L98">        callback.onProgress(gProgressGotToken + (gProgressUploadedFile - gProgressGotToken)</span>
+                * progressSum / (100 * fileBlockCount));
+      }
+<span class="fc" id="L101">    }</span>
+  }
+
+  public static void setUploadHeader(String key, String value) {
+<span class="nc" id="L105">    UPLOAD_HEADERS.put(key, value);</span>
+<span class="nc" id="L106">  }</span>
+
+  public static interface FileUploadProgressCallback {
+    void onProgress(int progress);
+  }
+<span class="fc" id="L111">  static HashMap&lt;String, String&gt; UPLOAD_HEADERS = new HashMap&lt;String, String&gt;();</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

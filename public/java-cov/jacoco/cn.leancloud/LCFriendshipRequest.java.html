@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LCFriendshipRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud</a> &gt; <span class="el_source">LCFriendshipRequest.java</span></div><h1>LCFriendshipRequest.java</h1><pre class="source lang-java linenums">package cn.leancloud;
+
+import cn.leancloud.annotation.LCClassName;
+import cn.leancloud.utils.ErrorUtils;
+import io.reactivex.Observable;
+
+import java.util.Map;
+
+@LCClassName(&quot;_FriendshipRequest&quot;)
+public class LCFriendshipRequest extends LCObject {
+  public static final String CLASS_NAME = &quot;_FriendshipRequest&quot;;
+  public static final String ATTR_FRIEND = &quot;friend&quot;;
+  public static final String ATTR_USER = &quot;user&quot;;
+  public static final String ATTR_STATUS = &quot;status&quot;;
+
+  public static final String INTERNAL_STATUS_ACCEPTED = &quot;accepted&quot;;
+  public static final String INTERNAL_STATUS_DECLINED = &quot;declined&quot;;
+  public static final int STATUS_PENDING = 0x01;
+  public static final int STATUS_ACCEPTED = 0x02;
+  public static final int STATUS_DECLINED = 0x04;
+  public static final int STATUS_ANY = STATUS_PENDING | STATUS_ACCEPTED | STATUS_DECLINED;
+
+<span class="fc" id="L23">  enum RequestStatus {</span>
+<span class="fc" id="L24">    Pending, Accepted, Declined</span>
+  }
+
+  public LCFriendshipRequest() {
+<span class="fc" id="L28">    super(CLASS_NAME);</span>
+<span class="fc" id="L29">  }</span>
+
+  public LCFriendshipRequest(LCFriendshipRequest other) {
+<span class="nc" id="L32">    super(other);</span>
+<span class="nc" id="L33">  }</span>
+
+  public void setFriend(LCUser user) {
+<span class="nc" id="L36">    put(ATTR_FRIEND, user);</span>
+<span class="nc" id="L37">  }</span>
+
+  public LCUser getFriend() {
+<span class="nc" id="L40">    return getLCObject(ATTR_FRIEND);</span>
+  }
+
+  public LCUser getSourceUser() {
+<span class="nc" id="L44">    return getLCObject(ATTR_USER);</span>
+  }
+
+  public void setSourceUser(LCUser user) {
+<span class="nc" id="L48">    put(ATTR_USER, user);</span>
+<span class="nc" id="L49">  }</span>
+
+  /**
+   * accept friend request by current user.
+   *
+   * @param attributes additional attributes for this friend.
+   * @return observable instance
+   *
+   * notice: attributes is necessary as parameter bcz they are not properties of FriendshipRequest.
+   */
+  public Observable&lt;? extends LCObject&gt; accept(Map&lt;String, Object&gt; attributes) {
+<span class="fc" id="L60">    LCUser currentUser = LCUser.currentUser();</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">    if (null == currentUser) {</span>
+<span class="nc" id="L62">      logger.d(&quot;current user is null.&quot;);</span>
+<span class="nc" id="L63">      return Observable.error(ErrorUtils.propagateException(LCException.SESSION_MISSING,</span>
+              &quot;No valid session token, make sure signUp or login has been called.&quot;));
+    }
+<span class="fc" id="L66">    return currentUser.acceptFriendshipRequest(this, attributes);</span>
+  }
+
+  /**
+   * decline friend request by current user.
+   *
+   * @return observable instance
+   */
+  public Observable&lt;? extends LCObject&gt; decline() {
+<span class="fc" id="L75">    LCUser currentUser = LCUser.currentUser();</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">    if (null == currentUser) {</span>
+<span class="nc" id="L77">      logger.d(&quot;current user is null.&quot;);</span>
+<span class="nc" id="L78">      return Observable.error(ErrorUtils.propagateException(LCException.SESSION_MISSING,</span>
+              &quot;No valid session token, make sure signUp or login has been called.&quot;));
+    }
+<span class="fc" id="L81">    return currentUser.declineFriendshipRequest(this);</span>
+  }
+
+  @Override
+  public Observable&lt;? extends LCObject&gt; saveInBackground(final LCSaveOption option) {
+<span class="nc" id="L86">    return Observable.error(ErrorUtils.propagateException(LCException.OPERATION_FORBIDDEN,</span>
+            &quot;save operation isn't allowed in AVFriendshipRequest class.&quot;));
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

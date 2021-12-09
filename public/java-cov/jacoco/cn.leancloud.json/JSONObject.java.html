@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JSONObject.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.json</a> &gt; <span class="el_source">JSONObject.java</span></div><h1>JSONObject.java</h1><pre class="source lang-java linenums">package cn.leancloud.json;
+
+import cn.leancloud.core.AppConfiguration;
+
+import java.io.Serializable;
+import java.lang.reflect.Type;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.sql.Timestamp;
+import java.util.*;
+
+<span class="fc" id="L12">public abstract class JSONObject implements Map&lt;String, Object&gt;, Cloneable, Serializable {</span>
+<span class="nc" id="L13">  public static class Builder {</span>
+    public static JSONObject create(Map&lt;String, Object&gt; param) {
+<span class="fc" id="L15">      return AppConfiguration.getJsonParser().toJSONObject(param);</span>
+    }
+  }
+  public abstract JSONObject getJSONObject(String key);
+
+  public abstract JSONArray getJSONArray(String key);
+
+  public abstract &lt;T&gt; T getObject(String key, Class&lt;T&gt; clazz);
+  public abstract &lt;T&gt; T getObject(String key, Type type);
+
+  public abstract &lt;T&gt; T getObject(String key, TypeReference typeReference);
+  public abstract Boolean getBoolean(String key);
+
+  public abstract byte[] getBytes(String key);
+
+  public abstract boolean getBooleanValue(String key);
+  public abstract Byte getByte(String key);
+  public abstract byte getByteValue(String key);
+
+  public abstract Short getShort(String key);
+  public abstract short getShortValue(String key);
+
+  public abstract Integer getInteger(String key);
+
+  public abstract int getIntValue(String key);
+
+  public abstract Long getLong(String key);
+  public abstract long getLongValue(String key);
+  public abstract Float getFloat(String key);
+  public abstract float getFloatValue(String key);
+  public abstract Double getDouble(String key);
+  public abstract double getDoubleValue(String key);
+  public abstract BigDecimal getBigDecimal(String key);
+  public abstract BigInteger getBigInteger(String key);
+  public abstract String getString(String key);
+  public abstract Date getDate(String key);
+
+  public abstract java.sql.Date getSqlDate(String key);
+  public abstract Timestamp getTimestamp(String key);
+
+  public abstract JSONObject fluentPut(String key, Object value);
+
+  public abstract void putAll(Map&lt;? extends String, ? extends Object&gt; m);
+
+  public abstract JSONObject fluentPutAll(Map&lt;? extends String, ? extends Object&gt; m);
+  public abstract JSONObject fluentClear();
+  public abstract Map&lt;String, Object&gt; getInnerMap();
+
+  public abstract &lt;T&gt; T toJavaObject(Class&lt;T&gt; clazz);
+
+  public abstract String toJSONString();
+
+  @Override
+  public String toString() {
+<span class="fc" id="L69">    return toJSONString();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

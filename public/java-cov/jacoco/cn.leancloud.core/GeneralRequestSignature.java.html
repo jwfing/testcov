@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GeneralRequestSignature.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.core</a> &gt; <span class="el_source">GeneralRequestSignature.java</span></div><h1>GeneralRequestSignature.java</h1><pre class="source lang-java linenums">package cn.leancloud.core;
+
+import cn.leancloud.codec.MDFive;
+import cn.leancloud.utils.LCUtils;
+import cn.leancloud.utils.StringUtil;
+
+<span class="fc" id="L7">public class GeneralRequestSignature implements RequestSignature {</span>
+<span class="fc" id="L8">  private static boolean useMasterKey = false;</span>
+<span class="fc" id="L9">  private static String masterKey = null;</span>
+
+  public String generateSign() {
+<span class="fc" id="L12">    return requestSign(LCUtils.getCurrentTimestamp(), isUseMasterKey());</span>
+  }
+
+  public static String requestSign(String key, long ts, String suffix) {
+<span class="fc" id="L16">    StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L17">    StringBuilder result = new StringBuilder();</span>
+<span class="fc" id="L18">    result.append(MDFive.computeMD5(builder.append(ts).append(key).toString()).toLowerCase());</span>
+<span class="fc" id="L19">    result.append(',').append(ts);</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">    if (null != suffix) {</span>
+<span class="fc" id="L21">      result.append(',').append(suffix);</span>
+    }
+<span class="fc" id="L23">    return result.toString();</span>
+  }
+
+  public static String requestSign(long ts, boolean useMasterKey) {
+<span class="fc" id="L27">    String appKey = LeanCloud.getApplicationKey();</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">    String usedKey = useMasterKey ? masterKey : appKey;</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">    return requestSign(usedKey, ts, useMasterKey?&quot;master&quot;:null);</span>
+  }
+
+  public static void setMasterKey(String masKey) {
+<span class="fc bfc" id="L33" title="All 2 branches covered.">    if (!StringUtil.isEmpty(masKey)) {</span>
+<span class="fc" id="L34">      masterKey = masKey;</span>
+<span class="fc" id="L35">      useMasterKey = true;</span>
+    } else {
+<span class="fc" id="L37">      useMasterKey = false;</span>
+<span class="fc" id="L38">      masterKey = null;</span>
+    }
+<span class="fc" id="L40">  }</span>
+
+  protected static boolean isUseMasterKey() {
+<span class="fc" id="L43">    return useMasterKey;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

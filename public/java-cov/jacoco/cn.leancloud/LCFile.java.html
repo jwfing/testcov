@@ -1,0 +1,796 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LCFile.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud</a> &gt; <span class="el_source">LCFile.java</span></div><h1>LCFile.java</h1><pre class="source lang-java linenums">package cn.leancloud;
+
+import cn.leancloud.annotation.LCClassName;
+import cn.leancloud.callback.ProgressCallback;
+import cn.leancloud.codec.MDFive;
+import cn.leancloud.core.LeanCloud;
+import cn.leancloud.cache.FileCache;
+import cn.leancloud.cache.PersistenceUtil;
+import cn.leancloud.core.AppConfiguration;
+import cn.leancloud.core.StorageClient;
+import cn.leancloud.core.PaasClient;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.Callable;
+
+import cn.leancloud.upload.*;
+import cn.leancloud.utils.LCUtils;
+import cn.leancloud.utils.FileUtil;
+import cn.leancloud.utils.StringUtil;
+import cn.leancloud.json.JSONObject;
+import io.reactivex.Observable;
+import io.reactivex.Observer;
+import io.reactivex.annotations.NonNull;
+import io.reactivex.disposables.Disposable;
+import io.reactivex.functions.Function;
+import io.reactivex.schedulers.Schedulers;
+
+@LCClassName(&quot;_File&quot;)
+public final class LCFile extends LCObject {
+  public static final String CLASS_NAME = &quot;_File&quot;;
+
+  private static final String FILE_SUM_KEY = &quot;_checksum&quot;;
+  private static final String FILE_NAME_KEY = &quot;_name&quot;;
+  private static final String FILE_LENGTH_KEY = &quot;size&quot;;
+  private static final String FILE_SOURCE_KEY = &quot;__source&quot;;
+  private static final String FILE_SOURCE_EXTERNAL = &quot;external&quot;;
+  private static final String FILE_PATH_PREFIX_KEY = &quot;prefix&quot;;
+
+  private static final String THUMBNAIL_FMT = &quot;?imageView/%d/w/%d/h/%d/q/%d/format/%s&quot;;
+
+  private static final String KEY_FILE_NAME = &quot;name&quot;;
+  private static final String KEY_METADATA = &quot;metaData&quot;;
+  private static final String KEY_URL = &quot;url&quot;;
+  private static final String KEY_BUCKET = &quot;bucket&quot;;
+  private static final String KEY_PROVIDER = &quot;provider&quot;;
+  private static final String KEY_MIME_TYPE = &quot;mime_type&quot;;
+  private static final String KEY_FILE_KEY = &quot;key&quot;;
+
+  public static void setUploadHeader(String key, String value) {
+<span class="nc" id="L55">    FileUploader.setUploadHeader(key, value);</span>
+<span class="nc" id="L56">  }</span>
+
+<span class="fc" id="L58">  private transient String localPath = &quot;&quot;; // local file used by AVFile(name, file) constructor.</span>
+
+<span class="fc" id="L60">  private transient String cachePath = &quot;&quot;; // file cache path</span>
+
+  /**
+   * default constructor.
+   */
+  public LCFile() {
+<span class="fc" id="L66">    super(CLASS_NAME);</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">    if (AppConfiguration.getDefaultACL() != null) {</span>
+<span class="nc" id="L68">      this.acl = new LCACL(AppConfiguration.getDefaultACL());</span>
+    }
+<span class="fc" id="L70">  }</span>
+
+  /**
+   * constructor with name and data.
+   * @param name file name.
+   * @param data binary data.
+   */
+  public LCFile(String name, byte[] data) {
+<span class="fc" id="L78">    this();</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">    if (null == data) {</span>
+<span class="nc" id="L80">      logger.w(&quot;data is illegal(null)&quot;);</span>
+<span class="nc" id="L81">      throw new IllegalArgumentException(&quot;data is illegal(null)&quot;);</span>
+    }
+<span class="fc" id="L83">    internalPut(KEY_FILE_NAME, name);</span>
+<span class="fc" id="L84">    addMetaData(FILE_NAME_KEY, name);</span>
+<span class="fc" id="L85">    String md5 = MDFive.computeMD5(data);</span>
+<span class="fc" id="L86">    localPath = FileCache.getIntance().saveData(md5, data);</span>
+<span class="fc" id="L87">    addMetaData(FILE_SUM_KEY, md5);</span>
+<span class="fc" id="L88">    addMetaData(FILE_LENGTH_KEY, data.length);</span>
+<span class="fc" id="L89">    internalPut(KEY_MIME_TYPE, FileUtil.getMimeTypeFromFilename(name));</span>
+<span class="fc" id="L90">  }</span>
+
+  /**
+   * constructor with name and local file.
+   * @param name file name.
+   * @param localFile local file.
+   */
+  public LCFile(String name, File localFile) {
+<span class="fc" id="L98">    this();</span>
+<span class="pc bpc" id="L99" title="2 of 6 branches missed.">    if (null == localFile || !localFile.exists() || !localFile.isFile()) {</span>
+<span class="fc" id="L100">      logger.w(&quot;local file is illegal&quot;);</span>
+<span class="fc" id="L101">      throw new IllegalArgumentException(&quot;local file is illegal.&quot;);</span>
+    }
+<span class="fc" id="L103">    internalPut(KEY_FILE_NAME, name);</span>
+<span class="fc" id="L104">    addMetaData(FILE_NAME_KEY, name);</span>
+<span class="fc" id="L105">    String md5 = MDFive.computeFileMD5(localFile);</span>
+<span class="fc" id="L106">    localPath = localFile.getAbsolutePath();</span>
+<span class="fc" id="L107">    addMetaData(FILE_SUM_KEY, md5);</span>
+<span class="fc" id="L108">    addMetaData(FILE_LENGTH_KEY, localFile.length());</span>
+<span class="fc" id="L109">    internalPut(KEY_MIME_TYPE, FileUtil.getMimeTypeFromPath(localPath));</span>
+<span class="fc" id="L110">  }</span>
+
+  /**
+   * constructor with name and external url.
+   * @param name file name.
+   * @param url external url.
+   */
+  public LCFile(String name, String url) {
+<span class="fc" id="L118">    this(name, url, null);</span>
+<span class="fc" id="L119">  }</span>
+
+  /**
+   * constructor with name and external url.
+   * @param name file name
+   * @param url external url.
+   * @param metaData additional attributes.
+   */
+  public LCFile(String name, String url, Map&lt;String, Object&gt; metaData) {
+<span class="fc" id="L128">    this(name, url, metaData, true);</span>
+<span class="fc" id="L129">  }</span>
+
+  protected LCFile(String name, String url, Map&lt;String, Object&gt; metaData, boolean external) {
+<span class="fc" id="L132">    this();</span>
+<span class="fc" id="L133">    internalPut(KEY_FILE_NAME, name);</span>
+<span class="fc" id="L134">    addMetaData(FILE_NAME_KEY, name);</span>
+<span class="fc" id="L135">    internalPut(KEY_URL, url);</span>
+<span class="fc" id="L136">    Map&lt;String, Object&gt; meta = new HashMap&lt;String, Object&gt;();</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">    if (null != metaData) {</span>
+<span class="nc" id="L138">      LCUtils.putAllWithNullFilter(meta, metaData);</span>
+    }
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">    if (external) {</span>
+<span class="fc" id="L141">      meta.put(FILE_SOURCE_KEY, FILE_SOURCE_EXTERNAL);</span>
+    }
+<span class="fc" id="L143">    internalPut(KEY_METADATA, meta);</span>
+<span class="fc" id="L144">    internalPut(KEY_MIME_TYPE, FileUtil.getMimeTypeFromUrl(url));</span>
+<span class="fc" id="L145">  }</span>
+
+  // add for avoiding sonarqube check, idiot sonar
+  @Override
+  public boolean equals(Object o) {
+<span class="nc" id="L150">    return super.equals(o);</span>
+  }
+
+  // add for avoiding sonarqube check, idiot sonar
+  @Override
+  public int hashCode() {
+<span class="fc" id="L156">    return super.hashCode();</span>
+  }
+
+  private void internalPutDirectly(String key, Object value) {
+<span class="fc" id="L160">    this.serverData.put(key, value);</span>
+<span class="fc" id="L161">  }</span>
+
+  /**
+   * Get AVFile instance from objectId.
+   * @param objectId file objectId.
+   * @return observable instance.
+   */
+  public static Observable&lt;LCFile&gt; withObjectIdInBackground(final String objectId) {
+<span class="fc" id="L169">    return PaasClient.getStorageClient().fetchFile(null, objectId);</span>
+  }
+
+  /**
+   * Get file name.
+   * @return file name.
+   */
+  public String getName() {
+<span class="fc" id="L177">    return (String) internalGet(KEY_FILE_NAME);</span>
+  }
+
+  /**
+   * Set file name.
+   * @param name file name.
+   */
+  public void setName(String name) {
+<span class="nc" id="L185">    internalPut(KEY_FILE_NAME, name);</span>
+<span class="nc" id="L186">  }</span>
+
+  /**
+   * set folder path
+   * @param path folder path. null or empty string equals to clearPathPrefix.
+   */
+  public void setPathPrefix(String path) {
+<span class="fc" id="L193">    Object externalFlag = getMetaData(FILE_SOURCE_KEY);</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">    if (FILE_SOURCE_EXTERNAL.equals(externalFlag)) {</span>
+<span class="fc" id="L195">      return;</span>
+    }
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(path)) {</span>
+<span class="nc" id="L198">      clearPathPrefix();</span>
+    } else {
+<span class="fc" id="L200">      internalPut(FILE_PATH_PREFIX_KEY, path);</span>
+<span class="fc" id="L201">      addMetaData(FILE_PATH_PREFIX_KEY, path);</span>
+    }
+<span class="fc" id="L203">  }</span>
+
+  /**
+   * clear folder path.
+   */
+  public void clearPathPrefix() {
+<span class="fc" id="L209">    Object externalFlag = getMetaData(FILE_SOURCE_KEY);</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">    if (FILE_SOURCE_EXTERNAL.equals(externalFlag)) {</span>
+<span class="fc" id="L211">      return;</span>
+    }
+<span class="nc" id="L213">    super.remove(FILE_PATH_PREFIX_KEY);</span>
+<span class="nc" id="L214">    getMetaData().remove(FILE_PATH_PREFIX_KEY);</span>
+<span class="nc" id="L215">  }</span>
+  /**
+   * Get file meta data.
+   * @return meta data.
+   */
+  public Map&lt;String, Object&gt; getMetaData() {
+<span class="fc" id="L221">    Map&lt;String, Object&gt; result = (Map&lt;String, Object&gt;)internalGet(KEY_METADATA);</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">    if (null == result) {</span>
+<span class="fc" id="L223">      result = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L224">      internalPut(KEY_METADATA, result);</span>
+    }
+<span class="fc" id="L226">    return result;</span>
+  }
+
+  /**
+   * Set file meta data.
+   * @param metaData meta data.
+   */
+  public void setMetaData(Map&lt;String, Object&gt; metaData) {
+<span class="nc" id="L234">    internalPut(KEY_METADATA, metaData);</span>
+<span class="nc" id="L235">  }</span>
+
+  /**
+   * Add new meta data.
+   * @param key meta key.
+   * @param val meta value.
+   */
+  public void addMetaData(String key, Object val) {
+<span class="fc" id="L243">    Map&lt;String, Object&gt; metaData = getMetaData();</span>
+<span class="fc" id="L244">    metaData.put(key, val);</span>
+<span class="fc" id="L245">  }</span>
+
+  /**
+   * Get file meta data.
+   * @param key meta key.
+   * @return meta value.
+   */
+  public Object getMetaData(String key) {
+<span class="fc" id="L253">    return getMetaData().get(key);</span>
+  }
+
+  /**
+   * Remove file meta data.
+   * @param key meta key.
+   * @return old value.
+   */
+  public Object removeMetaData(String key) {
+<span class="nc" id="L262">    return getMetaData().remove(key);</span>
+  }
+
+  /**
+   * Cleanup meta data.
+   */
+  public void clearMetaData() {
+<span class="nc" id="L269">    getMetaData().clear();</span>
+<span class="nc" id="L270">  }</span>
+
+  /**
+   * Get file size.
+   * @return file size.
+   */
+  public int getSize() {
+<span class="fc" id="L277">    Number size = (Number) getMetaData(FILE_LENGTH_KEY);</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">    if (size != null)</span>
+<span class="fc" id="L279">      return size.intValue();</span>
+    else
+<span class="fc" id="L281">      return -1;</span>
+  }
+
+  /**
+   * Get file mime type.
+   * @return mime type.
+   */
+  public String getMimeType() {
+<span class="fc" id="L289">    return (String) internalGet(KEY_MIME_TYPE);</span>
+  }
+
+  /**
+   * Set file mime type.
+   * @param mimeType mime type.
+   */
+  public void setMimeType(String mimeType) {
+<span class="nc" id="L297">    internalPut(KEY_MIME_TYPE, mimeType);</span>
+<span class="nc" id="L298">  }</span>
+
+  /**
+   * Get file key.
+   * @return file key.
+   */
+  public String getKey() {
+<span class="fc" id="L305">    return (String) internalGet(KEY_FILE_KEY);</span>
+  }
+
+  /**
+   * Set file key.
+   * @param fileKey - fileKey
+   * @notice this method needs authentication with masterKey!!
+   *
+   * File key is a part of url. After specified `fileKey`, the file's url should become `https://domain/fileKey`.
+   * With the help of this method, developer can upload file with particular path. For example, upload a robots.txt file as following:
+   *     File localFile = new File(&quot;./20160704174809.txt&quot;);
+   *     AVFile file = new AVFile(&quot;testfilename&quot;, localFile);
+   *     file.setKey(&quot;robots.txt&quot;);
+   *     file.saveInBackground().blockingSubscribe();
+   *
+   */
+  void setKey(String fileKey) {
+<span class="fc" id="L322">    internalPut(KEY_FILE_KEY, fileKey);</span>
+<span class="fc" id="L323">  }</span>
+
+  /**
+   * Get file bucket.
+   * @return file bucket.
+   */
+  public String getBucket() {
+<span class="nc" id="L330">    return (String) internalGet(KEY_BUCKET);</span>
+  }
+
+  /**
+   * Get file url.
+   * @return file url.
+   */
+  public String getUrl() {
+<span class="fc" id="L338">    return (String) internalGet(KEY_URL);</span>
+  }
+
+  /**
+   * Get file provider.
+   * @return file provider.
+   */
+  public String getProvider() {
+<span class="nc" id="L346">    return (String) internalGet(KEY_PROVIDER);</span>
+  }
+
+  /**
+   * Set file attribute.
+   * @param key attribute key.
+   * @param value attribute value.
+   * notice: UnsupportedOperationException
+   */
+  @Override
+  public void put(String key, Object value) {
+<span class="nc" id="L357">    throw new UnsupportedOperationException(&quot;cannot invoke put method in AVFile&quot;);</span>
+  }
+
+  /**
+   * Get file attribute.
+   * @param key attribute key.
+   * @return attribute value.
+   * notice: UnsupportedOperationException
+   */
+  @Override
+  public Object get(String key) {
+<span class="nc" id="L368">    throw new UnsupportedOperationException(&quot;cannot invoke get method in AVFile&quot;);</span>
+  }
+
+  /**
+   * Remove file attribute.
+   * @param key attribute key.
+   * notice: UnsupportedOperationException
+   */
+  @Override
+  public void remove(String key) {
+<span class="nc" id="L378">    throw new UnsupportedOperationException(&quot;cannot invoke remove method in AVFile&quot;);</span>
+  }
+
+  /**
+   * Increment file attribute.
+   * @param key attribute key.
+   * notice: UnsupportedOperationException
+   */
+  @Override
+  public void increment(String key) {
+<span class="nc" id="L388">    throw new UnsupportedOperationException(&quot;cannot invoke increment method in AVFile&quot;);</span>
+  }
+
+  /**
+   * Increment file attribute.
+   * @param key attribute key.
+   * @param value step value.
+   * notice: UnsupportedOperationException
+   */
+  @Override
+  public void increment(String key, Number value) {
+<span class="nc" id="L399">    throw new UnsupportedOperationException(&quot;cannot invoke increment(Number) method in AVFile&quot;);</span>
+  }
+
+  /**
+   * Returns a thumbnail image url using QiNiu endpoints.
+   *
+   * @param scaleToFit scale param.
+   * @param width width.
+   * @param height height.
+   * @return new url for thumbnail.
+   * @see #getThumbnailUrl(boolean, int, int, int, String)
+   */
+  public String getThumbnailUrl(boolean scaleToFit, int width, int height) {
+<span class="fc" id="L412">    return getThumbnailUrl(scaleToFit, width, height, 100, &quot;png&quot;);</span>
+  }
+
+  /**
+   * Returns a thumbnail image url using QiNiu endpoints.
+   * @param scaleToFit scale param.
+   * @param width width
+   * @param height height
+   * @param quality quality.
+   * @param fmt format string.
+   * @return new url for thumbnail.
+   */
+  public String getThumbnailUrl(boolean scaleToFit, int width, int height, int quality, String fmt) {
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">    if (LeanCloud.getRegion() == LeanCloud.REGION.NorthAmerica) {</span>
+<span class="nc" id="L426">      logger.w(&quot;We only support this method for qiniu storage.&quot;);</span>
+<span class="nc" id="L427">      throw new UnsupportedOperationException(&quot;We only support this method for qiniu storage.&quot;);</span>
+    }
+<span class="pc bpc" id="L429" title="2 of 4 branches missed.">    if (width &lt; 0 || height &lt; 0) {</span>
+<span class="nc" id="L430">      logger.w(&quot;Invalid width or height.&quot;);</span>
+<span class="nc" id="L431">      throw new IllegalArgumentException(&quot;Invalid width or height.&quot;);</span>
+    }
+<span class="pc bpc" id="L433" title="2 of 4 branches missed.">    if (quality &lt; 1 || quality &gt; 100) {</span>
+<span class="nc" id="L434">      logger.w(&quot;Invalid quality,valid range is 0-100.&quot;);</span>
+<span class="nc" id="L435">      throw new IllegalArgumentException(&quot;Invalid quality,valid range is 0-100.&quot;);</span>
+    }
+<span class="pc bpc" id="L437" title="2 of 4 branches missed.">    if (fmt == null || StringUtil.isEmpty(fmt.trim())) {</span>
+<span class="nc" id="L438">      fmt = &quot;png&quot;;</span>
+    }
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">    int mode = scaleToFit ? 2 : 1;</span>
+<span class="fc" id="L441">    return this.getUrl() + String.format(THUMBNAIL_FMT, mode, width, height, quality, fmt);</span>
+  }
+
+  /**
+   * Get map data of current file.
+   * @return map data.
+   */
+  public Map&lt;String, Object&gt; toMap() {
+<span class="nc" id="L449">    Map&lt;String, Object&gt; result = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L450">    result.put(&quot;__type&quot;, CLASS_NAME);</span>
+<span class="nc" id="L451">    result.put(KEY_METADATA, getMetaData());</span>
+
+<span class="nc bnc" id="L453" title="All 2 branches missed.">    if (!StringUtil.isEmpty(getUrl())) {</span>
+<span class="nc" id="L454">      result.put(KEY_URL, getUrl());</span>
+    }
+
+<span class="nc bnc" id="L457" title="All 2 branches missed.">    if (!StringUtil.isEmpty(getObjectId())) {</span>
+<span class="nc" id="L458">      result.put(LCObject.KEY_OBJECT_ID, getObjectId());</span>
+    }
+
+<span class="nc" id="L461">    result.put(&quot;id&quot;, getName());</span>
+
+<span class="nc" id="L463">    return result;</span>
+  }
+
+  /**
+   * save to cloud backend.
+   * @param keepFileName whether keep file name in url or not.
+   * @param progressCallback progress callback.
+   */
+  public synchronized void saveInBackground(boolean keepFileName, final ProgressCallback progressCallback) {
+<span class="nc" id="L472">    saveInBackground(null, keepFileName, progressCallback);</span>
+<span class="nc" id="L473">  }</span>
+
+  /**
+   * save to cloud in background.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param keepFileName whether keep file name in url or not.
+   * @param progressCallback progress callback.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public synchronized void saveInBackground(LCUser asAuthenticatedUser,
+                                            boolean keepFileName, final ProgressCallback progressCallback) {
+<span class="nc" id="L485">    saveWithProgressCallback(asAuthenticatedUser, keepFileName, progressCallback).subscribe(new Observer&lt;LCFile&gt;() {</span>
+      @Override
+      public void onSubscribe(Disposable disposable) {
+
+<span class="nc" id="L489">      }</span>
+
+      @Override
+      public void onNext(LCFile avFile) {
+<span class="nc bnc" id="L493" title="All 2 branches missed.">        if (null != progressCallback) {</span>
+<span class="nc" id="L494">          progressCallback.internalDone(100, null);</span>
+        }
+<span class="nc" id="L496">      }</span>
+
+      @Override
+      public void onError(Throwable throwable) {
+<span class="nc bnc" id="L500" title="All 2 branches missed.">        if (null != progressCallback) {</span>
+<span class="nc" id="L501">          progressCallback.internalDone(90, new LCException(throwable));</span>
+        }
+<span class="nc" id="L503">      }</span>
+
+      @Override
+      public void onComplete() {
+
+<span class="nc" id="L508">      }</span>
+    });
+<span class="nc" id="L510">  }</span>
+
+  /**
+   * save to cloud backend.
+   * @param progressCallback progress callback.
+   */
+  public void saveInBackground(final ProgressCallback progressCallback) {
+<span class="nc" id="L517">    saveInBackground(false, progressCallback);</span>
+<span class="nc" id="L518">  }</span>
+
+  private Observable&lt;LCFile&gt; directlyCreate(LCUser asAuthenticatedUser, final JSONObject parameters) {
+<span class="fc" id="L521">    return PaasClient.getStorageClient().createObject(asAuthenticatedUser,</span>
+            this.className, parameters, false, null)
+<span class="fc" id="L523">            .map(new Function&lt;LCObject, LCFile&gt;() {</span>
+              @Override
+              public LCFile apply(LCObject LCObject) throws Exception {
+<span class="fc" id="L526">                LCUtils.putAllWithNullFilter(LCFile.this.serverData, parameters);</span>
+<span class="fc" id="L527">                LCFile.this.mergeRawData(LCObject, true);</span>
+<span class="fc" id="L528">                LCFile.this.onSaveSuccess();</span>
+<span class="fc" id="L529">                return LCFile.this;</span>
+              }});
+  }
+
+  private boolean isSavingExternalFile() {
+<span class="pc bpc" id="L534" title="1 of 4 branches missed.">    return StringUtil.isEmpty(getObjectId()) &amp;&amp; !StringUtil.isEmpty(getUrl());</span>
+  }
+
+  private Observable&lt;LCFile&gt; saveWithProgressCallback(final LCUser asAuthenticatedUser,
+                                                      boolean keepFileName, final ProgressCallback callback) {
+<span class="fc" id="L539">    JSONObject paramData = generateChangedParam();</span>
+//    final String fileKey = FileUtil.generateFileKey(this.getName(), keepFileName);
+//    paramData.put(&quot;key&quot;, fileKey);
+//    paramData.put(&quot;__type&quot;, &quot;File&quot;);
+<span class="pc bpc" id="L543" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(getObjectId())) {</span>
+<span class="fc bfc" id="L544" title="All 2 branches covered.">      if (!StringUtil.isEmpty(getUrl())) {</span>
+<span class="fc" id="L545">        return directlyCreate(asAuthenticatedUser, paramData);</span>
+      }
+<span class="fc" id="L547">      logger.d(&quot;createToken params: &quot; + paramData.toJSONString() + &quot;, &quot; + this);</span>
+<span class="fc" id="L548">      StorageClient storageClient = PaasClient.getStorageClient();</span>
+<span class="fc" id="L549">      Observable&lt;LCFile&gt; result = storageClient.newUploadToken(asAuthenticatedUser, paramData)</span>
+<span class="fc" id="L550">              .map(new Function&lt;FileUploadToken, LCFile&gt;() {</span>
+                public LCFile apply(@NonNull FileUploadToken fileUploadToken) throws Exception {
+<span class="fc" id="L552">                  logger.d(&quot;[Thread:&quot; + Thread.currentThread().getId() + &quot;]&quot; + fileUploadToken.toString() + &quot;, &quot; + LCFile.this);</span>
+<span class="fc" id="L553">                  LCFile.this.setObjectId(fileUploadToken.getObjectId());</span>
+<span class="fc" id="L554">                  LCFile.this.internalPutDirectly(KEY_OBJECT_ID, fileUploadToken.getObjectId());</span>
+<span class="fc" id="L555">                  LCFile.this.internalPutDirectly(KEY_BUCKET, fileUploadToken.getBucket());</span>
+<span class="fc" id="L556">                  LCFile.this.internalPutDirectly(KEY_PROVIDER, fileUploadToken.getProvider());</span>
+<span class="fc" id="L557">                  LCFile.this.internalPutDirectly(KEY_FILE_KEY, fileUploadToken.getKey());</span>
+
+<span class="fc" id="L559">                  Uploader uploader = new FileUploader(LCFile.this, fileUploadToken, callback);</span>
+<span class="fc" id="L560">                  LCFile.this.internalPutDirectly(KEY_URL, fileUploadToken.getUrl());</span>
+
+<span class="fc" id="L562">                  LCException exception = uploader.execute();</span>
+
+<span class="fc" id="L564">                  JSONObject completeResult = JSONObject.Builder.create(null);</span>
+<span class="pc bpc" id="L565" title="1 of 2 branches missed.">                  completeResult.put(&quot;result&quot;, null == exception);</span>
+<span class="fc" id="L566">                  completeResult.put(&quot;token&quot;,fileUploadToken.getToken());</span>
+<span class="fc" id="L567">                  logger.d(&quot;file upload result: &quot; + completeResult.toJSONString());</span>
+                  try {
+<span class="fc" id="L569">                    PaasClient.getStorageClient().fileCallback(asAuthenticatedUser, completeResult);</span>
+<span class="pc bpc" id="L570" title="1 of 2 branches missed.">                    if (null != exception) {</span>
+<span class="nc" id="L571">                      logger.w(&quot;failed to invoke fileCallback. cause:&quot;, exception);</span>
+<span class="nc" id="L572">                      throw exception;</span>
+                    } else {
+<span class="fc" id="L574">                      return LCFile.this;</span>
+                    }
+<span class="nc" id="L576">                  } catch (IOException ex) {</span>
+<span class="nc" id="L577">                    logger.w(ex);</span>
+<span class="nc" id="L578">                    throw ex;</span>
+                  }
+                }
+              });
+<span class="fc" id="L582">      result = storageClient.wrapObservable(result);</span>
+<span class="fc" id="L583">      return result;</span>
+    } else {
+<span class="nc" id="L585">      logger.d(&quot;file has been upload to cloud, ignore update request.&quot;);</span>
+<span class="nc" id="L586">      return Observable.just(this);</span>
+    }
+  }
+
+  /**
+   * save to cloud backend.
+   * @return  Observable object.
+   */
+  @Override
+  public Observable&lt;LCFile&gt; saveInBackground() {
+<span class="fc" id="L596">    return saveInBackground(false);</span>
+  }
+
+  /**
+   * save to cloud.
+   */
+  @Override
+  public void save() {
+<span class="fc" id="L604">    this.saveInBackground().blockingSubscribe();</span>
+<span class="fc" id="L605">  }</span>
+
+  /**
+   * save to cloud
+   * @param asAuthenticatedUser explicit user for request authentication.
+   *
+   */
+  public void save(LCUser asAuthenticatedUser) {
+<span class="fc" id="L613">    this.saveInBackground(asAuthenticatedUser, false).blockingSubscribe();</span>
+<span class="fc" id="L614">  }</span>
+
+  /**
+   * save to cloud backend.
+   * @param keepFileName whether keep file name in url or not.
+   * @return Observable object.
+   */
+  public Observable&lt;LCFile&gt; saveInBackground(boolean keepFileName) {
+<span class="fc" id="L622">    return saveInBackground(null, keepFileName);</span>
+  }
+
+  /**
+   * Save eventually(not supported).
+   * @throws LCException exception happened.
+   *
+   * Because that file size is too big, cache the entire data will cost much disk capacity,
+   * so we don't support this method at present.
+   */
+  public void saveEventually() throws LCException {
+<span class="fc" id="L633">    saveEventually(null);</span>
+<span class="fc" id="L634">  }</span>
+
+  /**
+   * Save eventually(not supported).
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @throws LCException exception happened.
+   *
+   * Because that file size is too big, cache the entire data will cost much disk capacity,
+   * so we don't support this method at present.
+   */
+  public void saveEventually(final LCUser asAuthenticatedUser) throws LCException {
+<span class="fc bfc" id="L645" title="All 2 branches covered.">    if (isSavingExternalFile()) {</span>
+<span class="fc" id="L646">      super.saveEventually(asAuthenticatedUser);</span>
+    } else {
+<span class="fc" id="L648">      throw new UnsupportedOperationException(&quot;AVFile#saveEventually is not allowed,&quot; +</span>
+              &quot; please save the binary data to temp store and try to save in future.&quot;);
+    }
+<span class="fc" id="L651">  }</span>
+  /**
+   * save to cloud in background.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param keepFileName whether keep file name in url or not.
+   * @return Observable object.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;LCFile&gt; saveInBackground(LCUser asAuthenticatedUser, boolean keepFileName) {
+<span class="fc" id="L661">    return saveWithProgressCallback(asAuthenticatedUser, keepFileName,null);</span>
+  }
+
+  /**
+   * Get data in blocking mode.
+   * @return data bytes.
+   */
+  //@JSONField(serialize = false)
+  public byte[] getData() {
+<span class="fc" id="L670">    String filePath = &quot;&quot;;</span>
+<span class="pc bpc" id="L671" title="1 of 2 branches missed.">    if(!StringUtil.isEmpty(localPath)) {</span>
+<span class="nc" id="L672">      filePath = localPath;</span>
+<span class="pc bpc" id="L673" title="1 of 2 branches missed.">    } else if (!StringUtil.isEmpty(cachePath)) {</span>
+<span class="nc" id="L674">      filePath = cachePath;</span>
+<span class="pc bpc" id="L675" title="1 of 2 branches missed.">    } else if (!StringUtil.isEmpty(getUrl())) {</span>
+<span class="fc" id="L676">      File cacheFile = FileCache.getIntance().getCacheFile(getUrl());</span>
+<span class="pc bpc" id="L677" title="1 of 4 branches missed.">      if (null == cacheFile || !cacheFile.exists()) {</span>
+<span class="fc" id="L678">        FileDownloader downloader = new FileDownloader();</span>
+<span class="fc" id="L679">        downloader.execute(getUrl(), cacheFile);</span>
+      }
+<span class="pc bpc" id="L681" title="1 of 2 branches missed.">      if (null != cacheFile) {</span>
+<span class="fc" id="L682">        filePath = cacheFile.getAbsolutePath();</span>
+      }
+    }
+<span class="pc bpc" id="L685" title="1 of 2 branches missed.">    if(!StringUtil.isEmpty(filePath)) {</span>
+<span class="fc" id="L686">      return PersistenceUtil.sharedInstance().readContentBytesFromFile(new File(filePath));</span>
+    }
+<span class="nc" id="L688">    return new byte[0];</span>
+  }
+
+  /**
+   * Get data in async mode.
+   * @return observable instance.
+   */
+  public Observable&lt;byte[]&gt; getDataInBackground() {
+<span class="fc" id="L696">    Observable observable = Observable.fromCallable(new Callable&lt;byte[]&gt;() {</span>
+      @Override
+      public byte[] call() throws Exception {
+<span class="fc" id="L699">        return getData();</span>
+      }
+    });
+<span class="pc bpc" id="L702" title="1 of 2 branches missed.">    if (AppConfiguration.isAsynchronized()) {</span>
+<span class="nc" id="L703">      observable = observable.subscribeOn(Schedulers.io());</span>
+    }
+<span class="fc" id="L705">    AppConfiguration.SchedulerCreator defaultScheduler = AppConfiguration.getDefaultScheduler();</span>
+<span class="pc bpc" id="L706" title="1 of 2 branches missed.">    if (null != defaultScheduler) {</span>
+<span class="nc" id="L707">      observable = observable.observeOn(defaultScheduler.create());</span>
+    }
+<span class="fc" id="L709">    return observable;</span>
+  }
+
+  /**
+   * Get data stream in blocking mode.
+   * @return data stream.
+   * @throws Exception for file not found or io problem.
+   */
+  public InputStream getDataStream() throws Exception {
+<span class="fc" id="L718">    String filePath = &quot;&quot;;</span>
+<span class="fc bfc" id="L719" title="All 2 branches covered.">    if(!StringUtil.isEmpty(localPath)) {</span>
+<span class="fc" id="L720">      filePath = localPath;</span>
+<span class="pc bpc" id="L721" title="1 of 2 branches missed.">    } else if (!StringUtil.isEmpty(cachePath)) {</span>
+<span class="nc" id="L722">      filePath = cachePath;</span>
+<span class="pc bpc" id="L723" title="1 of 2 branches missed.">    } else if (!StringUtil.isEmpty(getUrl())) {</span>
+<span class="fc" id="L724">      File cacheFile = FileCache.getIntance().getCacheFile(getUrl());</span>
+<span class="pc bpc" id="L725" title="2 of 4 branches missed.">      if (null == cacheFile || !cacheFile.exists()) {</span>
+<span class="nc" id="L726">        FileDownloader downloader = new FileDownloader();</span>
+<span class="nc" id="L727">        downloader.execute(getUrl(), cacheFile);</span>
+      }
+<span class="pc bpc" id="L729" title="1 of 2 branches missed.">      if (null != cacheFile) {</span>
+<span class="fc" id="L730">        filePath = cacheFile.getAbsolutePath();</span>
+      }
+    }
+<span class="pc bpc" id="L733" title="1 of 2 branches missed.">    if(!StringUtil.isEmpty(filePath)) {</span>
+<span class="fc" id="L734">      logger.d(&quot;dest file path=&quot; + filePath);</span>
+<span class="fc" id="L735">      return FileCache.getIntance().getInputStreamFromFile(new File(filePath));</span>
+    }
+<span class="nc" id="L737">    logger.w(&quot;failed to get dataStream.&quot;);</span>
+<span class="nc" id="L738">    return null;</span>
+  }
+
+  /**
+   * Get data stream in async mode.
+   * @return observable instance.
+   */
+  public Observable&lt;InputStream&gt; getDataStreamInBackground() {
+<span class="fc" id="L746">    Observable&lt;InputStream&gt; observable = Observable.fromCallable(new Callable&lt;InputStream&gt;() {</span>
+      @Override
+      public InputStream call() throws Exception {
+<span class="fc" id="L749">        return getDataStream();</span>
+      }
+    });
+<span class="pc bpc" id="L752" title="1 of 2 branches missed.">    if (AppConfiguration.isAsynchronized()) {</span>
+<span class="nc" id="L753">      observable = observable.subscribeOn(Schedulers.io());</span>
+    }
+<span class="fc" id="L755">    AppConfiguration.SchedulerCreator defaultScheduler = AppConfiguration.getDefaultScheduler();</span>
+<span class="pc bpc" id="L756" title="1 of 2 branches missed.">    if (null != defaultScheduler) {</span>
+<span class="nc" id="L757">      observable = observable.observeOn(defaultScheduler.create());</span>
+    }
+<span class="fc" id="L759">    return observable;</span>
+  }
+
+  /**
+   * Generate File instance with local path.
+   * @param name file name
+   * @param absoluteLocalFilePath local path.
+   * @return file instance.
+   * @throws FileNotFoundException file not found.
+   */
+  public static LCFile withAbsoluteLocalPath(String name, String absoluteLocalFilePath)
+          throws FileNotFoundException {
+<span class="nc" id="L771">    return withFile(name, new File(absoluteLocalFilePath));</span>
+  }
+
+  /**
+   * Generate File instance with local file.
+   * @param name file name.
+   * @param file local file.
+   * @return file instance.
+   * @throws FileNotFoundException file not found.
+   */
+  public static LCFile withFile(String name, File file) throws FileNotFoundException {
+<span class="nc bnc" id="L782" title="All 2 branches missed.">    if (file == null) {</span>
+<span class="nc" id="L783">      throw new IllegalArgumentException(&quot;null file object.&quot;);</span>
+    }
+<span class="nc bnc" id="L785" title="All 4 branches missed.">    if (!file.exists() || !file.isFile()) {</span>
+<span class="nc" id="L786">      throw new FileNotFoundException();</span>
+    }
+<span class="nc" id="L788">    LCFile avFile = new LCFile(name, file);</span>
+<span class="nc" id="L789">    LCUser currentUser = LCUser.getCurrentUser();</span>
+<span class="nc bnc" id="L790" title="All 4 branches missed.">    if (null != currentUser &amp;&amp; !StringUtil.isEmpty(currentUser.getObjectId())) {</span>
+<span class="nc" id="L791">      avFile.addMetaData(&quot;owner&quot;, currentUser.getObjectId());</span>
+    }
+<span class="nc" id="L793">    return avFile;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

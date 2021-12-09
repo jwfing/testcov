@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AppAccessEndpoint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.service</a> &gt; <span class="el_source">AppAccessEndpoint.java</span></div><h1>AppAccessEndpoint.java</h1><pre class="source lang-java linenums">package cn.leancloud.service;
+
+import cn.leancloud.core.LeanService;
+import cn.leancloud.utils.StringUtil;
+
+<span class="fc" id="L6">public class AppAccessEndpoint {</span>
+  private long ttl;
+
+  private String statsServer;
+
+  private String pushServer;
+
+  private String rtmRouterServer;
+
+  private String apiServer;
+
+  private String engineServer;
+
+  public long getTtl() {
+<span class="fc" id="L20">    return ttl;</span>
+  }
+
+  public void setTtl(long ttl) {
+<span class="fc" id="L24">    this.ttl = ttl;</span>
+<span class="fc" id="L25">  }</span>
+
+  public String getStatsServer() {
+<span class="fc" id="L28">    return statsServer;</span>
+  }
+
+  public void setStatsServer(String statsServer) {
+<span class="fc" id="L32">    this.statsServer = statsServer;</span>
+<span class="fc" id="L33">  }</span>
+
+  public String getPushServer() {
+<span class="fc" id="L36">    return pushServer;</span>
+  }
+
+  public void setPushServer(String pushServer) {
+<span class="fc" id="L40">    this.pushServer = pushServer;</span>
+<span class="fc" id="L41">  }</span>
+
+  public String getRtmRouterServer() {
+<span class="fc" id="L44">    return rtmRouterServer;</span>
+  }
+
+  public void setRtmRouterServer(String rtmRouterServer) {
+<span class="fc" id="L48">    this.rtmRouterServer = rtmRouterServer;</span>
+<span class="fc" id="L49">  }</span>
+
+  public String getApiServer() {
+<span class="fc" id="L52">    return apiServer;</span>
+  }
+
+  public void setApiServer(String apiServer) {
+<span class="fc" id="L56">    this.apiServer = apiServer;</span>
+<span class="fc" id="L57">  }</span>
+
+  public String getEngineServer() {
+<span class="fc" id="L60">    return engineServer;</span>
+  }
+
+  public void setEngineServer(String engineServer) {
+<span class="fc" id="L64">    this.engineServer = engineServer;</span>
+<span class="fc" id="L65">  }</span>
+
+  public String getServerHost(LeanService service) {
+<span class="fc" id="L68">    String result = &quot;&quot;;</span>
+<span class="pc bpc" id="L69" title="3 of 6 branches missed.">    switch (service) {</span>
+      case API:
+<span class="fc" id="L71">        result = getApiServer();</span>
+<span class="fc" id="L72">        break;</span>
+      case ENGINE:
+<span class="nc" id="L74">        result = getEngineServer();</span>
+<span class="nc" id="L75">        break;</span>
+      case PUSH:
+<span class="fc" id="L77">        result = getPushServer();</span>
+<span class="fc" id="L78">        break;</span>
+      case RTM:
+<span class="fc" id="L80">        result = getRtmRouterServer();</span>
+<span class="fc" id="L81">        break;</span>
+      case STATS:
+<span class="nc" id="L83">        result = getStatsServer();</span>
+        break;
+    }
+<span class="fc" id="L86">    return result;</span>
+  }
+
+  public boolean hasSpecifiedEndpoint() {
+<span class="nc bnc" id="L90" title="All 6 branches missed.">    return !StringUtil.isEmpty(apiServer) || !StringUtil.isEmpty(engineServer) || !StringUtil.isEmpty(pushServer)</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">            || !StringUtil.isEmpty(rtmRouterServer);</span>
+  }
+
+  public void reset() {
+<span class="fc" id="L95">    this.ttl = 0;</span>
+<span class="fc" id="L96">    this.apiServer = null;</span>
+<span class="fc" id="L97">    this.engineServer = null;</span>
+<span class="fc" id="L98">    this.pushServer = null;</span>
+<span class="fc" id="L99">    this.rtmRouterServer = null;</span>
+<span class="fc" id="L100">    this.statsServer = null;</span>
+<span class="fc" id="L101">  }</span>
+
+  public void freezeEndpoint(LeanService service, String host) {
+<span class="pc bpc" id="L104" title="1 of 6 branches missed.">    switch (service) {</span>
+      case API:
+<span class="fc" id="L106">        this.setApiServer(host);</span>
+<span class="fc" id="L107">        break;</span>
+      case ENGINE:
+<span class="fc" id="L109">        this.setEngineServer(host);</span>
+<span class="fc" id="L110">        break;</span>
+      case PUSH:
+<span class="fc" id="L112">        this.setPushServer(host);</span>
+<span class="fc" id="L113">        break;</span>
+      case RTM:
+<span class="fc" id="L115">        this.setRtmRouterServer(host);</span>
+<span class="fc" id="L116">        break;</span>
+      case STATS:
+<span class="fc" id="L118">        this.setStatsServer(host);</span>
+        break;
+    }
+<span class="fc" id="L121">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,412 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MimeUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.utils</a> &gt; <span class="el_source">MimeUtils.java</span></div><h1>MimeUtils.java</h1><pre class="source lang-java linenums">package cn.leancloud.utils;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public final class MimeUtils {
+<span class="fc" id="L7">  private static final Map&lt;String, String&gt; mimeTypeToExtensionMap = new HashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L8">  private static final Map&lt;String, String&gt; extensionToMimeTypeMap = new HashMap&lt;String, String&gt;();</span>
+  static {
+    // The following table is based on /etc/mime.types data minus
+    // chemical/* MIME types and MIME types that don't map to any
+    // file extensions. We also exclude top-level domain names to
+    // deal with cases like:
+    //
+    // mail.google.com/a/google.com
+    //
+    // and &quot;active&quot; MIME types (due to potential security issues).
+    // Note that this list is _not_ in alphabetical order and must not be sorted.
+    // The &quot;most popular&quot; extension must come first, so that it's the one returned
+    // by guessExtensionFromMimeType.
+<span class="fc" id="L21">    add(&quot;application/andrew-inset&quot;, &quot;ez&quot;);</span>
+<span class="fc" id="L22">    add(&quot;application/dsptype&quot;, &quot;tsp&quot;);</span>
+<span class="fc" id="L23">    add(&quot;application/futuresplash&quot;, &quot;spl&quot;);</span>
+<span class="fc" id="L24">    add(&quot;application/hta&quot;, &quot;hta&quot;);</span>
+<span class="fc" id="L25">    add(&quot;application/mac-binhex40&quot;, &quot;hqx&quot;);</span>
+<span class="fc" id="L26">    add(&quot;application/mac-compactpro&quot;, &quot;cpt&quot;);</span>
+<span class="fc" id="L27">    add(&quot;application/mathematica&quot;, &quot;nb&quot;);</span>
+<span class="fc" id="L28">    add(&quot;application/msaccess&quot;, &quot;mdb&quot;);</span>
+<span class="fc" id="L29">    add(&quot;application/oda&quot;, &quot;oda&quot;);</span>
+<span class="fc" id="L30">    add(&quot;application/ogg&quot;, &quot;ogg&quot;);</span>
+<span class="fc" id="L31">    add(&quot;application/pdf&quot;, &quot;pdf&quot;);</span>
+<span class="fc" id="L32">    add(&quot;application/pgp-keys&quot;, &quot;key&quot;);</span>
+<span class="fc" id="L33">    add(&quot;application/pgp-signature&quot;, &quot;pgp&quot;);</span>
+<span class="fc" id="L34">    add(&quot;application/pics-rules&quot;, &quot;prf&quot;);</span>
+<span class="fc" id="L35">    add(&quot;application/pkix-cert&quot;, &quot;cer&quot;);</span>
+<span class="fc" id="L36">    add(&quot;application/rar&quot;, &quot;rar&quot;);</span>
+<span class="fc" id="L37">    add(&quot;application/rdf+xml&quot;, &quot;rdf&quot;);</span>
+<span class="fc" id="L38">    add(&quot;application/rss+xml&quot;, &quot;rss&quot;);</span>
+<span class="fc" id="L39">    add(&quot;application/zip&quot;, &quot;zip&quot;);</span>
+<span class="fc" id="L40">    add(&quot;application/vnd.android.package-archive&quot;, &quot;apk&quot;);</span>
+<span class="fc" id="L41">    add(&quot;application/vnd.cinderella&quot;, &quot;cdy&quot;);</span>
+<span class="fc" id="L42">    add(&quot;application/vnd.ms-pki.stl&quot;, &quot;stl&quot;);</span>
+<span class="fc" id="L43">    add(&quot;application/vnd.oasis.opendocument.database&quot;, &quot;odb&quot;);</span>
+<span class="fc" id="L44">    add(&quot;application/vnd.oasis.opendocument.formula&quot;, &quot;odf&quot;);</span>
+<span class="fc" id="L45">    add(&quot;application/vnd.oasis.opendocument.graphics&quot;, &quot;odg&quot;);</span>
+<span class="fc" id="L46">    add(&quot;application/vnd.oasis.opendocument.graphics-template&quot;, &quot;otg&quot;);</span>
+<span class="fc" id="L47">    add(&quot;application/vnd.oasis.opendocument.image&quot;, &quot;odi&quot;);</span>
+<span class="fc" id="L48">    add(&quot;application/vnd.oasis.opendocument.spreadsheet&quot;, &quot;ods&quot;);</span>
+<span class="fc" id="L49">    add(&quot;application/vnd.oasis.opendocument.spreadsheet-template&quot;, &quot;ots&quot;);</span>
+<span class="fc" id="L50">    add(&quot;application/vnd.oasis.opendocument.text&quot;, &quot;odt&quot;);</span>
+<span class="fc" id="L51">    add(&quot;application/vnd.oasis.opendocument.text-master&quot;, &quot;odm&quot;);</span>
+<span class="fc" id="L52">    add(&quot;application/vnd.oasis.opendocument.text-template&quot;, &quot;ott&quot;);</span>
+<span class="fc" id="L53">    add(&quot;application/vnd.oasis.opendocument.text-web&quot;, &quot;oth&quot;);</span>
+<span class="fc" id="L54">    add(&quot;application/vnd.google-earth.kml+xml&quot;, &quot;kml&quot;);</span>
+<span class="fc" id="L55">    add(&quot;application/vnd.google-earth.kmz&quot;, &quot;kmz&quot;);</span>
+<span class="fc" id="L56">    add(&quot;application/msword&quot;, &quot;doc&quot;);</span>
+<span class="fc" id="L57">    add(&quot;application/msword&quot;, &quot;dot&quot;);</span>
+<span class="fc" id="L58">    add(&quot;application/vnd.openxmlformats-officedocument.wordprocessingml.document&quot;, &quot;docx&quot;);</span>
+<span class="fc" id="L59">    add(&quot;application/vnd.openxmlformats-officedocument.wordprocessingml.template&quot;, &quot;dotx&quot;);</span>
+<span class="fc" id="L60">    add(&quot;application/vnd.ms-excel&quot;, &quot;xls&quot;);</span>
+<span class="fc" id="L61">    add(&quot;application/vnd.ms-excel&quot;, &quot;xlt&quot;);</span>
+<span class="fc" id="L62">    add(&quot;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet&quot;, &quot;xlsx&quot;);</span>
+<span class="fc" id="L63">    add(&quot;application/vnd.openxmlformats-officedocument.spreadsheetml.template&quot;, &quot;xltx&quot;);</span>
+<span class="fc" id="L64">    add(&quot;application/vnd.ms-powerpoint&quot;, &quot;ppt&quot;);</span>
+<span class="fc" id="L65">    add(&quot;application/vnd.ms-powerpoint&quot;, &quot;pot&quot;);</span>
+<span class="fc" id="L66">    add(&quot;application/vnd.ms-powerpoint&quot;, &quot;pps&quot;);</span>
+<span class="fc" id="L67">    add(&quot;application/vnd.openxmlformats-officedocument.presentationml.presentation&quot;, &quot;pptx&quot;);</span>
+<span class="fc" id="L68">    add(&quot;application/vnd.openxmlformats-officedocument.presentationml.template&quot;, &quot;potx&quot;);</span>
+<span class="fc" id="L69">    add(&quot;application/vnd.openxmlformats-officedocument.presentationml.slideshow&quot;, &quot;ppsx&quot;);</span>
+<span class="fc" id="L70">    add(&quot;application/vnd.rim.cod&quot;, &quot;cod&quot;);</span>
+<span class="fc" id="L71">    add(&quot;application/vnd.smaf&quot;, &quot;mmf&quot;);</span>
+<span class="fc" id="L72">    add(&quot;application/vnd.stardivision.calc&quot;, &quot;sdc&quot;);</span>
+<span class="fc" id="L73">    add(&quot;application/vnd.stardivision.draw&quot;, &quot;sda&quot;);</span>
+<span class="fc" id="L74">    add(&quot;application/vnd.stardivision.impress&quot;, &quot;sdd&quot;);</span>
+<span class="fc" id="L75">    add(&quot;application/vnd.stardivision.impress&quot;, &quot;sdp&quot;);</span>
+<span class="fc" id="L76">    add(&quot;application/vnd.stardivision.math&quot;, &quot;smf&quot;);</span>
+<span class="fc" id="L77">    add(&quot;application/vnd.stardivision.writer&quot;, &quot;sdw&quot;);</span>
+<span class="fc" id="L78">    add(&quot;application/vnd.stardivision.writer&quot;, &quot;vor&quot;);</span>
+<span class="fc" id="L79">    add(&quot;application/vnd.stardivision.writer-global&quot;, &quot;sgl&quot;);</span>
+<span class="fc" id="L80">    add(&quot;application/vnd.sun.xml.calc&quot;, &quot;sxc&quot;);</span>
+<span class="fc" id="L81">    add(&quot;application/vnd.sun.xml.calc.template&quot;, &quot;stc&quot;);</span>
+<span class="fc" id="L82">    add(&quot;application/vnd.sun.xml.draw&quot;, &quot;sxd&quot;);</span>
+<span class="fc" id="L83">    add(&quot;application/vnd.sun.xml.draw.template&quot;, &quot;std&quot;);</span>
+<span class="fc" id="L84">    add(&quot;application/vnd.sun.xml.impress&quot;, &quot;sxi&quot;);</span>
+<span class="fc" id="L85">    add(&quot;application/vnd.sun.xml.impress.template&quot;, &quot;sti&quot;);</span>
+<span class="fc" id="L86">    add(&quot;application/vnd.sun.xml.math&quot;, &quot;sxm&quot;);</span>
+<span class="fc" id="L87">    add(&quot;application/vnd.sun.xml.writer&quot;, &quot;sxw&quot;);</span>
+<span class="fc" id="L88">    add(&quot;application/vnd.sun.xml.writer.global&quot;, &quot;sxg&quot;);</span>
+<span class="fc" id="L89">    add(&quot;application/vnd.sun.xml.writer.template&quot;, &quot;stw&quot;);</span>
+<span class="fc" id="L90">    add(&quot;application/vnd.visio&quot;, &quot;vsd&quot;);</span>
+<span class="fc" id="L91">    add(&quot;application/x-abiword&quot;, &quot;abw&quot;);</span>
+<span class="fc" id="L92">    add(&quot;application/x-apple-diskimage&quot;, &quot;dmg&quot;);</span>
+<span class="fc" id="L93">    add(&quot;application/x-bcpio&quot;, &quot;bcpio&quot;);</span>
+<span class="fc" id="L94">    add(&quot;application/x-bittorrent&quot;, &quot;torrent&quot;);</span>
+<span class="fc" id="L95">    add(&quot;application/x-cdf&quot;, &quot;cdf&quot;);</span>
+<span class="fc" id="L96">    add(&quot;application/x-cdlink&quot;, &quot;vcd&quot;);</span>
+<span class="fc" id="L97">    add(&quot;application/x-chess-pgn&quot;, &quot;pgn&quot;);</span>
+<span class="fc" id="L98">    add(&quot;application/x-cpio&quot;, &quot;cpio&quot;);</span>
+<span class="fc" id="L99">    add(&quot;application/x-debian-package&quot;, &quot;deb&quot;);</span>
+<span class="fc" id="L100">    add(&quot;application/x-debian-package&quot;, &quot;udeb&quot;);</span>
+<span class="fc" id="L101">    add(&quot;application/x-director&quot;, &quot;dcr&quot;);</span>
+<span class="fc" id="L102">    add(&quot;application/x-director&quot;, &quot;dir&quot;);</span>
+<span class="fc" id="L103">    add(&quot;application/x-director&quot;, &quot;dxr&quot;);</span>
+<span class="fc" id="L104">    add(&quot;application/x-dms&quot;, &quot;dms&quot;);</span>
+<span class="fc" id="L105">    add(&quot;application/x-doom&quot;, &quot;wad&quot;);</span>
+<span class="fc" id="L106">    add(&quot;application/x-dvi&quot;, &quot;dvi&quot;);</span>
+<span class="fc" id="L107">    add(&quot;application/x-flac&quot;, &quot;flac&quot;);</span>
+<span class="fc" id="L108">    add(&quot;application/x-font&quot;, &quot;pfa&quot;);</span>
+<span class="fc" id="L109">    add(&quot;application/x-font&quot;, &quot;pfb&quot;);</span>
+<span class="fc" id="L110">    add(&quot;application/x-font&quot;, &quot;gsf&quot;);</span>
+<span class="fc" id="L111">    add(&quot;application/x-font&quot;, &quot;pcf&quot;);</span>
+<span class="fc" id="L112">    add(&quot;application/x-font&quot;, &quot;pcf.Z&quot;);</span>
+<span class="fc" id="L113">    add(&quot;application/x-freemind&quot;, &quot;mm&quot;);</span>
+<span class="fc" id="L114">    add(&quot;application/x-futuresplash&quot;, &quot;spl&quot;);</span>
+<span class="fc" id="L115">    add(&quot;application/x-gnumeric&quot;, &quot;gnumeric&quot;);</span>
+<span class="fc" id="L116">    add(&quot;application/x-go-sgf&quot;, &quot;sgf&quot;);</span>
+<span class="fc" id="L117">    add(&quot;application/x-graphing-calculator&quot;, &quot;gcf&quot;);</span>
+<span class="fc" id="L118">    add(&quot;application/x-gtar&quot;, &quot;tgz&quot;);</span>
+<span class="fc" id="L119">    add(&quot;application/x-gtar&quot;, &quot;gtar&quot;);</span>
+<span class="fc" id="L120">    add(&quot;application/x-gtar&quot;, &quot;taz&quot;);</span>
+<span class="fc" id="L121">    add(&quot;application/x-hdf&quot;, &quot;hdf&quot;);</span>
+<span class="fc" id="L122">    add(&quot;application/x-ica&quot;, &quot;ica&quot;);</span>
+<span class="fc" id="L123">    add(&quot;application/x-internet-signup&quot;, &quot;ins&quot;);</span>
+<span class="fc" id="L124">    add(&quot;application/x-internet-signup&quot;, &quot;isp&quot;);</span>
+<span class="fc" id="L125">    add(&quot;application/x-iphone&quot;, &quot;iii&quot;);</span>
+<span class="fc" id="L126">    add(&quot;application/x-iso9660-image&quot;, &quot;iso&quot;);</span>
+<span class="fc" id="L127">    add(&quot;application/x-jmol&quot;, &quot;jmz&quot;);</span>
+<span class="fc" id="L128">    add(&quot;application/x-kchart&quot;, &quot;chrt&quot;);</span>
+<span class="fc" id="L129">    add(&quot;application/x-killustrator&quot;, &quot;kil&quot;);</span>
+<span class="fc" id="L130">    add(&quot;application/x-koan&quot;, &quot;skp&quot;);</span>
+<span class="fc" id="L131">    add(&quot;application/x-koan&quot;, &quot;skd&quot;);</span>
+<span class="fc" id="L132">    add(&quot;application/x-koan&quot;, &quot;skt&quot;);</span>
+<span class="fc" id="L133">    add(&quot;application/x-koan&quot;, &quot;skm&quot;);</span>
+<span class="fc" id="L134">    add(&quot;application/x-kpresenter&quot;, &quot;kpr&quot;);</span>
+<span class="fc" id="L135">    add(&quot;application/x-kpresenter&quot;, &quot;kpt&quot;);</span>
+<span class="fc" id="L136">    add(&quot;application/x-kspread&quot;, &quot;ksp&quot;);</span>
+<span class="fc" id="L137">    add(&quot;application/x-kword&quot;, &quot;kwd&quot;);</span>
+<span class="fc" id="L138">    add(&quot;application/x-kword&quot;, &quot;kwt&quot;);</span>
+<span class="fc" id="L139">    add(&quot;application/x-latex&quot;, &quot;latex&quot;);</span>
+<span class="fc" id="L140">    add(&quot;application/x-lha&quot;, &quot;lha&quot;);</span>
+<span class="fc" id="L141">    add(&quot;application/x-lzh&quot;, &quot;lzh&quot;);</span>
+<span class="fc" id="L142">    add(&quot;application/x-lzx&quot;, &quot;lzx&quot;);</span>
+<span class="fc" id="L143">    add(&quot;application/x-maker&quot;, &quot;frm&quot;);</span>
+<span class="fc" id="L144">    add(&quot;application/x-maker&quot;, &quot;maker&quot;);</span>
+<span class="fc" id="L145">    add(&quot;application/x-maker&quot;, &quot;frame&quot;);</span>
+<span class="fc" id="L146">    add(&quot;application/x-maker&quot;, &quot;fb&quot;);</span>
+<span class="fc" id="L147">    add(&quot;application/x-maker&quot;, &quot;book&quot;);</span>
+<span class="fc" id="L148">    add(&quot;application/x-maker&quot;, &quot;fbdoc&quot;);</span>
+<span class="fc" id="L149">    add(&quot;application/x-mif&quot;, &quot;mif&quot;);</span>
+<span class="fc" id="L150">    add(&quot;application/x-ms-wmd&quot;, &quot;wmd&quot;);</span>
+<span class="fc" id="L151">    add(&quot;application/x-ms-wmz&quot;, &quot;wmz&quot;);</span>
+<span class="fc" id="L152">    add(&quot;application/x-msi&quot;, &quot;msi&quot;);</span>
+<span class="fc" id="L153">    add(&quot;application/x-ns-proxy-autoconfig&quot;, &quot;pac&quot;);</span>
+<span class="fc" id="L154">    add(&quot;application/x-nwc&quot;, &quot;nwc&quot;);</span>
+<span class="fc" id="L155">    add(&quot;application/x-object&quot;, &quot;o&quot;);</span>
+<span class="fc" id="L156">    add(&quot;application/x-oz-application&quot;, &quot;oza&quot;);</span>
+<span class="fc" id="L157">    add(&quot;application/x-pem-file&quot;, &quot;pem&quot;);</span>
+<span class="fc" id="L158">    add(&quot;application/x-pkcs12&quot;, &quot;p12&quot;);</span>
+<span class="fc" id="L159">    add(&quot;application/x-pkcs12&quot;, &quot;pfx&quot;);</span>
+<span class="fc" id="L160">    add(&quot;application/x-pkcs7-certreqresp&quot;, &quot;p7r&quot;);</span>
+<span class="fc" id="L161">    add(&quot;application/x-pkcs7-crl&quot;, &quot;crl&quot;);</span>
+<span class="fc" id="L162">    add(&quot;application/x-quicktimeplayer&quot;, &quot;qtl&quot;);</span>
+<span class="fc" id="L163">    add(&quot;application/x-shar&quot;, &quot;shar&quot;);</span>
+<span class="fc" id="L164">    add(&quot;application/x-shockwave-flash&quot;, &quot;swf&quot;);</span>
+<span class="fc" id="L165">    add(&quot;application/x-stuffit&quot;, &quot;sit&quot;);</span>
+<span class="fc" id="L166">    add(&quot;application/x-sv4cpio&quot;, &quot;sv4cpio&quot;);</span>
+<span class="fc" id="L167">    add(&quot;application/x-sv4crc&quot;, &quot;sv4crc&quot;);</span>
+<span class="fc" id="L168">    add(&quot;application/x-tar&quot;, &quot;tar&quot;);</span>
+<span class="fc" id="L169">    add(&quot;application/x-texinfo&quot;, &quot;texinfo&quot;);</span>
+<span class="fc" id="L170">    add(&quot;application/x-texinfo&quot;, &quot;texi&quot;);</span>
+<span class="fc" id="L171">    add(&quot;application/x-troff&quot;, &quot;t&quot;);</span>
+<span class="fc" id="L172">    add(&quot;application/x-troff&quot;, &quot;roff&quot;);</span>
+<span class="fc" id="L173">    add(&quot;application/x-troff-man&quot;, &quot;man&quot;);</span>
+<span class="fc" id="L174">    add(&quot;application/x-ustar&quot;, &quot;ustar&quot;);</span>
+<span class="fc" id="L175">    add(&quot;application/x-wais-source&quot;, &quot;src&quot;);</span>
+<span class="fc" id="L176">    add(&quot;application/x-wingz&quot;, &quot;wz&quot;);</span>
+<span class="fc" id="L177">    add(&quot;application/x-webarchive&quot;, &quot;webarchive&quot;);</span>
+<span class="fc" id="L178">    add(&quot;application/x-webarchive-xml&quot;, &quot;webarchivexml&quot;);</span>
+<span class="fc" id="L179">    add(&quot;application/x-x509-ca-cert&quot;, &quot;crt&quot;);</span>
+<span class="fc" id="L180">    add(&quot;application/x-x509-user-cert&quot;, &quot;crt&quot;);</span>
+<span class="fc" id="L181">    add(&quot;application/x-x509-server-cert&quot;, &quot;crt&quot;);</span>
+<span class="fc" id="L182">    add(&quot;application/x-xcf&quot;, &quot;xcf&quot;);</span>
+<span class="fc" id="L183">    add(&quot;application/x-xfig&quot;, &quot;fig&quot;);</span>
+<span class="fc" id="L184">    add(&quot;application/xhtml+xml&quot;, &quot;xhtml&quot;);</span>
+<span class="fc" id="L185">    add(&quot;audio/3gpp&quot;, &quot;3gpp&quot;);</span>
+<span class="fc" id="L186">    add(&quot;audio/amr&quot;, &quot;amr&quot;);</span>
+<span class="fc" id="L187">    add(&quot;audio/basic&quot;, &quot;snd&quot;);</span>
+<span class="fc" id="L188">    add(&quot;audio/midi&quot;, &quot;mid&quot;);</span>
+<span class="fc" id="L189">    add(&quot;audio/midi&quot;, &quot;midi&quot;);</span>
+<span class="fc" id="L190">    add(&quot;audio/midi&quot;, &quot;kar&quot;);</span>
+<span class="fc" id="L191">    add(&quot;audio/midi&quot;, &quot;xmf&quot;);</span>
+<span class="fc" id="L192">    add(&quot;audio/mobile-xmf&quot;, &quot;mxmf&quot;);</span>
+    // add &quot;.mp3&quot; first so it will be the default for guessExtensionFromMimeType
+<span class="fc" id="L194">    add(&quot;audio/mpeg&quot;, &quot;mp3&quot;);</span>
+<span class="fc" id="L195">    add(&quot;audio/mpeg&quot;, &quot;mpga&quot;);</span>
+<span class="fc" id="L196">    add(&quot;audio/mpeg&quot;, &quot;mpega&quot;);</span>
+<span class="fc" id="L197">    add(&quot;audio/mpeg&quot;, &quot;mp2&quot;);</span>
+<span class="fc" id="L198">    add(&quot;audio/mpeg&quot;, &quot;m4a&quot;);</span>
+<span class="fc" id="L199">    add(&quot;audio/mpegurl&quot;, &quot;m3u&quot;);</span>
+<span class="fc" id="L200">    add(&quot;audio/prs.sid&quot;, &quot;sid&quot;);</span>
+<span class="fc" id="L201">    add(&quot;audio/x-aiff&quot;, &quot;aif&quot;);</span>
+<span class="fc" id="L202">    add(&quot;audio/x-aiff&quot;, &quot;aiff&quot;);</span>
+<span class="fc" id="L203">    add(&quot;audio/x-aiff&quot;, &quot;aifc&quot;);</span>
+<span class="fc" id="L204">    add(&quot;audio/x-gsm&quot;, &quot;gsm&quot;);</span>
+<span class="fc" id="L205">    add(&quot;audio/x-mpegurl&quot;, &quot;m3u&quot;);</span>
+<span class="fc" id="L206">    add(&quot;audio/x-ms-wma&quot;, &quot;wma&quot;);</span>
+<span class="fc" id="L207">    add(&quot;audio/x-ms-wax&quot;, &quot;wax&quot;);</span>
+<span class="fc" id="L208">    add(&quot;audio/x-pn-realaudio&quot;, &quot;ra&quot;);</span>
+<span class="fc" id="L209">    add(&quot;audio/x-pn-realaudio&quot;, &quot;rm&quot;);</span>
+<span class="fc" id="L210">    add(&quot;audio/x-pn-realaudio&quot;, &quot;ram&quot;);</span>
+<span class="fc" id="L211">    add(&quot;audio/x-realaudio&quot;, &quot;ra&quot;);</span>
+<span class="fc" id="L212">    add(&quot;audio/x-scpls&quot;, &quot;pls&quot;);</span>
+<span class="fc" id="L213">    add(&quot;audio/x-sd2&quot;, &quot;sd2&quot;);</span>
+<span class="fc" id="L214">    add(&quot;audio/x-wav&quot;, &quot;wav&quot;);</span>
+<span class="fc" id="L215">    add(&quot;image/bmp&quot;, &quot;bmp&quot;);</span>
+<span class="fc" id="L216">    add(&quot;image/gif&quot;, &quot;gif&quot;);</span>
+<span class="fc" id="L217">    add(&quot;image/ico&quot;, &quot;cur&quot;);</span>
+<span class="fc" id="L218">    add(&quot;image/ico&quot;, &quot;ico&quot;);</span>
+<span class="fc" id="L219">    add(&quot;image/ief&quot;, &quot;ief&quot;);</span>
+<span class="fc" id="L220">    add(&quot;image/jpeg&quot;, &quot;jpeg&quot;);</span>
+<span class="fc" id="L221">    add(&quot;image/jpeg&quot;, &quot;jpg&quot;);</span>
+<span class="fc" id="L222">    add(&quot;image/jpeg&quot;, &quot;jpe&quot;);</span>
+<span class="fc" id="L223">    add(&quot;image/pcx&quot;, &quot;pcx&quot;);</span>
+<span class="fc" id="L224">    add(&quot;image/png&quot;, &quot;png&quot;);</span>
+<span class="fc" id="L225">    add(&quot;image/svg+xml&quot;, &quot;svg&quot;);</span>
+<span class="fc" id="L226">    add(&quot;image/svg+xml&quot;, &quot;svgz&quot;);</span>
+<span class="fc" id="L227">    add(&quot;image/tiff&quot;, &quot;tiff&quot;);</span>
+<span class="fc" id="L228">    add(&quot;image/tiff&quot;, &quot;tif&quot;);</span>
+<span class="fc" id="L229">    add(&quot;image/vnd.djvu&quot;, &quot;djvu&quot;);</span>
+<span class="fc" id="L230">    add(&quot;image/vnd.djvu&quot;, &quot;djv&quot;);</span>
+<span class="fc" id="L231">    add(&quot;image/vnd.wap.wbmp&quot;, &quot;wbmp&quot;);</span>
+<span class="fc" id="L232">    add(&quot;image/x-cmu-raster&quot;, &quot;ras&quot;);</span>
+<span class="fc" id="L233">    add(&quot;image/x-coreldraw&quot;, &quot;cdr&quot;);</span>
+<span class="fc" id="L234">    add(&quot;image/x-coreldrawpattern&quot;, &quot;pat&quot;);</span>
+<span class="fc" id="L235">    add(&quot;image/x-coreldrawtemplate&quot;, &quot;cdt&quot;);</span>
+<span class="fc" id="L236">    add(&quot;image/x-corelphotopaint&quot;, &quot;cpt&quot;);</span>
+<span class="fc" id="L237">    add(&quot;image/x-icon&quot;, &quot;ico&quot;);</span>
+<span class="fc" id="L238">    add(&quot;image/x-jg&quot;, &quot;art&quot;);</span>
+<span class="fc" id="L239">    add(&quot;image/x-jng&quot;, &quot;jng&quot;);</span>
+<span class="fc" id="L240">    add(&quot;image/x-ms-bmp&quot;, &quot;bmp&quot;);</span>
+<span class="fc" id="L241">    add(&quot;image/x-photoshop&quot;, &quot;psd&quot;);</span>
+<span class="fc" id="L242">    add(&quot;image/x-portable-anymap&quot;, &quot;pnm&quot;);</span>
+<span class="fc" id="L243">    add(&quot;image/x-portable-bitmap&quot;, &quot;pbm&quot;);</span>
+<span class="fc" id="L244">    add(&quot;image/x-portable-graymap&quot;, &quot;pgm&quot;);</span>
+<span class="fc" id="L245">    add(&quot;image/x-portable-pixmap&quot;, &quot;ppm&quot;);</span>
+<span class="fc" id="L246">    add(&quot;image/x-rgb&quot;, &quot;rgb&quot;);</span>
+<span class="fc" id="L247">    add(&quot;image/x-xbitmap&quot;, &quot;xbm&quot;);</span>
+<span class="fc" id="L248">    add(&quot;image/x-xpixmap&quot;, &quot;xpm&quot;);</span>
+<span class="fc" id="L249">    add(&quot;image/x-xwindowdump&quot;, &quot;xwd&quot;);</span>
+<span class="fc" id="L250">    add(&quot;model/iges&quot;, &quot;igs&quot;);</span>
+<span class="fc" id="L251">    add(&quot;model/iges&quot;, &quot;iges&quot;);</span>
+<span class="fc" id="L252">    add(&quot;model/mesh&quot;, &quot;msh&quot;);</span>
+<span class="fc" id="L253">    add(&quot;model/mesh&quot;, &quot;mesh&quot;);</span>
+<span class="fc" id="L254">    add(&quot;model/mesh&quot;, &quot;silo&quot;);</span>
+<span class="fc" id="L255">    add(&quot;text/calendar&quot;, &quot;ics&quot;);</span>
+<span class="fc" id="L256">    add(&quot;text/calendar&quot;, &quot;icz&quot;);</span>
+<span class="fc" id="L257">    add(&quot;text/comma-separated-values&quot;, &quot;csv&quot;);</span>
+<span class="fc" id="L258">    add(&quot;text/css&quot;, &quot;css&quot;);</span>
+<span class="fc" id="L259">    add(&quot;text/html&quot;, &quot;htm&quot;);</span>
+<span class="fc" id="L260">    add(&quot;text/html&quot;, &quot;html&quot;);</span>
+<span class="fc" id="L261">    add(&quot;text/h323&quot;, &quot;323&quot;);</span>
+<span class="fc" id="L262">    add(&quot;text/iuls&quot;, &quot;uls&quot;);</span>
+<span class="fc" id="L263">    add(&quot;text/mathml&quot;, &quot;mml&quot;);</span>
+    // add &quot;.txt&quot; first so it will be the default for guessExtensionFromMimeType
+<span class="fc" id="L265">    add(&quot;text/plain&quot;, &quot;txt&quot;);</span>
+<span class="fc" id="L266">    add(&quot;text/plain&quot;, &quot;asc&quot;);</span>
+<span class="fc" id="L267">    add(&quot;text/plain&quot;, &quot;text&quot;);</span>
+<span class="fc" id="L268">    add(&quot;text/plain&quot;, &quot;diff&quot;);</span>
+<span class="fc" id="L269">    add(&quot;text/plain&quot;, &quot;po&quot;);     // reserve &quot;pot&quot; for vnd.ms-powerpoint</span>
+<span class="fc" id="L270">    add(&quot;text/richtext&quot;, &quot;rtx&quot;);</span>
+<span class="fc" id="L271">    add(&quot;text/rtf&quot;, &quot;rtf&quot;);</span>
+<span class="fc" id="L272">    add(&quot;text/texmacs&quot;, &quot;ts&quot;);</span>
+<span class="fc" id="L273">    add(&quot;text/text&quot;, &quot;phps&quot;);</span>
+<span class="fc" id="L274">    add(&quot;text/tab-separated-values&quot;, &quot;tsv&quot;);</span>
+<span class="fc" id="L275">    add(&quot;text/xml&quot;, &quot;xml&quot;);</span>
+<span class="fc" id="L276">    add(&quot;text/x-bibtex&quot;, &quot;bib&quot;);</span>
+<span class="fc" id="L277">    add(&quot;text/x-boo&quot;, &quot;boo&quot;);</span>
+<span class="fc" id="L278">    add(&quot;text/x-c++hdr&quot;, &quot;hpp&quot;);</span>
+<span class="fc" id="L279">    add(&quot;text/x-c++hdr&quot;, &quot;h++&quot;);</span>
+<span class="fc" id="L280">    add(&quot;text/x-c++hdr&quot;, &quot;hxx&quot;);</span>
+<span class="fc" id="L281">    add(&quot;text/x-c++hdr&quot;, &quot;hh&quot;);</span>
+<span class="fc" id="L282">    add(&quot;text/x-c++src&quot;, &quot;cpp&quot;);</span>
+<span class="fc" id="L283">    add(&quot;text/x-c++src&quot;, &quot;c++&quot;);</span>
+<span class="fc" id="L284">    add(&quot;text/x-c++src&quot;, &quot;cc&quot;);</span>
+<span class="fc" id="L285">    add(&quot;text/x-c++src&quot;, &quot;cxx&quot;);</span>
+<span class="fc" id="L286">    add(&quot;text/x-chdr&quot;, &quot;h&quot;);</span>
+<span class="fc" id="L287">    add(&quot;text/x-component&quot;, &quot;htc&quot;);</span>
+<span class="fc" id="L288">    add(&quot;text/x-csh&quot;, &quot;csh&quot;);</span>
+<span class="fc" id="L289">    add(&quot;text/x-csrc&quot;, &quot;c&quot;);</span>
+<span class="fc" id="L290">    add(&quot;text/x-dsrc&quot;, &quot;d&quot;);</span>
+<span class="fc" id="L291">    add(&quot;text/x-haskell&quot;, &quot;hs&quot;);</span>
+<span class="fc" id="L292">    add(&quot;text/x-java&quot;, &quot;java&quot;);</span>
+<span class="fc" id="L293">    add(&quot;text/x-literate-haskell&quot;, &quot;lhs&quot;);</span>
+<span class="fc" id="L294">    add(&quot;text/x-moc&quot;, &quot;moc&quot;);</span>
+<span class="fc" id="L295">    add(&quot;text/x-pascal&quot;, &quot;p&quot;);</span>
+<span class="fc" id="L296">    add(&quot;text/x-pascal&quot;, &quot;pas&quot;);</span>
+<span class="fc" id="L297">    add(&quot;text/x-pcs-gcd&quot;, &quot;gcd&quot;);</span>
+<span class="fc" id="L298">    add(&quot;text/x-setext&quot;, &quot;etx&quot;);</span>
+<span class="fc" id="L299">    add(&quot;text/x-tcl&quot;, &quot;tcl&quot;);</span>
+<span class="fc" id="L300">    add(&quot;text/x-tex&quot;, &quot;tex&quot;);</span>
+<span class="fc" id="L301">    add(&quot;text/x-tex&quot;, &quot;ltx&quot;);</span>
+<span class="fc" id="L302">    add(&quot;text/x-tex&quot;, &quot;sty&quot;);</span>
+<span class="fc" id="L303">    add(&quot;text/x-tex&quot;, &quot;cls&quot;);</span>
+<span class="fc" id="L304">    add(&quot;text/x-vcalendar&quot;, &quot;vcs&quot;);</span>
+<span class="fc" id="L305">    add(&quot;text/x-vcard&quot;, &quot;vcf&quot;);</span>
+<span class="fc" id="L306">    add(&quot;video/3gpp&quot;, &quot;3gpp&quot;);</span>
+<span class="fc" id="L307">    add(&quot;video/3gpp&quot;, &quot;3gp&quot;);</span>
+<span class="fc" id="L308">    add(&quot;video/3gpp&quot;, &quot;3g2&quot;);</span>
+<span class="fc" id="L309">    add(&quot;video/dl&quot;, &quot;dl&quot;);</span>
+<span class="fc" id="L310">    add(&quot;video/dv&quot;, &quot;dif&quot;);</span>
+<span class="fc" id="L311">    add(&quot;video/dv&quot;, &quot;dv&quot;);</span>
+<span class="fc" id="L312">    add(&quot;video/fli&quot;, &quot;fli&quot;);</span>
+<span class="fc" id="L313">    add(&quot;video/m4v&quot;, &quot;m4v&quot;);</span>
+<span class="fc" id="L314">    add(&quot;video/mpeg&quot;, &quot;mpeg&quot;);</span>
+<span class="fc" id="L315">    add(&quot;video/mpeg&quot;, &quot;mpg&quot;);</span>
+<span class="fc" id="L316">    add(&quot;video/mpeg&quot;, &quot;mpe&quot;);</span>
+<span class="fc" id="L317">    add(&quot;video/mp4&quot;, &quot;mp4&quot;);</span>
+<span class="fc" id="L318">    add(&quot;video/mpeg&quot;, &quot;VOB&quot;);</span>
+<span class="fc" id="L319">    add(&quot;video/quicktime&quot;, &quot;qt&quot;);</span>
+<span class="fc" id="L320">    add(&quot;video/quicktime&quot;, &quot;mov&quot;);</span>
+<span class="fc" id="L321">    add(&quot;video/vnd.mpegurl&quot;, &quot;mxu&quot;);</span>
+<span class="fc" id="L322">    add(&quot;video/x-la-asf&quot;, &quot;lsf&quot;);</span>
+<span class="fc" id="L323">    add(&quot;video/x-la-asf&quot;, &quot;lsx&quot;);</span>
+<span class="fc" id="L324">    add(&quot;video/x-mng&quot;, &quot;mng&quot;);</span>
+<span class="fc" id="L325">    add(&quot;video/x-ms-asf&quot;, &quot;asf&quot;);</span>
+<span class="fc" id="L326">    add(&quot;video/x-ms-asf&quot;, &quot;asx&quot;);</span>
+<span class="fc" id="L327">    add(&quot;video/x-ms-wm&quot;, &quot;wm&quot;);</span>
+<span class="fc" id="L328">    add(&quot;video/x-ms-wmv&quot;, &quot;wmv&quot;);</span>
+<span class="fc" id="L329">    add(&quot;video/x-ms-wmx&quot;, &quot;wmx&quot;);</span>
+<span class="fc" id="L330">    add(&quot;video/x-ms-wvx&quot;, &quot;wvx&quot;);</span>
+<span class="fc" id="L331">    add(&quot;video/x-msvideo&quot;, &quot;avi&quot;);</span>
+<span class="fc" id="L332">    add(&quot;video/x-sgi-movie&quot;, &quot;movie&quot;);</span>
+<span class="fc" id="L333">    add(&quot;video/x-webex&quot;, &quot;wrf&quot;);</span>
+<span class="fc" id="L334">    add(&quot;x-conference/x-cooltalk&quot;, &quot;ice&quot;);</span>
+<span class="fc" id="L335">    add(&quot;x-epoc/x-sisx-app&quot;, &quot;sisx&quot;);</span>
+//    applyOverrides();
+<span class="fc" id="L337">  }</span>
+  private static void add(String mimeType, String extension) {
+    //
+    // if we have an existing x --&gt; y mapping, we do not want to
+    // override it with another mapping x --&gt; ?
+    // this is mostly because of the way the mime-type map below
+    // is constructed (if a mime type maps to several extensions
+    // the first extension is considered the most popular and is
+    // added first; we do not want to overwrite it later).
+    //
+<span class="fc bfc" id="L347" title="All 2 branches covered.">    if (!mimeTypeToExtensionMap.containsKey(mimeType)) {</span>
+<span class="fc" id="L348">      mimeTypeToExtensionMap.put(mimeType, extension);</span>
+    }
+<span class="fc" id="L350">    extensionToMimeTypeMap.put(extension, mimeType);</span>
+<span class="fc" id="L351">  }</span>
+//  private static InputStream getContentTypesPropertiesStream() {
+//    // User override?
+//    String userTable = System.getProperty(&quot;content.types.user.table&quot;);
+//    if (userTable != null) {
+//      File f = new File(userTable);
+//      if (f.exists()) {
+//        try {
+//          return new FileInputStream(f);
+//        } catch (IOException ignored) {
+//        }
+//      }
+//    }
+//    // Standard location?
+//    File f = new File(System.getProperty(&quot;java.home&quot;), &quot;lib&quot; + File.separator + &quot;content-types.properties&quot;);
+//    if (f.exists()) {
+//      try {
+//        return new FileInputStream(f);
+//      } catch (IOException ignored) {
+//      }
+//    }
+//    return null;
+//  }
+//  private static void applyOverrides() {
+//    // Get the appropriate InputStream to read overrides from, if any.
+//    InputStream stream = getContentTypesPropertiesStream();
+//    if (stream == null) {
+//      return;
+//    }
+//    try {
+//      try {
+//        // Read the properties file...
+//        Properties overrides = new Properties();
+//        overrides.load(stream);
+//        // And translate its mapping to ours...
+//        for (Map.Entry&lt;Object, Object&gt; entry : overrides.entrySet()) {
+//          String extension = (String) entry.getKey();
+//          String mimeType = (String) entry.getValue();
+//          add(mimeType, extension);
+//        }
+//      } finally {
+//        stream.close();
+//      }
+//    } catch (IOException ignored) {
+//    }
+//  }
+  private MimeUtils() {
+  }
+  public static String guessExtensionFromMimeType(String mimeType) {
+<span class="nc bnc" id="L400" title="All 4 branches missed.">    if (mimeType == null || mimeType.isEmpty()) {</span>
+<span class="nc" id="L401">      return null;</span>
+    }
+<span class="nc" id="L403">    return mimeTypeToExtensionMap.get(mimeType);</span>
+  }
+  public static String guessMimeTypeFromExtension(String extension) {
+<span class="pc bpc" id="L406" title="2 of 4 branches missed.">    if (extension == null || extension.isEmpty()) {</span>
+<span class="nc" id="L407">      return null;</span>
+    }
+<span class="fc" id="L409">    return extensionToMimeTypeMap.get(extension);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

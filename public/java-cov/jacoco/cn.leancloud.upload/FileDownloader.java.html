@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileDownloader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.upload</a> &gt; <span class="el_source">FileDownloader.java</span></div><h1>FileDownloader.java</h1><pre class="source lang-java linenums">package cn.leancloud.upload;
+
+import cn.leancloud.LCException;
+import cn.leancloud.LCLogger;
+import cn.leancloud.cache.PersistenceUtil;
+import cn.leancloud.utils.LogUtil;
+import cn.leancloud.utils.StringUtil;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+
+import java.io.*;
+import java.nio.file.FileAlreadyExistsException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+
+<span class="fc" id="L17">public class FileDownloader {</span>
+<span class="fc" id="L18">  private static final LCLogger gLogger = LogUtil.getLogger(FileDownloader.class);</span>
+
+  private static final int READ_BUF_SIZE = 1024*8;
+
+  public LCException execute(final String url, File localFile) {
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(url)) {</span>
+<span class="nc" id="L24">      return new LCException(new IllegalArgumentException(&quot;url is null&quot;));</span>
+    }
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">    if (localFile.exists()) {</span>
+<span class="nc" id="L27">      return new LCException(new FileAlreadyExistsException(&quot;local file already existed.&quot;));</span>
+    }
+<span class="fc" id="L29">    return downloadFileFromNetwork(url, localFile);</span>
+  }
+
+  private OkHttpClient createHttpClient() {
+<span class="fc" id="L33">    return new OkHttpClient.Builder()</span>
+<span class="fc" id="L34">            .connectTimeout(15, TimeUnit.SECONDS)</span>
+<span class="fc" id="L35">            .readTimeout(10, TimeUnit.SECONDS)</span>
+<span class="fc" id="L36">            .writeTimeout(10, TimeUnit.SECONDS)</span>
+<span class="fc" id="L37">            .build();</span>
+  }
+
+  private LCException downloadFileFromNetwork(final String url, File cacheFile) {
+
+<span class="fc" id="L42">    LCException errors = null;</span>
+<span class="fc" id="L43">    Request.Builder requestBuilder = new Request.Builder();</span>
+<span class="fc" id="L44">    requestBuilder.url(url);</span>
+
+<span class="fc" id="L46">    OkHttpClient client = createHttpClient();</span>
+<span class="fc" id="L47">    Response response = null;</span>
+    try {
+<span class="fc" id="L49">      response = client.newCall(requestBuilder.build()).execute();</span>
+<span class="fc" id="L50">      int statusCode = response.code();</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">      if (null == response.body()) {</span>
+<span class="nc" id="L52">        errors = new LCException(statusCode, &quot;response body is invalid&quot;);</span>
+<span class="nc" id="L53">        gLogger.w(errors);</span>
+      } else {
+<span class="fc" id="L55">        InputStream data = response.body().byteStream();</span>
+<span class="pc bpc" id="L56" title="1 of 4 branches missed.">        if (statusCode / 100 == 2 &amp;&amp; null != data) {</span>
+          // read data from InputStream and save to cache File
+<span class="fc" id="L58">          byte[] content = new byte[READ_BUF_SIZE];</span>
+
+<span class="fc" id="L60">          Lock writeLock = PersistenceUtil.sharedInstance().getLock(cacheFile.getAbsolutePath()).writeLock();</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">          if (writeLock.tryLock()) {</span>
+<span class="fc" id="L62">            FileOutputStream out = null;</span>
+            try {
+<span class="fc" id="L64">              out = new FileOutputStream(cacheFile, false);</span>
+<span class="fc" id="L65">              int currentReadSize = data.read(content);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">              while (currentReadSize &gt; 0) {</span>
+<span class="fc" id="L67">                out.write(content, 0, currentReadSize);</span>
+<span class="fc" id="L68">                currentReadSize = data.read(content);</span>
+              }
+<span class="nc" id="L70">            } catch (Exception e) {</span>
+<span class="nc" id="L71">              gLogger.w(e);</span>
+<span class="nc" id="L72">              errors = new LCException(e);</span>
+            } finally {
+              try {
+<span class="fc" id="L75">                data.close();</span>
+<span class="nc" id="L76">              } catch (IOException e) {</span>
+<span class="fc" id="L77">              }</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">              if (out != null) {</span>
+                try {
+<span class="fc" id="L80">                  out.close();</span>
+<span class="nc" id="L81">                } catch (IOException e) {</span>
+<span class="fc" id="L82">                }</span>
+              }
+<span class="fc" id="L84">              writeLock.unlock();</span>
+            }
+<span class="fc" id="L86">          } else {</span>
+<span class="nc" id="L87">            gLogger.w(&quot;failed to lock writeLocker, skip to save network streaming to local cache.&quot;);</span>
+          }
+<span class="fc" id="L89">        } else {</span>
+<span class="fc" id="L90">          errors = new LCException(statusCode, &quot;status code is invalid&quot;);</span>
+<span class="fc" id="L91">          gLogger.w(errors);</span>
+        }
+      }
+<span class="nc" id="L94">    } catch (IOException ex) {</span>
+<span class="nc" id="L95">      errors = new LCException(ex);</span>
+    } finally {
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">      if (null != response) {</span>
+<span class="fc" id="L98">        response.close();</span>
+      }
+    }
+<span class="fc" id="L101">    return errors;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

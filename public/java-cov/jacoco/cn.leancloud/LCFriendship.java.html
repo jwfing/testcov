@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LCFriendship.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud</a> &gt; <span class="el_source">LCFriendship.java</span></div><h1>LCFriendship.java</h1><pre class="source lang-java linenums">package cn.leancloud;
+
+import cn.leancloud.annotation.LCClassName;
+import cn.leancloud.utils.ErrorUtils;
+import io.reactivex.Observable;
+
+@LCClassName(&quot;_Followee&quot;)
+public class LCFriendship extends LCObject {
+  public static final String CLASS_NAME = &quot;_Followee&quot;;
+
+  public static final String ATTR_FOLLOWEE = &quot;followee&quot;;// user who was followed by other
+  public static final String ATTR_FOLLOWER = &quot;follower&quot;;// user who followed someone.
+  public static final String ATTR_USER = &quot;user&quot;;
+  public static final String ATTR_FRIEND_STATUS = &quot;friendStatus&quot;;
+
+  public LCFriendship() {
+<span class="fc" id="L17">    super(CLASS_NAME);</span>
+<span class="fc" id="L18">  }</span>
+
+  public LCFriendship(LCObject object) {
+<span class="fc" id="L21">    super(object);</span>
+<span class="fc" id="L22">    setClassName(CLASS_NAME);</span>
+<span class="fc" id="L23">  }</span>
+
+  public LCUser getFollowee() {
+<span class="nc" id="L26">    return getLCObject(ATTR_FOLLOWEE);</span>
+  }
+
+  public void setFollowee(LCUser followee) {
+<span class="nc" id="L30">    put(ATTR_FOLLOWEE, followee);</span>
+<span class="nc" id="L31">  }</span>
+
+  public LCUser getFollower() {
+<span class="nc" id="L34">    return getLCObject(ATTR_FOLLOWER);</span>
+  }
+
+  public void setFollower(LCUser follower) {
+<span class="nc" id="L38">    put(ATTR_FOLLOWER, follower);</span>
+<span class="nc" id="L39">  }</span>
+
+  /**
+   * save friendship in backgound.
+   * @param option save option.
+   * @return observable instance.
+   */
+  @Override
+  public Observable&lt;? extends LCObject&gt; saveInBackground(final LCSaveOption option) {
+<span class="nc" id="L48">    LCUser currentUser = LCUser.currentUser();</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">    if (null == currentUser) {</span>
+<span class="nc" id="L50">      return Observable.error(ErrorUtils.propagateException(LCException.SESSION_MISSING,</span>
+              &quot;No valid session token, make sure signUp or login has been called.&quot;));
+    }
+<span class="nc" id="L53">    return currentUser.updateFriendship(this);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

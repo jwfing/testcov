@@ -1,0 +1,344 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Utils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.ops</a> &gt; <span class="el_source">Utils.java</span></div><h1>Utils.java</h1><pre class="source lang-java linenums">package cn.leancloud.ops;
+
+import java.util.*;
+
+import cn.leancloud.*;
+import cn.leancloud.gson.ObjectDeserializer;
+import cn.leancloud.types.LCGeoPoint;
+import cn.leancloud.utils.StringUtil;
+
+import cn.leancloud.codec.Base64;
+import cn.leancloud.json.JSONObject;
+
+<span class="nc" id="L13">public class Utils {</span>
+  private static final String typeTag = &quot;__type&quot;;
+
+  public static Map&lt;String, Object&gt; createPointerArrayOpMap(String key, String op,
+                                                            Collection&lt;LCObject&gt; objects) {
+<span class="nc" id="L18">    Map&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L19">    map.put(&quot;__op&quot;, op);</span>
+<span class="nc" id="L20">    List&lt;Map&lt;String, ?&gt;&gt; list = new ArrayList&lt;Map&lt;String, ?&gt;&gt;();</span>
+<span class="nc bnc" id="L21" title="All 2 branches missed.">    for (LCObject obj : objects) {</span>
+<span class="nc" id="L22">      list.add(mapFromPointerObject(obj));</span>
+<span class="nc" id="L23">    }</span>
+<span class="nc" id="L24">    map.put(&quot;objects&quot;, list);</span>
+<span class="nc" id="L25">    Map&lt;String, Object&gt; result = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L26">    result.put(key, map);</span>
+<span class="nc" id="L27">    return result;</span>
+  }
+
+  public static Map&lt;String, Object&gt; mapFromPointerObject(LCObject object) {
+<span class="fc" id="L31">    return mapFromAVObject(object, false);</span>
+  }
+
+  public static Map&lt;String, Object&gt; mapFromGeoPoint(LCGeoPoint point) {
+<span class="nc" id="L35">    Map&lt;String, Object&gt; result = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L36">    result.put(typeTag, &quot;GeoPoint&quot;);</span>
+<span class="nc" id="L37">    result.put(&quot;latitude&quot;, point.getLatitude());</span>
+<span class="nc" id="L38">    result.put(&quot;longitude&quot;, point.getLongitude());</span>
+<span class="nc" id="L39">    return result;</span>
+  }
+
+  public static LCGeoPoint geoPointFromMap(Map&lt;String, Object&gt; map) {
+<span class="fc" id="L43">    double la = ((Number) map.get(&quot;latitude&quot;)).doubleValue();</span>
+<span class="fc" id="L44">    double lo = ((Number) map.get(&quot;longitude&quot;)).doubleValue();</span>
+<span class="fc" id="L45">    LCGeoPoint point = new LCGeoPoint(la, lo);</span>
+<span class="fc" id="L46">    return point;</span>
+  }
+
+  public static LCObject parseObjectFromMap(Map&lt;String, Object&gt; map) {
+<span class="fc" id="L50">    LCObject LCObject = Transformer.objectFromClassName((String) map.get(&quot;className&quot;));</span>
+<span class="fc" id="L51">    map.remove(&quot;__type&quot;);</span>
+<span class="fc" id="L52">    LCObject.resetServerData(map);</span>
+<span class="fc" id="L53">    return LCObject;</span>
+  }
+
+  public static byte[] dataFromMap(Map&lt;String, Object&gt; map) {
+<span class="fc" id="L57">    String value = (String) map.get(&quot;base64&quot;);</span>
+<span class="fc" id="L58">    return Base64.decode(value, Base64.NO_WRAP);</span>
+  }
+  public static Date dateFromMap(Map&lt;String, Object&gt; map) {
+<span class="fc" id="L61">    String value = (String) map.get(&quot;iso&quot;);</span>
+<span class="fc" id="L62">    return StringUtil.dateFromString(value);</span>
+  }
+
+
+  public static Map&lt;String, Object&gt; mapFromDate(Date date) {
+<span class="fc" id="L67">    Map&lt;String, Object&gt; result = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L68">    result.put(typeTag, &quot;Date&quot;);</span>
+<span class="fc" id="L69">    result.put(&quot;iso&quot;, StringUtil.stringFromDate(date));</span>
+<span class="fc" id="L70">    return result;</span>
+  }
+
+  public static Map&lt;String, Object&gt; mapFromByteArray(byte[] data) {
+<span class="nc" id="L74">    Map&lt;String, Object&gt; result = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L75">    result.put(typeTag, &quot;Bytes&quot;);</span>
+<span class="nc" id="L76">    result.put(&quot;base64&quot;, Base64.encodeToString(data, Base64.NO_WRAP));</span>
+<span class="nc" id="L77">    return result;</span>
+  }
+
+  public static Map&lt;String, Object&gt; mapFromFile(LCFile file) {
+<span class="nc" id="L81">    Map&lt;String, Object&gt; result = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L82">    result.put(&quot;__type&quot;, &quot;_File&quot;);</span>
+<span class="nc" id="L83">    result.put(&quot;metaData&quot;, file.getMetaData());</span>
+<span class="nc" id="L84">    result.put(&quot;id&quot;, file.getName());</span>
+<span class="nc" id="L85">    return result;</span>
+  }
+
+  public static Map&lt;String, Object&gt; mapFromAVObject(LCObject object, boolean topObject) {
+<span class="fc" id="L89">    Map&lt;String, Object&gt; result = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L90">    result.put(&quot;className&quot;, object.internalClassName());</span>
+
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(object.getObjectId())) {</span>
+<span class="fc" id="L93">      result.put(&quot;objectId&quot;, object.getObjectId());</span>
+    }
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">    if (!topObject) {</span>
+<span class="fc" id="L96">      result.put(&quot;__type&quot;, &quot;Pointer&quot;);</span>
+    } else {
+<span class="nc" id="L98">      result.put(&quot;__type&quot;, &quot;Object&quot;);</span>
+
+<span class="nc" id="L100">      Map&lt;String, Object&gt; serverData = getParsedMap(object.getServerData(), false);</span>
+<span class="nc bnc" id="L101" title="All 4 branches missed.">      if (serverData != null &amp;&amp; !serverData.isEmpty()) {</span>
+<span class="nc" id="L102">        result.putAll(serverData);</span>
+      }
+    }
+<span class="fc" id="L105">    return result;</span>
+  }
+
+  public static Map&lt;String, Object&gt; getParsedMap(Map&lt;String, Object&gt; map) {
+<span class="fc" id="L109">    return getParsedMap(map, false);</span>
+  }
+
+  public static Map&lt;String, Object&gt; getParsedMap(Map&lt;String, Object&gt; object, boolean topObject) {
+<span class="fc" id="L113">    Map newMap = new HashMap&lt;String, Object&gt;(object.size());</span>
+
+<span class="fc bfc" id="L115" title="All 2 branches covered.">    for (Map.Entry&lt;String, Object&gt; entry : object.entrySet()) {</span>
+<span class="fc" id="L116">      final String key = entry.getKey();</span>
+<span class="fc" id="L117">      Object o = entry.getValue();</span>
+<span class="fc" id="L118">      newMap.put(key, getParsedObject(o, topObject));</span>
+<span class="fc" id="L119">    }</span>
+
+<span class="fc" id="L121">    return newMap;</span>
+  }
+
+  public static List getParsedList(Collection list) {
+<span class="fc" id="L125">    List newList = new ArrayList(list.size());</span>
+
+<span class="fc bfc" id="L127" title="All 2 branches covered.">    for (Object o : list) {</span>
+<span class="fc" id="L128">      newList.add(getParsedObject(o));</span>
+<span class="fc" id="L129">    }</span>
+
+<span class="fc" id="L131">    return newList;</span>
+  }
+
+  public static List getParsedList(Collection object, boolean topObject) {
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">    if (!topObject) {</span>
+<span class="fc" id="L136">      return getParsedList(object);</span>
+    } else {
+<span class="nc" id="L138">      List newList = new ArrayList(object.size());</span>
+
+<span class="nc bnc" id="L140" title="All 2 branches missed.">      for (Object o : object) {</span>
+<span class="nc" id="L141">        newList.add(getParsedObject(o, true));</span>
+<span class="nc" id="L142">      }</span>
+
+<span class="nc" id="L144">      return newList;</span>
+    }
+  }
+
+  public static Object getParsedObject(Object object) {
+<span class="fc" id="L149">    return getParsedObject(object, false);</span>
+  }
+
+  public static Object getParsedObject(Object object, boolean topObject) {
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">    if (object == null) {</span>
+<span class="nc" id="L154">      return null;</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">    } else if (object instanceof Map) {</span>
+<span class="fc" id="L156">      return getParsedMap((Map&lt;String, Object&gt;) object, topObject);</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">    } else if (object instanceof Collection) {</span>
+<span class="fc" id="L158">      return getParsedList((Collection) object, topObject);</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">    } else if (object instanceof LCObject) {</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">      if (!topObject) {</span>
+<span class="fc" id="L161">        return mapFromPointerObject((LCObject) object);</span>
+      } else {
+<span class="nc" id="L163">        return mapFromAVObject((LCObject) object, true);</span>
+      }
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">    } else if (object instanceof LCGeoPoint) {</span>
+<span class="nc" id="L166">      return mapFromGeoPoint((LCGeoPoint) object);</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">    } else if (object instanceof Date) {</span>
+<span class="fc" id="L168">      return mapFromDate((Date) object);</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">    } else if (object instanceof byte[]) {</span>
+<span class="nc" id="L170">      return mapFromByteArray((byte[]) object);</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">    } else if (object instanceof LCFile) {</span>
+<span class="nc" id="L172">      return mapFromFile((LCFile) object);</span>
+    } else {
+<span class="fc" id="L174">      return object;</span>
+    }
+  }
+
+  public static Map&lt;String, Object&gt; createArrayOpMap(String key, String op, Collection&lt;?&gt; objects) {
+<span class="nc" id="L179">    Map&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L180">    map.put(&quot;__op&quot;, op);</span>
+<span class="nc" id="L181">    List&lt;Object&gt; array = new ArrayList&lt;Object&gt;();</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">    for (Object obj : objects) {</span>
+<span class="nc" id="L183">      array.add(getParsedObject(obj));</span>
+<span class="nc" id="L184">    }</span>
+<span class="nc" id="L185">    map.put(&quot;objects&quot;, array);</span>
+<span class="nc" id="L186">    Map&lt;String, Object&gt; ops = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L187">    ops.put(key, map);</span>
+<span class="nc" id="L188">    return ops;</span>
+  }
+
+  public static LCRelation objectFromRelationMap(Map&lt;String, Object&gt; map) {
+<span class="fc" id="L192">    String className = (String) map.get(&quot;className&quot;);</span>
+<span class="fc" id="L193">    return new LCRelation(className);</span>
+  }
+
+  public static LCFile fileFromMap(Map&lt;String, Object&gt; map) {
+<span class="fc" id="L197">    LCFile file = new LCFile(&quot;&quot;, &quot;&quot;);</span>
+<span class="fc" id="L198">    file.resetServerData(map);</span>
+<span class="fc" id="L199">    Object metadata = map.get(&quot;metaData&quot;);</span>
+<span class="pc bpc" id="L200" title="2 of 4 branches missed.">    if (metadata != null &amp;&amp; metadata instanceof Map) {</span>
+<span class="fc" id="L201">      file.getMetaData().putAll((Map) metadata);</span>
+    }
+<span class="fc" id="L203">    return file;</span>
+  }
+
+  public static List getObjectFrom(Collection list) {
+<span class="fc" id="L207">    List newList = new ArrayList();</span>
+
+<span class="fc bfc" id="L209" title="All 2 branches covered.">    for (Object obj : list) {</span>
+<span class="fc" id="L210">      newList.add(getObjectFrom(obj));</span>
+<span class="fc" id="L211">    }</span>
+
+<span class="fc" id="L213">    return newList;</span>
+  }
+
+  public static Object getObjectFrom(Map&lt;String, Object&gt; map) {
+<span class="fc" id="L217">    Object type = map.get(&quot;__type&quot;);</span>
+<span class="pc bpc" id="L218" title="1 of 4 branches missed.">    if (null == type || !(type instanceof String)) {</span>
+<span class="pc bpc" id="L219" title="1 of 4 branches missed.">      if(map.containsKey(LCObject.KEY_CLASSNAME) &amp;&amp; map.containsKey(ObjectDeserializer.KEY_SERVERDATA)) {</span>
+        // support new version jsonString of AVObject.
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">        String className = map.containsKey(LCObject.KEY_CLASSNAME)?</span>
+<span class="pc" id="L222">                (String) map.get(LCObject.KEY_CLASSNAME) : (String) map.get(&quot;@type&quot;);</span>
+<span class="fc" id="L223">        LCObject LCObject = Transformer.objectFromClassName(className);</span>
+<span class="fc" id="L224">        Map&lt;String, Object&gt; serverData = (Map) map.get(ObjectDeserializer.KEY_SERVERDATA);</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        if (serverData.containsKey(LCObject.KEY_CLASSNAME)) {</span>
+<span class="fc" id="L226">          serverData.remove(LCObject.KEY_CLASSNAME);</span>
+        }
+<span class="fc" id="L228">        Map&lt;String, Object&gt; decodedValues = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        for(Map.Entry&lt;String, Object&gt; entry: serverData.entrySet()) {</span>
+<span class="fc" id="L230">          String k = entry.getKey();</span>
+<span class="fc" id="L231">          Object v = entry.getValue();</span>
+<span class="pc bpc" id="L232" title="4 of 10 branches missed.">          if (v instanceof String || v instanceof Number || v instanceof Boolean || v instanceof Byte || v instanceof Character) {</span>
+            // primitive type
+<span class="fc" id="L234">            decodedValues.put(k, v);</span>
+<span class="pc bpc" id="L235" title="3 of 4 branches missed.">          } else if (v instanceof Map || v instanceof JSONObject) {</span>
+<span class="fc" id="L236">            decodedValues.put(k, Utils.getObjectFrom(v));</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">          } else if (v instanceof Collection) {</span>
+<span class="nc" id="L238">            decodedValues.put(k, Utils.getObjectFrom(v));</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">          } else if (null != v) {</span>
+<span class="nc" id="L240">            decodedValues.put(k, v);</span>
+          }
+<span class="fc" id="L242">        }</span>
+<span class="fc" id="L243">        LCObject.resetServerData(decodedValues);</span>
+<span class="fc" id="L244">        return LCObject;</span>
+<span class="pc bpc" id="L245" title="1 of 4 branches missed.">      } else if (map.containsKey(&quot;@type&quot;) &amp;&amp; map.get(&quot;@type&quot;) instanceof String) {</span>
+<span class="fc" id="L246">        String classType = (String) map.get(&quot;@type&quot;);</span>
+<span class="pc bpc" id="L247" title="1 of 4 branches missed.">        if (null != classType &amp;&amp; classType.startsWith(&quot;cn.leancloud.&quot;)) {</span>
+          try {
+<span class="fc" id="L249">            LCObject LCObject = (LCObject) Class.forName(classType).newInstance();</span>
+<span class="fc" id="L250">            map.remove(&quot;@type&quot;);</span>
+<span class="fc" id="L251">            Map&lt;String, Object&gt; decodedValues = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">            for (Map.Entry&lt;String, Object&gt; entry : map.entrySet()) {</span>
+<span class="fc" id="L253">              String k = entry.getKey();</span>
+<span class="fc" id="L254">              Object v = entry.getValue();</span>
+<span class="pc bpc" id="L255" title="2 of 10 branches missed.">              if (v instanceof String || v instanceof Number || v instanceof Boolean || v instanceof Byte || v instanceof Character) {</span>
+                // primitive type
+<span class="fc" id="L257">                decodedValues.put(k, v);</span>
+<span class="pc bpc" id="L258" title="3 of 4 branches missed.">              } else if (v instanceof Map || v instanceof JSONObject) {</span>
+<span class="fc" id="L259">                decodedValues.put(k, Utils.getObjectFrom(v));</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">              } else if (v instanceof Collection) {</span>
+<span class="nc" id="L261">                decodedValues.put(k, Utils.getObjectFrom(v));</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">              } else if (null != v) {</span>
+<span class="nc" id="L263">                decodedValues.put(k, v);</span>
+              }
+<span class="fc" id="L265">            }</span>
+<span class="fc" id="L266">            LCObject.resetServerData(decodedValues);</span>
+<span class="fc" id="L267">            return LCObject;</span>
+<span class="nc" id="L268">          } catch (ClassNotFoundException ex) {</span>
+<span class="nc" id="L269">            ex.printStackTrace();</span>
+<span class="nc" id="L270">          } catch (IllegalAccessException e) {</span>
+<span class="nc" id="L271">            e.printStackTrace();</span>
+<span class="nc" id="L272">          } catch (InstantiationException e) {</span>
+<span class="nc" id="L273">            e.printStackTrace();</span>
+<span class="nc" id="L274">          }</span>
+        }
+      }
+<span class="fc" id="L277">      Map&lt;String, Object&gt; newMap = new HashMap&lt;String, Object&gt;(map.size());</span>
+
+<span class="fc bfc" id="L279" title="All 2 branches covered.">      for (Map.Entry&lt;String, Object&gt; entry : map.entrySet()) {</span>
+<span class="fc" id="L280">        final String key = entry.getKey();</span>
+<span class="fc" id="L281">        Object o = entry.getValue();</span>
+<span class="fc" id="L282">        newMap.put(key, getObjectFrom(o));</span>
+<span class="fc" id="L283">      }</span>
+<span class="fc" id="L284">      return newMap;</span>
+    }
+<span class="fc" id="L286">    map.remove(&quot;__type&quot;);</span>
+<span class="pc bpc" id="L287" title="1 of 4 branches missed.">    if (type.equals(&quot;Pointer&quot;) || type.equals(&quot;Object&quot;)) {</span>
+<span class="fc" id="L288">      LCObject LCObject = Transformer.objectFromClassName((String) map.get(&quot;className&quot;));</span>
+//      avObject.resetServerData(map);
+<span class="fc" id="L290">      map.remove(&quot;className&quot;);</span>
+<span class="fc bfc" id="L291" title="All 2 branches covered.">      for (Map.Entry&lt;String, Object&gt; entry: map.entrySet()) {</span>
+<span class="fc" id="L292">        String k = entry.getKey();</span>
+<span class="fc" id="L293">        Object v = entry.getValue();</span>
+<span class="pc bpc" id="L294" title="2 of 10 branches missed.">        if (v instanceof String || v instanceof Number || v instanceof Boolean || v instanceof Byte || v instanceof Character) {</span>
+          // primitive type
+<span class="fc" id="L296">          LCObject.getServerData().put(k, v);</span>
+<span class="pc bpc" id="L297" title="1 of 4 branches missed.">        } else if (v instanceof Map || v instanceof JSONObject) {</span>
+<span class="fc" id="L298">          LCObject.getServerData().put(k, Utils.getObjectFrom(v));</span>
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">        } else if (v instanceof Collection) {</span>
+<span class="fc" id="L300">          LCObject.getServerData().put(k, Utils.getObjectFrom(v));</span>
+<span class="nc bnc" id="L301" title="All 2 branches missed.">        } else if (null != v) {</span>
+<span class="nc" id="L302">          LCObject.getServerData().put(k, v);</span>
+        }
+<span class="fc" id="L304">      }</span>
+<span class="fc" id="L305">      return LCObject;</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">    } else if (type.equals(&quot;GeoPoint&quot;)) {</span>
+<span class="fc" id="L307">      return geoPointFromMap(map);</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">    } else if (type.equals(&quot;Bytes&quot;)) {</span>
+<span class="fc" id="L309">      return dataFromMap(map);</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">    } else if (type.equals(&quot;Date&quot;)) {</span>
+<span class="fc" id="L311">      return dateFromMap(map);</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">    } else if (type.equals(&quot;Relation&quot;)) {</span>
+<span class="fc" id="L313">      return objectFromRelationMap(map);</span>
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">    } else if (type.equals(&quot;File&quot;)) {</span>
+<span class="fc" id="L315">      return fileFromMap(map);</span>
+    }
+<span class="nc" id="L317">    return map;</span>
+  }
+
+  public static Object getObjectFrom(Object obj) {
+<span class="fc bfc" id="L321" title="All 2 branches covered.">    if (obj instanceof Collection) {</span>
+<span class="fc" id="L322">      return getObjectFrom((Collection) obj);</span>
+<span class="pc bpc" id="L323" title="1 of 4 branches missed.">    } else if (obj instanceof Map || obj instanceof JSONObject) {</span>
+<span class="fc" id="L324">      return getObjectFrom((Map&lt;String, Object&gt;) obj);</span>
+    }
+
+<span class="fc" id="L327">    return obj;</span>
+  }
+
+  public static Map&lt;String, Object&gt; makeCompletedRequest(String internalId, String path, String method, Map&lt;String, Object&gt; param) {
+<span class="pc bpc" id="L331" title="3 of 6 branches missed.">    if (null == param || StringUtil.isEmpty(path) || StringUtil.isEmpty(method)) {</span>
+<span class="nc" id="L332">      return null;</span>
+    }
+<span class="fc" id="L334">    param.put(BaseOperation.KEY_INTERNAL_ID, internalId);</span>
+
+<span class="fc" id="L336">    Map&lt;String, Object&gt; topParams = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L337">    topParams.put(BaseOperation.KEY_BODY, param);</span>
+<span class="fc" id="L338">    topParams.put(BaseOperation.KEY_PATH, path);</span>
+<span class="fc" id="L339">    topParams.put(BaseOperation.KEY_HTTP_METHOD, method);</span>
+<span class="fc" id="L340">    return topParams;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

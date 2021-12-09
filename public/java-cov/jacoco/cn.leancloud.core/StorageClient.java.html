@@ -1,0 +1,1117 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StorageClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.core</a> &gt; <span class="el_source">StorageClient.java</span></div><h1>StorageClient.java</h1><pre class="source lang-java linenums">package cn.leancloud.core;
+
+import cn.leancloud.*;
+import cn.leancloud.cache.QueryResultCache;
+import cn.leancloud.gson.NumberDeserializerDoubleAsIntFix;
+import cn.leancloud.ops.Utils;
+import cn.leancloud.query.LCQueryResult;
+import cn.leancloud.search.LCSearchResponse;
+import cn.leancloud.service.APIService;
+import cn.leancloud.sms.LCCaptchaDigest;
+import cn.leancloud.sms.LCCaptchaOption;
+import cn.leancloud.sms.LCCaptchaValidateResult;
+import cn.leancloud.types.LCDate;
+import cn.leancloud.types.LCNull;
+import cn.leancloud.upload.FileUploadToken;
+import cn.leancloud.utils.ErrorUtils;
+import cn.leancloud.utils.LogUtil;
+import cn.leancloud.utils.StringUtil;
+import cn.leancloud.json.JSON;
+import cn.leancloud.json.JSONObject;
+import io.reactivex.Observable;
+import io.reactivex.ObservableSource;
+import io.reactivex.Scheduler;
+import io.reactivex.functions.Function;
+import io.reactivex.schedulers.Schedulers;
+
+import java.io.IOException;
+import java.util.*;
+
+public class StorageClient {
+<span class="fc" id="L31">  private static LCLogger LOGGER = LogUtil.getLogger(StorageClient.class);</span>
+
+<span class="fc" id="L33">  private APIService apiService = null;</span>
+<span class="fc" id="L34">  private boolean asynchronized = false;</span>
+<span class="fc" id="L35">  private AppConfiguration.SchedulerCreator defaultCreator = null;</span>
+<span class="fc" id="L36">  private QueryResultCache queryResultCache = QueryResultCache.getInstance();</span>
+<span class="fc" id="L37">  private LCUser currentUser = null;</span>
+
+<span class="fc" id="L39">  public StorageClient(APIService apiService, boolean asyncRequest, AppConfiguration.SchedulerCreator observerSchedulerCreator) {</span>
+<span class="fc" id="L40">    this.apiService = apiService;</span>
+<span class="fc" id="L41">    this.asynchronized = asyncRequest;</span>
+<span class="fc" id="L42">    this.defaultCreator = observerSchedulerCreator;</span>
+<span class="fc" id="L43">  }</span>
+
+  public void setCurrentUser(LCUser newUser) {
+<span class="fc" id="L46">    this.currentUser = newUser;</span>
+<span class="fc" id="L47">  }</span>
+
+  public LCUser getCurrentUser() {
+<span class="fc" id="L50">    return this.currentUser;</span>
+  }
+
+  public Observable wrapObservable(Observable observable) {
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">    if (null == observable) {</span>
+<span class="nc" id="L55">      return null;</span>
+    }
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">    if (asynchronized) {</span>
+<span class="nc" id="L58">      observable = observable.subscribeOn(Schedulers.io());</span>
+    }
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">    if (null != defaultCreator) {</span>
+<span class="nc" id="L61">      observable = observable.observeOn(defaultCreator.create());</span>
+    }
+<span class="fc" id="L63">    observable = observable.onErrorResumeNext(new Function&lt;Throwable, ObservableSource&gt;() {</span>
+      @Override
+      public ObservableSource apply(Throwable throwable) throws Exception {
+<span class="fc" id="L66">        return Observable.error(ErrorUtils.propagateException(throwable));</span>
+      }
+    });
+<span class="fc" id="L69">    return observable;</span>
+  }
+
+  private Observable wrapObservableInBackground(Observable observable) {
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">    if (null == observable) {</span>
+<span class="nc" id="L74">      return null;</span>
+    }
+<span class="fc" id="L76">    Scheduler scheduler = Schedulers.io();</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">    if (asynchronized) {</span>
+<span class="nc" id="L78">      observable = observable.subscribeOn(scheduler);</span>
+    }
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">    if (null != defaultCreator) {</span>
+<span class="nc" id="L81">      observable = observable.observeOn(scheduler);</span>
+    }
+<span class="fc" id="L83">    return observable;</span>
+  }
+
+  public Observable&lt;LCDate&gt; getServerTime() {
+<span class="fc" id="L87">    Observable&lt;LCDate&gt; date = wrapObservable(apiService.currentTimeMillis());</span>
+<span class="fc" id="L88">    return date;</span>
+  }
+
+  public Observable&lt;? extends LCObject&gt; fetchObject(final LCUser authenticatedUser,
+                                                    final String className, String objectId, String includeKeys) {
+<span class="fc" id="L93">    Observable&lt;LCObject&gt; object = null;</span>
+<span class="fc" id="L94">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">    if (StringUtil.isEmpty(includeKeys)) {</span>
+<span class="fc" id="L96">      object = wrapObservable(apiService.fetchObject(authenticatedSession, className, objectId));</span>
+    } else {
+<span class="fc" id="L98">      object = wrapObservable(apiService.fetchObject(authenticatedSession, className, objectId, includeKeys));</span>
+    }
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">    if (null == object) {</span>
+<span class="nc" id="L101">      return object;</span>
+    }
+<span class="fc" id="L103">    return object.map(new Function&lt;LCObject, LCObject&gt;() {</span>
+              public LCObject apply(LCObject LCObject) throws Exception {
+<span class="fc" id="L105">                return Transformer.transform(LCObject, className);</span>
+              }
+            });
+  }
+
+  public boolean hasCachedResult(String className, Map&lt;String, String&gt; query, long maxAgeInMilliseconds) {
+<span class="fc" id="L111">    return QueryResultCache.getInstance().hasCachedResult(className, query, maxAgeInMilliseconds);</span>
+  }
+
+  private String getSessionToken(LCUser avUser) {
+<span class="fc bfc" id="L115" title="All 2 branches covered.">    if (null == avUser) {</span>
+<span class="pc bpc" id="L116" title="1 of 4 branches missed.">      if (AppConfiguration.isIncognitoMode() || null == LCUser.currentUser()) {</span>
+<span class="fc" id="L117">        return &quot;&quot;;</span>
+      } else {
+<span class="fc" id="L119">        return LCUser.currentUser().getSessionToken();</span>
+      }
+    }
+<span class="fc" id="L122">    return avUser.getSessionToken();</span>
+  }
+
+  private Observable&lt;LCQueryResult&gt; queryRemoteServer(final LCUser authenticatedUser,
+                                                      String className, final Map&lt;String, String&gt; query) {
+<span class="fc" id="L127">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">    if (LCUser.CLASS_NAME.equalsIgnoreCase(className)) {</span>
+<span class="fc" id="L129">      return wrapObservable(apiService.queryUsers(authenticatedSession, query));</span>
+    } else {
+<span class="fc" id="L131">      return wrapObservable(apiService.queryObjects(authenticatedSession, className, query));</span>
+    }
+  }
+
+  public Observable&lt;List&lt;LCUser&gt;&gt; strictlyQueryUsers(final LCUser authenticatedUser,
+                                                     final Map&lt;String, String&gt; query){
+<span class="fc" id="L137">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L138">    return wrapObservable(apiService.strictlyQueryUsers(authenticatedSession, query))</span>
+<span class="fc" id="L139">      .map(new Function&lt;LCQueryResult, List&lt;LCObject&gt;&gt;() {</span>
+        public List&lt;LCObject&gt; apply(LCQueryResult o) throws Exception {
+<span class="fc" id="L141">          o.setClassName(LCUser.CLASS_NAME);</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">          for (LCObject obj: o.getResults()) {</span>
+<span class="fc" id="L143">            obj.setClassName(LCUser.CLASS_NAME);</span>
+<span class="fc" id="L144">          }</span>
+<span class="fc" id="L145">          LOGGER.d(&quot;invoke within StorageClient.strictlyQueryUsers(). resultSize:&quot;</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                  + ((null != o.getResults())? o.getResults().size(): 0));</span>
+<span class="fc" id="L147">          return o.getResults();</span>
+        }
+      })
+<span class="fc" id="L150">      .map(new Function&lt;List&lt;LCObject&gt;, List&lt;LCUser&gt;&gt;() {</span>
+        public List&lt;LCUser&gt; apply(List&lt;LCObject&gt; var1) throws Exception {
+<span class="fc" id="L152">          List&lt;LCUser&gt; result = new ArrayList&lt;LCUser&gt;(var1.size());</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">          for (LCObject obj: var1) {</span>
+<span class="fc" id="L154">            LCUser tmp = Transformer.transform(obj, LCUser.CLASS_NAME);</span>
+<span class="fc" id="L155">            result.add(tmp);</span>
+<span class="fc" id="L156">          }</span>
+<span class="fc" id="L157">          return result;</span>
+        }
+      });                                        
+  }
+
+
+  public Observable&lt;List&lt;LCObject&gt;&gt; queryObjects(final LCUser authenticatedUser,
+                                                 final String className, final Map&lt;String, String&gt; query,
+                                                 LCQuery.CachePolicy cachePolicy, final long maxAgeInMilliseconds) {
+<span class="fc" id="L166">    final String cacheKey = QueryResultCache.generateKeyForQueryCondition(className, query);</span>
+<span class="fc" id="L167">    Observable&lt;List&lt;LCObject&gt;&gt; result = null;</span>
+<span class="fc" id="L168">    Observable&lt;LCQueryResult&gt; queryResult = null;</span>
+<span class="pc bpc" id="L169" title="1 of 4 branches missed.">    switch (cachePolicy) {</span>
+      case CACHE_ONLY:
+<span class="fc" id="L171">        result = wrapObservable(</span>
+<span class="fc" id="L172">                QueryResultCache.getInstance().getCacheResult(className, query, maxAgeInMilliseconds, true));</span>
+<span class="fc" id="L173">        break;</span>
+      case CACHE_ELSE_NETWORK:
+<span class="fc" id="L175">        result = wrapObservable(</span>
+<span class="fc" id="L176">                QueryResultCache.getInstance().getCacheResult(className, query, maxAgeInMilliseconds, false))</span>
+<span class="fc" id="L177">                .onErrorResumeNext(new Function&lt;Throwable, ObservableSource&lt;? extends List&lt;LCObject&gt;&gt;&gt;() {</span>
+                  @Override
+                  public ObservableSource&lt;? extends List&lt;LCObject&gt;&gt; apply(Throwable throwable) throws Exception {
+<span class="fc" id="L180">                    LOGGER.d(&quot;failed to query local cache, cause: &quot; + throwable.getMessage() + &quot;, try to query networking&quot;);</span>
+
+<span class="fc" id="L182">                    return queryRemoteServer(authenticatedUser, className, query)</span>
+<span class="fc" id="L183">                            .map(new Function&lt;LCQueryResult, List&lt;LCObject&gt;&gt;() {</span>
+                              public List&lt;LCObject&gt; apply(LCQueryResult o) throws Exception {
+<span class="fc" id="L185">                                o.setClassName(className);</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">                                for (LCObject obj: o.getResults()) {</span>
+<span class="fc" id="L187">                                  obj.setClassName(className);</span>
+<span class="fc" id="L188">                                }</span>
+<span class="fc" id="L189">                                QueryResultCache.getInstance().cacheResult(cacheKey, o.toJSONString());</span>
+<span class="fc" id="L190">                                LOGGER.d(&quot;invoke within StorageClient.queryObjects(). resultSize:&quot;</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">                                        + ((null != o.getResults())? o.getResults().size(): 0));</span>
+<span class="fc" id="L192">                                return o.getResults();</span>
+                              }
+                            });
+                  }
+                });
+<span class="fc" id="L197">        break;</span>
+      case NETWORK_ELSE_CACHE:
+<span class="nc" id="L199">        queryResult =  queryRemoteServer(authenticatedUser, className, query);</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (null != queryResult) {</span>
+<span class="nc" id="L201">          result = queryResult.map(new Function&lt;LCQueryResult, List&lt;LCObject&gt;&gt;() {</span>
+            public List&lt;LCObject&gt; apply(LCQueryResult o) throws Exception {
+<span class="nc" id="L203">              o.setClassName(className);</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">              for (LCObject obj : o.getResults()) {</span>
+<span class="nc" id="L205">                obj.setClassName(className);</span>
+<span class="nc" id="L206">              }</span>
+<span class="nc" id="L207">              QueryResultCache.getInstance().cacheResult(cacheKey, o.toJSONString());</span>
+<span class="nc" id="L208">              LOGGER.d(&quot;invoke within StorageClient.queryObjects(). resultSize:&quot;</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">                      + ((null != o.getResults()) ? o.getResults().size() : 0));</span>
+<span class="nc" id="L210">              return o.getResults();</span>
+            }
+<span class="nc" id="L212">          }).onErrorResumeNext(new Function&lt;Throwable, ObservableSource&lt;? extends List&lt;LCObject&gt;&gt;&gt;() {</span>
+            @Override
+            public ObservableSource&lt;? extends List&lt;LCObject&gt;&gt; apply(Throwable throwable) throws Exception {
+<span class="nc" id="L215">              LOGGER.d(&quot;failed to query networking, cause: &quot; + throwable.getMessage()</span>
+                      + &quot;, try to query local cache.&quot;);
+<span class="nc" id="L217">              return QueryResultCache.getInstance().getCacheResult(className, query, maxAgeInMilliseconds, true);</span>
+            }
+          });
+        }
+        break;
+      case IGNORE_CACHE:
+      default:
+<span class="fc" id="L224">        queryResult = queryRemoteServer(authenticatedUser, className, query);</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        if (null != queryResult) {</span>
+<span class="fc" id="L226">          result = queryResult.map(new Function&lt;LCQueryResult, List&lt;LCObject&gt;&gt;() {</span>
+            public List&lt;LCObject&gt; apply(LCQueryResult o) throws Exception {
+<span class="fc" id="L228">              o.setClassName(className);</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">              for (LCObject obj: o.getResults()) {</span>
+<span class="fc" id="L230">                obj.setClassName(className);</span>
+<span class="fc" id="L231">              }</span>
+<span class="fc" id="L232">              QueryResultCache.getInstance().cacheResult(cacheKey, o.toJSONString());</span>
+<span class="fc" id="L233">              LOGGER.d(&quot;invoke within StorageClient.queryObjects(). resultSize:&quot;</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">                      + ((null != o.getResults())? o.getResults().size(): 0));</span>
+<span class="fc" id="L235">              return o.getResults();</span>
+            }
+          });
+        }
+        break;
+    }
+<span class="fc" id="L241">    return result;</span>
+  }
+
+  public Observable&lt;LCQueryResult&gt; cloudQuery(final LCUser authenticatedUser, Map&lt;String, String&gt; query) {
+<span class="fc" id="L245">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L246">    return wrapObservable(apiService.cloudQuery(authenticatedSession, query));</span>
+  }
+
+  public Observable&lt;Integer&gt; queryCount(final LCUser authenticatedUser,
+                                        final String className, Map&lt;String, String&gt; query) {
+<span class="fc" id="L251">    Observable&lt;LCQueryResult&gt; queryResult = this.queryRemoteServer(authenticatedUser, className, query);</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">    if (null == queryResult) {</span>
+<span class="nc" id="L253">      return null;</span>
+    }
+<span class="fc" id="L255">    return queryResult.map(new Function&lt;LCQueryResult, Integer&gt;() {</span>
+      public Integer apply(LCQueryResult o) throws Exception {
+<span class="fc" id="L257">        LOGGER.d(&quot;invoke within StorageClient.queryCount(). result:&quot; + o + &quot;, return:&quot; + o.getCount());</span>
+<span class="fc" id="L258">        return o.getCount();</span>
+      }
+    });
+  }
+
+  public Observable&lt;LCNull&gt; deleteObject(final LCUser authenticatedUser,
+                                         final String className, String objectId, Map&lt;String, Object&gt; param) {
+<span class="fc" id="L265">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L266">    return wrapObservable(apiService.deleteObject(authenticatedSession, className, objectId, param));</span>
+  }
+
+  public Observable&lt;? extends LCObject&gt; createObject(final LCUser authenticatedUser,
+                                                     final String className, JSONObject data, boolean fetchFlag,
+                                                     JSONObject where) {
+<span class="fc" id="L272">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L273">    Observable&lt;LCObject&gt; object = wrapObservable(apiService.createObject(authenticatedSession, className, data, fetchFlag,</span>
+            where));
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">    if (null == object) {</span>
+<span class="nc" id="L276">      return null;</span>
+    }
+<span class="fc" id="L278">    return object.map(new Function&lt;LCObject, LCObject&gt;() {</span>
+      public LCObject apply(LCObject LCObject) {
+<span class="fc" id="L280">        LOGGER.d(LCObject.toString());</span>
+<span class="fc" id="L281">        return Transformer.transform(LCObject, className);</span>
+      }
+    });
+  }
+
+  public Observable&lt;? extends LCObject&gt; saveObject(final LCUser authenticatedUser,
+                                                   final String className, String objectId, JSONObject data,
+                                                   boolean fetchFlag, JSONObject where) {
+<span class="fc" id="L289">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L290">    Observable&lt;LCObject&gt; object = wrapObservable(apiService.updateObject(authenticatedSession, className, objectId, data,</span>
+            fetchFlag, where));
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">    if (null == object) {</span>
+<span class="nc" id="L293">      return null;</span>
+    }
+<span class="fc" id="L295">    return object.map(new Function&lt;LCObject, LCObject&gt;() {</span>
+      public LCObject apply(LCObject LCObject) {
+<span class="fc" id="L297">        LOGGER.d(&quot;saveObject finished. intermediaObj=&quot; + LCObject.toString() + &quot;, convert to &quot; + className);</span>
+<span class="fc" id="L298">        return Transformer.transform(LCObject, className);</span>
+      }
+    });
+  }
+
+  public &lt;E extends LCObject&gt; Observable&lt;E&gt; saveWholeObject(final LCUser authenticatedUser,
+                                                            final Class&lt;E&gt; clazz, final String endpointClass,
+                                                            String objectId,
+                                                            JSONObject object, boolean fetchFlag, JSONObject where) {
+<span class="fc" id="L307">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L308">    Observable&lt;LCObject&gt; result = null;</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">    if (StringUtil.isEmpty(objectId)) {</span>
+<span class="fc" id="L310">      result = wrapObservable(apiService.saveWholeObject(authenticatedSession, endpointClass, object, fetchFlag, where));</span>
+    } else {
+<span class="fc" id="L312">      result = wrapObservable(apiService.saveWholeObject(authenticatedSession, endpointClass, objectId, object,</span>
+              fetchFlag, where));
+    }
+
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">    if (null == result) {</span>
+<span class="nc" id="L317">      return null;</span>
+    }
+<span class="fc" id="L319">    return result.map(new Function&lt;LCObject, E&gt;() {</span>
+      @Override
+      public E apply(LCObject LCObject) throws Exception {
+<span class="fc" id="L322">        return Transformer.transform(LCObject, clazz);</span>
+      }
+    });
+  }
+
+  public Observable&lt;LCObject&gt; getWholeObject(final LCUser authenticatedUser,
+                                             final String endpointClass, String objectId, String includeKeys) {
+<span class="fc" id="L329">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L330">    return wrapObservable(apiService.getWholeObject(authenticatedSession, endpointClass, objectId, includeKeys));</span>
+  }
+
+  public Observable&lt;LCNull&gt; deleteWholeObject(final LCUser authenticatedUser,
+                                              final String endpointClass, String objectId, Map&lt;String, Object&gt; param) {
+<span class="nc" id="L335">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="nc" id="L336">    return wrapObservable(apiService.deleteWholeObject(authenticatedSession, endpointClass, objectId, param));</span>
+  }
+
+  public Observable&lt;LCFile&gt; fetchFile(final LCUser authenticatedUser, String objectId) {
+<span class="fc" id="L340">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L341">    Observable&lt;LCFile&gt; object = wrapObservable(apiService.fetchFile(authenticatedSession, objectId));</span>
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">    if (null == object) {</span>
+<span class="nc" id="L343">      return null;</span>
+    }
+<span class="fc" id="L345">    return object.map(new Function&lt;LCFile, LCFile&gt;() {</span>
+      public LCFile apply(LCFile avFile) throws Exception {
+<span class="fc" id="L347">        avFile.setClassName(LCFile.CLASS_NAME);</span>
+<span class="fc" id="L348">        return avFile;</span>
+      }
+    });
+  }
+
+  public Observable&lt;FileUploadToken&gt; newUploadToken(final LCUser authenticatedUser, JSONObject fileData) {
+<span class="fc" id="L354">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L355">    return wrapObservableInBackground(apiService.createUploadToken(authenticatedSession, fileData));</span>
+  }
+
+  public void fileCallback(final LCUser authenticatedUser, JSONObject result) throws IOException {
+<span class="fc" id="L359">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L360">    apiService.fileCallback(authenticatedSession, result).execute();</span>
+<span class="fc" id="L361">    return;</span>
+  }
+
+  public Observable&lt;List&lt;Map&lt;String, Object&gt;&gt;&gt; batchSave(final LCUser authenticatedUser, JSONObject parameter) {
+    // resposne is:
+    // [{&quot;success&quot;:{&quot;updatedAt&quot;:&quot;2018-03-30T06:21:08.052Z&quot;,&quot;objectId&quot;:&quot;5abd026d9f54540038791715&quot;}},
+    //  {&quot;success&quot;:{&quot;updatedAt&quot;:&quot;2018-03-30T06:21:08.092Z&quot;,&quot;objectId&quot;:&quot;5abd026d9f54540038791715&quot;}},
+    //  {&quot;success&quot;:{&quot;updatedAt&quot;:&quot;2018-03-30T06:21:08.106Z&quot;,&quot;objectId&quot;:&quot;5abd026d9f54540038791715&quot;}}]
+<span class="fc" id="L369">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L370">    Observable&lt;List&lt;Map&lt;String, Object&gt;&gt;&gt; result = wrapObservable(apiService.batchCreate(authenticatedSession,</span>
+            parameter));
+<span class="fc" id="L372">    return result;</span>
+  }
+
+  public Observable&lt;JSONObject&gt; batchUpdate(final LCUser authenticatedUser, JSONObject parameter) {
+    // response is:
+    // {&quot;5abd026d9f54540038791715&quot;:{&quot;updatedAt&quot;:&quot;2018-03-30T06:21:46.084Z&quot;,&quot;objectId&quot;:&quot;5abd026d9f54540038791715&quot;}}
+<span class="fc" id="L378">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L379">    Observable&lt;JSONObject&gt; result = wrapObservable(apiService.batchUpdate(authenticatedSession, parameter));</span>
+<span class="fc" id="L380">    return result;</span>
+  }
+
+  public Observable&lt;LCUser&gt; signUp(JSONObject data) {
+<span class="fc" id="L384">    return wrapObservable(apiService.signup(data));</span>
+  }
+  public Observable&lt;LCUser&gt; signUpWithFlag(JSONObject data, boolean failOnNotExist) {
+<span class="fc" id="L387">    return wrapObservable(apiService.signup(data, failOnNotExist));</span>
+  }
+  public &lt;T extends LCUser&gt; Observable&lt;T&gt; signUpOrLoginByMobilephone(final JSONObject data, final Class&lt;T&gt; clazz) {
+<span class="nc" id="L390">    return wrapObservable(apiService.signupByMobilePhone(data)).map(new Function&lt;LCUser, T&gt;() {</span>
+      @Override
+      public T apply(LCUser avUser) throws Exception {
+<span class="nc" id="L393">        T rst = Transformer.transform(avUser, clazz);</span>
+<span class="nc" id="L394">        attachLoginInfo(data, rst);</span>
+<span class="nc" id="L395">        LCUser.changeCurrentUser(rst, true);</span>
+<span class="nc" id="L396">        return rst;</span>
+      }
+    });
+  }
+
+  private &lt;T extends LCUser&gt; void attachLoginInfo(final JSONObject data, T rst) {
+<span class="pc bpc" id="L402" title="2 of 4 branches missed.">    if (null == data || null == rst) {</span>
+<span class="nc" id="L403">      return;</span>
+    }
+<span class="fc bfc" id="L405" title="All 2 branches covered.">    if (data.containsKey(LCUser.ATTR_EMAIL)) {</span>
+<span class="fc" id="L406">      rst.setEmail(data.getString(LCUser.ATTR_EMAIL));</span>
+    }
+<span class="fc bfc" id="L408" title="All 2 branches covered.">    if (data.containsKey(LCUser.ATTR_USERNAME)) {</span>
+<span class="fc" id="L409">      rst.setUsername(data.getString(LCUser.ATTR_USERNAME));</span>
+    }
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">    if (data.containsKey(LCUser.ATTR_MOBILEPHONE)) {</span>
+<span class="nc" id="L412">      rst.setMobilePhoneNumber(data.getString(LCUser.ATTR_MOBILEPHONE));</span>
+    }
+<span class="fc" id="L414">  }</span>
+  public &lt;T extends LCUser&gt; Observable&lt;T&gt; logIn(final JSONObject data, final Class&lt;T&gt; clazz) {
+<span class="fc" id="L416">    Observable&lt;LCUser&gt; object = wrapObservable(apiService.login(data));</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">    if (null == object) {</span>
+<span class="nc" id="L418">      return null;</span>
+    }
+<span class="fc" id="L420">    return object.map(new Function&lt;LCUser, T&gt;() {</span>
+      public T apply(LCUser avUser) throws Exception {
+<span class="fc" id="L422">        T rst = Transformer.transform(avUser, clazz);</span>
+<span class="fc" id="L423">        attachLoginInfo(data, rst);</span>
+<span class="fc" id="L424">        LCUser.changeCurrentUser(rst, true);</span>
+<span class="fc" id="L425">        return rst;</span>
+      }
+    });
+  }
+
+  public Observable&lt;LCFriendshipRequest&gt; applyFriendshipRequest(final LCUser authenticatedUser, final JSONObject data) {
+<span class="fc" id="L431">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L432">    Observable&lt;LCObject&gt; result = wrapObservable(apiService.applyFriendship(authenticatedSession, data));</span>
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">    if (null == result) {</span>
+<span class="nc" id="L434">      return null;</span>
+    }
+<span class="fc" id="L436">    return result.map(new Function&lt;LCObject, LCFriendshipRequest&gt;() {</span>
+      @Override
+      public LCFriendshipRequest apply(LCObject LCObject) throws Exception {
+<span class="fc" id="L439">        return Transformer.transform(LCObject, LCFriendshipRequest.class);</span>
+      }
+    });
+  }
+
+  public Observable&lt;LCFriendshipRequest&gt; acceptFriendshipRequest(final LCUser authenticatedUser,
+                                                                 final LCFriendshipRequest request, JSONObject param) {
+<span class="fc" id="L446">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L447">    Observable&lt;LCObject&gt; result = wrapObservable(apiService.acceptFriendshipRequest(authenticatedSession,</span>
+<span class="fc" id="L448">            request.getObjectId(), param));</span>
+<span class="pc bpc" id="L449" title="1 of 2 branches missed.">    if (null == result) {</span>
+<span class="nc" id="L450">      return null;</span>
+    }
+<span class="fc" id="L452">    return result.map(new Function&lt;LCObject, LCFriendshipRequest&gt;() {</span>
+      @Override
+      public LCFriendshipRequest apply(LCObject LCObject) throws Exception {
+<span class="fc" id="L455">        LCFriendshipRequest response = Transformer.transform(LCObject, LCFriendshipRequest.class);</span>
+<span class="fc" id="L456">        request.getServerData().put(LCFriendshipRequest.ATTR_STATUS, LCFriendshipRequest.INTERNAL_STATUS_ACCEPTED);</span>
+<span class="fc" id="L457">        request.getServerData().put(LCObject.KEY_UPDATED_AT, response.getUpdatedAtString());</span>
+<span class="fc" id="L458">        return request;</span>
+      }
+    });
+  }
+
+  public Observable&lt;LCFriendshipRequest&gt; declineFriendshipRequest(final LCUser authenticatedUser,
+                                                                  final LCFriendshipRequest request) {
+<span class="fc" id="L465">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L466">    Observable&lt;LCObject&gt; result = wrapObservable(apiService.declineFriendshipRequest(authenticatedSession, request.getObjectId()));</span>
+<span class="fc" id="L467">    return result.map(new Function&lt;LCObject, LCFriendshipRequest&gt;() {</span>
+      @Override
+      public LCFriendshipRequest apply(LCObject LCObject) throws Exception {
+<span class="fc" id="L470">        LCFriendshipRequest response = Transformer.transform(LCObject, LCFriendshipRequest.class);</span>
+<span class="fc" id="L471">        request.getServerData().put(LCFriendshipRequest.ATTR_STATUS, LCFriendshipRequest.INTERNAL_STATUS_DECLINED);</span>
+<span class="fc" id="L472">        request.getServerData().put(LCObject.KEY_UPDATED_AT, response.getUpdatedAtString());</span>
+<span class="fc" id="L473">        return request;</span>
+      }
+    });
+  }
+
+  public Observable&lt;Boolean&gt; checkAuthenticated(String sessionToken) {
+<span class="fc" id="L479">    Map&lt;String, String&gt; param = new HashMap&lt;String, String&gt;(1);</span>
+<span class="fc" id="L480">    param.put(&quot;session_token&quot;, sessionToken);</span>
+<span class="fc" id="L481">    Observable&lt;LCUser&gt; apiResult = wrapObservable(apiService.checkAuthenticated(sessionToken, param));</span>
+<span class="pc bpc" id="L482" title="1 of 2 branches missed.">    if (null == apiResult) {</span>
+<span class="nc" id="L483">      return Observable.just(false);</span>
+    }
+<span class="fc" id="L485">    return apiResult.map(new Function&lt;LCUser, Boolean&gt;() {</span>
+      public Boolean apply(LCUser o) throws Exception {
+<span class="pc bpc" id="L487" title="1 of 2 branches missed.">        if (null != o) {</span>
+<span class="fc" id="L488">          return true;</span>
+        } else {
+<span class="nc" id="L490">          return false;</span>
+        }
+      }
+    });
+  }
+
+  public &lt;T extends LCUser&gt; Observable&lt;T&gt; createUserBySession(String sessionToken, final Class&lt;T&gt; clazz) {
+<span class="fc" id="L497">    Map&lt;String, String&gt; param = new HashMap&lt;String, String&gt;(1);</span>
+<span class="fc" id="L498">    param.put(&quot;session_token&quot;, sessionToken);</span>
+<span class="fc" id="L499">    Observable&lt;LCUser&gt; result = wrapObservable(apiService.checkAuthenticated(sessionToken, param));</span>
+<span class="fc" id="L500">    return result.map(new Function&lt;LCUser, T&gt;() {</span>
+      public T apply(LCUser avUser) throws Exception {
+<span class="pc bpc" id="L502" title="1 of 2 branches missed.">        if (null == avUser) {</span>
+<span class="nc" id="L503">          LOGGER.e(&quot;The mapper function returned a null value.&quot;);</span>
+<span class="nc" id="L504">          return null;</span>
+        }
+<span class="fc" id="L506">        return Transformer.transform(avUser, clazz);</span>
+      }
+    });
+  }
+
+  public Observable&lt;Boolean&gt; refreshSessionToken(final LCUser user) {
+<span class="nc" id="L512">    return wrapObservable(apiService.refreshSessionToken(user.getSessionToken(), user.getObjectId()).map(new Function&lt;LCUser, Boolean&gt;() {</span>
+      public Boolean apply(LCUser avUser) throws Exception {
+<span class="nc bnc" id="L514" title="All 4 branches missed.">        if (null != avUser &amp;&amp; !StringUtil.isEmpty(avUser.getSessionToken())) {</span>
+<span class="nc" id="L515">          user.internalChangeSessionToken(avUser.getSessionToken());</span>
+<span class="nc" id="L516">          return true;</span>
+        }
+<span class="nc" id="L518">        return false;</span>
+      }
+    }));
+  }
+
+  public Observable&lt;LCNull&gt; requestResetPassword(String email) {
+<span class="nc" id="L524">    Map&lt;String, String&gt; map = new HashMap&lt;String, String&gt;();</span>
+<span class="nc" id="L525">    map.put(&quot;email&quot;, email);</span>
+<span class="nc" id="L526">    return wrapObservable(apiService.requestResetPassword(map));</span>
+  }
+
+  public Observable&lt;LCNull&gt; requestResetPasswordBySmsCode(String phoneNumber, String validateToken) {
+<span class="nc" id="L530">    Map&lt;String, String&gt; map = new HashMap&lt;String, String&gt;();</span>
+<span class="nc" id="L531">    map.put(&quot;mobilePhoneNumber&quot;, phoneNumber);</span>
+<span class="nc bnc" id="L532" title="All 2 branches missed.">    if (!StringUtil.isEmpty(validateToken)) {</span>
+<span class="nc" id="L533">      map.put(&quot;validate_token&quot;, validateToken);</span>
+    }
+<span class="nc" id="L535">    return wrapObservable(apiService.requestResetPasswordBySmsCode(map));</span>
+  }
+
+  public Observable&lt;LCNull&gt; requestEmailVerify(String email) {
+<span class="nc" id="L539">    Map&lt;String, String&gt; map = new HashMap&lt;String, String&gt;();</span>
+<span class="nc" id="L540">    map.put(&quot;email&quot;, email);</span>
+<span class="nc" id="L541">    return wrapObservable(apiService.requestEmailVerify(map));</span>
+  }
+
+  public Observable&lt;LCNull&gt; requestMobilePhoneVerify(String mobilePhone, String validateToken) {
+<span class="nc" id="L545">    Map&lt;String, String&gt; map = new HashMap&lt;String, String&gt;();</span>
+<span class="nc" id="L546">    map.put(&quot;mobilePhoneNumber&quot;, mobilePhone);</span>
+<span class="nc bnc" id="L547" title="All 2 branches missed.">    if (!StringUtil.isEmpty(validateToken)) {</span>
+<span class="nc" id="L548">      map.put(&quot;validate_token&quot;, validateToken);</span>
+    }
+<span class="nc" id="L550">    return wrapObservable(apiService.requestMobilePhoneVerify(map));</span>
+  }
+
+  public Observable&lt;LCNull&gt; verifyMobilePhone(String verifyCode) {
+<span class="nc" id="L554">    return wrapObservable(apiService.verifyMobilePhone(verifyCode));</span>
+  }
+
+  public Observable&lt;LCNull&gt; requestLoginSmsCode(String phoneNumber, String validateToken) {
+<span class="nc" id="L558">    Map&lt;String, String&gt; map = new HashMap&lt;String, String&gt;();</span>
+<span class="nc" id="L559">    map.put(&quot;mobilePhoneNumber&quot;, phoneNumber);</span>
+<span class="nc bnc" id="L560" title="All 2 branches missed.">    if (!StringUtil.isEmpty(validateToken)) {</span>
+<span class="nc" id="L561">      map.put(&quot;validate_token&quot;, validateToken);</span>
+    }
+<span class="nc" id="L563">    return wrapObservable(apiService.requestLoginSmsCode(map));</span>
+  }
+
+  public Observable&lt;LCNull&gt; resetPasswordBySmsCode(String smsCode, String newPass) {
+<span class="nc" id="L567">    Map&lt;String, String&gt; map = new HashMap&lt;String, String&gt;();</span>
+<span class="nc" id="L568">    map.put(&quot;password&quot;, newPass);</span>
+<span class="nc" id="L569">    return wrapObservable(apiService.resetPasswordBySmsCode(smsCode, map));</span>
+  }
+
+  public Observable&lt;LCNull&gt; updatePassword(final LCUser user, String oldPass, String newPass) {
+<span class="nc bnc" id="L573" title="All 2 branches missed.">    if (null == user) {</span>
+<span class="nc" id="L574">      return Observable.error(new IllegalArgumentException(&quot;user is null&quot;));</span>
+    }
+<span class="nc bnc" id="L576" title="All 4 branches missed.">    if (StringUtil.isEmpty(oldPass) || StringUtil.isEmpty(newPass)) {</span>
+<span class="nc" id="L577">      return Observable.error(new IllegalArgumentException(&quot;old password or new password is empty&quot;));</span>
+    }
+<span class="nc" id="L579">    JSONObject param = JSONObject.Builder.create(null);</span>
+<span class="nc" id="L580">    param.put(&quot;old_password&quot;, oldPass);</span>
+<span class="nc" id="L581">    param.put(&quot;new_password&quot;, newPass);</span>
+<span class="nc" id="L582">    return wrapObservable(apiService.updatePassword(user.getSessionToken(), user.getObjectId(), param)</span>
+<span class="nc" id="L583">            .map(new Function&lt;LCUser, LCNull&gt;() {</span>
+      public LCNull apply(LCUser var1) throws Exception {
+<span class="nc bnc" id="L585" title="All 2 branches missed.">        if (null != var1) {</span>
+<span class="nc" id="L586">          user.internalChangeSessionToken(var1.getSessionToken());</span>
+        }
+<span class="nc" id="L588">        return new LCNull();</span>
+      }
+    }));
+  }
+
+  public Observable&lt;JSONObject&gt; followUser(final LCUser authenticatedUser,
+                                           String followee, String follower, Map&lt;String, Object&gt; attr) {
+<span class="fc" id="L595">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L596">    return wrapObservable(apiService.followUser(authenticatedSession, followee, follower, attr));</span>
+  }
+
+  public Observable&lt;JSONObject&gt; unfollowUser(final LCUser authenticatedUser,
+                                             String followee, String follower) {
+<span class="fc" id="L601">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L602">    return wrapObservable(apiService.unfollowUser(authenticatedSession, followee, follower));</span>
+  }
+
+  public Observable&lt;LCFriendship&gt; updateFriendship(final LCUser authenticatedUser,
+                                                   String followeeUserid, String friendObjectId, Map&lt;String, Object&gt; attr) {
+<span class="nc" id="L607">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="nc" id="L608">    return wrapObservable(apiService.updateFriendship(authenticatedSession, followeeUserid, friendObjectId, attr));</span>
+  }
+
+  public Observable&lt;JSONObject&gt; getFollowersAndFollowees(final LCUser authenticatedUser, String userId) {
+<span class="fc" id="L612">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L613">    return wrapObservable(apiService.getFollowersAndFollowees(authenticatedSession, userId));</span>
+  }
+
+  public Observable&lt;List&lt;LCFriendship&gt;&gt; queryFriendship(final LCUser authenticatedUser, Map&lt;String, String&gt; conditions) {
+<span class="fc" id="L617">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L618">    return wrapObservable(</span>
+<span class="fc" id="L619">            apiService.getFollowees(authenticatedSession, authenticatedUser.getObjectId(), conditions)</span>
+<span class="fc" id="L620">                    .map(new Function&lt;LCQueryResult, List&lt;LCFriendship&gt;&gt;() {</span>
+      @Override
+      public List&lt;LCFriendship&gt; apply(LCQueryResult result) throws Exception {
+<span class="pc bpc" id="L623" title="2 of 4 branches missed.">        if (null == result || null == result.getResults()) {</span>
+<span class="nc" id="L624">          return null;</span>
+        }
+<span class="fc" id="L626">        List&lt;LCObject&gt; originResult = result.getResults();</span>
+<span class="fc" id="L627">        List&lt;LCFriendship&gt; convertedResult = new ArrayList&lt;&gt;(originResult.size());</span>
+<span class="fc bfc" id="L628" title="All 2 branches covered.">        for (LCObject obj : originResult) {</span>
+<span class="fc" id="L629">          convertedResult.add(new LCFriendship(obj));</span>
+<span class="fc" id="L630">        }</span>
+<span class="fc" id="L631">        return convertedResult;</span>
+      }
+    }));
+  }
+
+  public Observable&lt;LCStatus&gt; postStatus(final LCUser authenticatedUser, Map&lt;String, Object&gt; param) {
+<span class="fc" id="L637">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L638">    return wrapObservable(apiService.postStatus(authenticatedSession, param));</span>
+  }
+
+  public Observable&lt;LCStatus&gt; fetchStatus(final LCUser authenticatedUser, String objectId) {
+<span class="nc" id="L642">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="nc" id="L643">    return wrapObservable(apiService.fetchSingleStatus(authenticatedSession, objectId));</span>
+  }
+
+  public Observable&lt;List&lt;LCStatus&gt;&gt; queryStatus(final LCUser authenticatedUser, Map&lt;String, String&gt; param) {
+<span class="fc" id="L647">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L648">    return wrapObservable(apiService.fetchStatuses(authenticatedSession, param)</span>
+<span class="fc" id="L649">            .map(new Function&lt;LCQueryResult, List&lt;LCStatus&gt;&gt;() {</span>
+      @Override
+      public List&lt;LCStatus&gt; apply(LCQueryResult o) throws Exception {
+<span class="pc bpc" id="L652" title="1 of 2 branches missed.">        if (null == o) {</span>
+<span class="nc" id="L653">          LOGGER.e(&quot;The mapper function returned a null value.&quot;);</span>
+<span class="nc" id="L654">          return null;</span>
+        }
+<span class="fc" id="L656">        List&lt;LCStatus&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L657" title="All 2 branches covered.">        for (LCObject obj: o.getResults()) {</span>
+<span class="fc" id="L658">          results.add(new LCStatus(obj));</span>
+<span class="fc" id="L659">        }</span>
+<span class="fc" id="L660">        return results;</span>
+      }
+    }));
+  }
+
+  public Observable&lt;List&lt;LCStatus&gt;&gt; queryInbox(final LCUser authenticatedUser, Map&lt;String, String&gt; param) {
+<span class="fc" id="L666">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L667">    return wrapObservable(apiService.queryInbox(authenticatedSession, param)</span>
+<span class="fc" id="L668">            .map(new Function&lt;LCQueryResult, List&lt;LCStatus&gt;&gt;() {</span>
+      @Override
+      public List&lt;LCStatus&gt; apply(LCQueryResult o) throws Exception {
+<span class="pc bpc" id="L671" title="1 of 2 branches missed.">        if (null == o) {</span>
+<span class="nc" id="L672">          LOGGER.e(&quot;The mapper function returned a null value.&quot;);</span>
+<span class="nc" id="L673">          return null;</span>
+        }
+<span class="fc" id="L675">        List&lt;LCStatus&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L676" title="All 2 branches covered.">        for (LCObject obj: o.getResults()) {</span>
+<span class="fc" id="L677">          results.add(new LCStatus(obj));</span>
+<span class="fc" id="L678">        }</span>
+<span class="fc" id="L679">        return results;</span>
+      }
+    }));
+  }
+
+  public Observable&lt;JSONObject&gt; getInboxCount(final LCUser authenticatedUser, Map&lt;String, String&gt; param) {
+<span class="fc" id="L685">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L686">    return wrapObservable(apiService.getInboxCount(authenticatedSession, param));</span>
+  }
+
+  public Observable&lt;LCNull&gt; deleteStatus(final LCUser authenticatedUser, String statusId) {
+<span class="fc" id="L690">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L691">    return wrapObservable(apiService.deleteStatus(authenticatedSession, statusId));</span>
+  }
+
+  public Observable&lt;LCNull&gt; deleteInboxStatus(final LCUser authenticatedUser, Map&lt;String, Object&gt; param) {
+<span class="fc" id="L695">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L696">    return wrapObservable(apiService.deleteInboxStatus(authenticatedSession, param));</span>
+  }
+
+  public &lt;T&gt; Observable&lt;T&gt; callRPC(final LCUser authenticatedUser, String name, Object param) {
+<span class="fc" id="L700">    return callRPC(authenticatedUser, name, param, false, null);</span>
+  }
+
+  &lt;T&gt; Observable&lt;T&gt; callRPC(final LCUser authenticatedUser,
+                            final String name, final Object param, final boolean enableCache, final String cacheKey) {
+<span class="fc" id="L705">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L706">    Observable&lt;Map&lt;String, ?&gt;&gt; cloudCall =  wrapObservable(apiService.cloudRPC(authenticatedSession, name, param));</span>
+<span class="pc bpc" id="L707" title="1 of 2 branches missed.">    if (null == cloudCall) {</span>
+<span class="nc" id="L708">      return null;</span>
+    }
+<span class="fc" id="L710">    return cloudCall.map(new Function&lt;Map&lt;String, ?&gt;, T&gt;() {</span>
+      public T apply(Map&lt;String, ?&gt; resultMap) throws Exception {
+        try {
+<span class="nc" id="L713">          Object resultValue = resultMap.get(&quot;result&quot;);</span>
+<span class="nc bnc" id="L714" title="All 4 branches missed.">          if (enableCache &amp;&amp; !StringUtil.isEmpty(cacheKey)) {</span>
+<span class="nc" id="L715">            LOGGER.d(&quot;cache rpc result:&quot; + JSON.toJSONString(resultValue));</span>
+            // Notice!!
+            // 这里缓存内容的不同（与 callFunc 相比），导致 RPC 结果解析时需要采用完全不一样的方法——需要调用方指定结果类型。
+            // 应该是统一成 callFunc 的结果才对，不过那样会导致原有缓存失效，并且要解析之前缓存的结果也还是需要明确告知结果类型。
+<span class="nc" id="L719">            QueryResultCache.getInstance().cacheResult(cacheKey, JSON.toJSONString(resultValue));</span>
+          }
+<span class="nc bnc" id="L721" title="All 2 branches missed.">          if (resultValue instanceof Collection) {</span>
+<span class="nc" id="L722">            return (T) Utils.getObjectFrom((Collection) resultValue);</span>
+<span class="nc bnc" id="L723" title="All 2 branches missed.">          } else if (resultValue instanceof Map) {</span>
+<span class="nc" id="L724">            return (T) Utils.getObjectFrom((Map) resultValue);</span>
+          } else {
+<span class="nc" id="L726">            return (T) resultValue;</span>
+          }
+<span class="nc" id="L728">        } catch (Exception ex) {</span>
+<span class="nc" id="L729">          LOGGER.d(&quot;RPCFunction error: &quot; + ex.getMessage());</span>
+<span class="nc" id="L730">          return null;</span>
+        }
+      }
+    });
+  }
+
+  public &lt;T&gt; Observable&lt;T&gt; callFunction(final LCUser authenticatedUser, String name, Map&lt;String, Object&gt; params) {
+<span class="fc" id="L737">    return callFunction(authenticatedUser, name, params, false, null);</span>
+  }
+
+  &lt;T&gt; Observable&lt;T&gt; callFunction(final LCUser authenticatedUser,
+                                 String name, Map&lt;String, Object&gt; params, final boolean enableCache, final String cacheKey) {
+<span class="fc" id="L742">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L743">    Observable&lt;Map&lt;String, ?&gt;&gt; cloudCall = wrapObservable(apiService.cloudFunction(authenticatedSession, name, params));</span>
+<span class="pc bpc" id="L744" title="1 of 2 branches missed.">    if (null == cloudCall) {</span>
+<span class="nc" id="L745">      return null;</span>
+    }
+<span class="fc" id="L747">    return cloudCall.map(new Function&lt;Map&lt;String, ?&gt;, T&gt;() {</span>
+      public T apply(Map&lt;String, ?&gt; resultMap) throws Exception {
+        try {
+<span class="fc" id="L750">          Object resultValue = resultMap.get(&quot;result&quot;);</span>
+<span class="pc bpc" id="L751" title="1 of 4 branches missed.">          if (enableCache &amp;&amp; !StringUtil.isEmpty(cacheKey)) {</span>
+<span class="fc" id="L752">            LOGGER.d(&quot;cache cloud function result:&quot; + JSON.toJSONString(resultValue));</span>
+            // Notice!!
+            // 这里缓存内容的不同（与 callRPC 相比），造成了缓存 json 解析的差异。
+<span class="fc" id="L755">            QueryResultCache.getInstance().cacheResult(cacheKey, JSON.toJSONString(resultMap));</span>
+          }
+<span class="pc bpc" id="L757" title="1 of 2 branches missed.">          if (resultValue instanceof Collection) {</span>
+<span class="nc" id="L758">            return (T) Utils.getObjectFrom((Collection) resultValue);</span>
+<span class="pc bpc" id="L759" title="1 of 2 branches missed.">          } else if (resultValue instanceof Map) {</span>
+<span class="nc" id="L760">            return (T) Utils.getObjectFrom((Map) resultValue);</span>
+          } else {
+<span class="fc" id="L762">            return (T) resultValue;</span>
+          }
+<span class="nc" id="L764">        } catch (Exception ex) {</span>
+<span class="nc" id="L765">          LOGGER.d(&quot;CloudFunction error: &quot; + ex.getMessage());</span>
+<span class="nc" id="L766">          return null;</span>
+        }
+      }
+    });
+  }
+
+  interface QueryExecutor {
+    &lt;T&gt; Observable&lt;T&gt; executor();
+  }
+  &lt;T&gt; Observable&lt;T&gt; executeCachedQuery(final String clazz, final Map&lt;String, Object&gt; query,
+                                       LCQuery.CachePolicy cachePolicy, final long maxAgeInMilliseconds,
+                                       final QueryExecutor cacheQueryExecutor,
+                                       final QueryExecutor remoteQueryExecutor) {
+<span class="fc" id="L779">    Observable&lt;T&gt; result = null;</span>
+<span class="pc bpc" id="L780" title="1 of 4 branches missed.">    switch (cachePolicy) {</span>
+      case CACHE_ONLY:
+<span class="nc" id="L782">        result = cacheQueryExecutor.executor();</span>
+<span class="nc" id="L783">        break;</span>
+      case CACHE_ELSE_NETWORK:
+<span class="fc" id="L785">        result = cacheQueryExecutor.executor();</span>
+<span class="fc" id="L786">        result = result.onErrorResumeNext(new Function&lt;Throwable, Observable&lt;T&gt;&gt;() {</span>
+          @Override
+          public Observable&lt;T&gt; apply(Throwable throwable) throws Exception {
+<span class="fc" id="L789">            LOGGER.d(&quot;failed to query local cache, cause: &quot; + throwable.getMessage() + &quot;, try to query networking&quot;);</span>
+<span class="fc" id="L790">            return remoteQueryExecutor.executor();</span>
+          }
+        });
+<span class="fc" id="L793">        break;</span>
+      case NETWORK_ELSE_CACHE:
+<span class="fc" id="L795">        result = remoteQueryExecutor.executor();</span>
+<span class="fc" id="L796">        result = result.onErrorResumeNext(new Function&lt;Throwable, Observable&lt;T&gt;&gt;() {</span>
+          @Override
+          public Observable&lt;T&gt; apply(Throwable throwable) throws Exception {
+<span class="nc" id="L799">            LOGGER.d(&quot;failed to query networking, cause: &quot; + throwable.getMessage()</span>
+                    + &quot;, try to query local cache.&quot;);
+<span class="nc" id="L801">            return cacheQueryExecutor.executor();</span>
+          }
+        });
+<span class="fc" id="L804">        break;</span>
+      case IGNORE_CACHE:
+      default:
+<span class="fc" id="L807">        result = remoteQueryExecutor.executor();</span>
+        break;
+    }
+<span class="fc" id="L810">    return result;</span>
+  }
+
+  public &lt;T&gt; Observable&lt;T&gt; callRPCWithCachePolicy(final LCUser asAuthenticatedUser,
+                                                  final String name, final Map&lt;String, Object&gt; param,
+                                                  final LCQuery.CachePolicy cachePolicy, final long maxCacheAge,
+                                                  final Class&lt;T&gt; clazz) {
+<span class="nc" id="L817">    final String cacheKey = QueryResultCache.generateCachedKey(name, param);</span>
+<span class="nc" id="L818">    return executeCachedQuery(name, param, cachePolicy, maxCacheAge,</span>
+<span class="nc" id="L819">            new QueryExecutor() {</span>
+              @Override
+              public &lt;T&gt; Observable&lt;T&gt; executor() {
+<span class="nc" id="L822">                return QueryResultCache.getInstance().getCacheRawResult(name, cacheKey, maxCacheAge, true)</span>
+<span class="nc" id="L823">                        .map(new Function&lt;String, T&gt;() {</span>
+                          @Override
+                          public T apply(String s) throws Exception {
+<span class="nc bnc" id="L826" title="All 2 branches missed.">                            if (StringUtil.isEmpty(s)) {</span>
+<span class="nc" id="L827">                              return null;</span>
+                            }
+<span class="nc" id="L829">                            LOGGER.d(&quot;found cached rpc result: &quot; + s);</span>
+<span class="nc" id="L830">                            Object parsedObject = JSON.parseObject(s, clazz);</span>
+<span class="nc bnc" id="L831" title="All 2 branches missed.">                            if (parsedObject instanceof Collection) {</span>
+<span class="nc" id="L832">                              return (T) Utils.getObjectFrom((Collection) parsedObject);</span>
+<span class="nc bnc" id="L833" title="All 2 branches missed.">                            } else if (parsedObject instanceof Map) {</span>
+<span class="nc" id="L834">                              return (T) Utils.getObjectFrom((Map) parsedObject);</span>
+                            } else {
+<span class="nc" id="L836">                              return (T) parsedObject;</span>
+                            }
+                          }
+                        });
+              }
+            },
+<span class="nc" id="L842">            new QueryExecutor() {</span>
+              @Override
+              public &lt;T&gt; Observable&lt;T&gt; executor() {
+<span class="nc bnc" id="L845" title="All 4 branches missed.">                return callRPC(asAuthenticatedUser, name, param,</span>
+                        cachePolicy != LCQuery.CachePolicy.IGNORE_CACHE &amp;&amp; cachePolicy != LCQuery.CachePolicy.NETWORK_ONLY,
+                        cacheKey);
+              }
+            });
+  }
+
+  public &lt;T&gt; Observable&lt;T&gt; callFunctionWithCachePolicy(final LCUser asAuthenticatedUser,
+                                                       final String name, final Map&lt;String, Object&gt; params,
+                                                       final LCQuery.CachePolicy cachePolicy, final long maxCacheAge,
+                                                       final Class&lt;T&gt; clazz) {
+<span class="fc" id="L856">    final String cacheKey = QueryResultCache.generateCachedKey(name, params);</span>
+<span class="fc" id="L857">    return executeCachedQuery(name, params, cachePolicy, maxCacheAge,</span>
+<span class="fc" id="L858">            new QueryExecutor() {</span>
+              @Override
+              public &lt;T&gt; Observable&lt;T&gt; executor() {
+<span class="fc" id="L861">                return QueryResultCache.getInstance().getCacheRawResult(name, cacheKey, maxCacheAge, true)</span>
+<span class="fc" id="L862">                        .map(new Function&lt;String, T&gt;() {</span>
+                          @Override
+                          public T apply(String s) throws Exception {
+<span class="pc bpc" id="L865" title="1 of 2 branches missed.">                            if (StringUtil.isEmpty(s)) {</span>
+<span class="nc" id="L866">                              return null;</span>
+                            }
+<span class="fc" id="L868">                            LOGGER.d(&quot;found cached function result: &quot; + s);</span>
+<span class="fc" id="L869">                            Object parsedObject = null;</span>
+                            try {
+<span class="fc" id="L871">                              JSONObject tmpObject = JSON.parseObject(s);</span>
+<span class="pc bpc" id="L872" title="2 of 4 branches missed.">                              if (null != tmpObject &amp;&amp; tmpObject.containsKey(&quot;result&quot;)) {</span>
+<span class="fc" id="L873">                                parsedObject = tmpObject.get(&quot;result&quot;);</span>
+                              } else {
+                                // compatible for existing cache data(json).
+<span class="nc" id="L876">                                parsedObject = tmpObject;</span>
+                              }
+<span class="nc" id="L878">                            } catch (Exception exception) {</span>
+                              // compatible for existing cache data(array or primitives).
+                              // 应该不会发生。
+<span class="nc" id="L881">                              parsedObject = JSON.parseObject(s, clazz);</span>
+<span class="fc" id="L882">                            }</span>
+<span class="pc bpc" id="L883" title="1 of 2 branches missed.">                            if (parsedObject instanceof Collection) {</span>
+<span class="nc" id="L884">                              return (T) Utils.getObjectFrom((Collection) parsedObject);</span>
+<span class="pc bpc" id="L885" title="1 of 2 branches missed.">                            } else if (parsedObject instanceof Map) {</span>
+<span class="nc" id="L886">                              return (T) Utils.getObjectFrom((Map) parsedObject);</span>
+<span class="pc bpc" id="L887" title="1 of 2 branches missed.">                            } else if (parsedObject instanceof Number) {</span>
+<span class="fc" id="L888">                              return (T) NumberDeserializerDoubleAsIntFix.parsePrecisionNumber((Number) parsedObject);</span>
+                            } else {
+<span class="nc" id="L890">                              return (T) parsedObject;</span>
+                            }
+                          }
+                        });
+              }
+            },
+<span class="fc" id="L896">            new QueryExecutor() {</span>
+              @Override
+              public &lt;T&gt; Observable&lt;T&gt; executor() {
+<span class="pc bpc" id="L899" title="1 of 4 branches missed.">                return callFunction(asAuthenticatedUser, name, params,</span>
+                        cachePolicy != LCQuery.CachePolicy.IGNORE_CACHE &amp;&amp; cachePolicy != LCQuery.CachePolicy.NETWORK_ONLY,
+                        cacheKey);
+              }
+            });
+  }
+
+
+  public Observable&lt;LCCaptchaDigest&gt; requestCaptcha(LCCaptchaOption option) {
+<span class="nc" id="L908">    return wrapObservable(apiService.requestCaptcha(option.getRequestParam()));</span>
+  }
+
+  public Observable&lt;LCCaptchaValidateResult&gt; verifyCaptcha(String code, String token) {
+<span class="nc bnc" id="L912" title="All 4 branches missed.">    if (StringUtil.isEmpty(code) || StringUtil.isEmpty(token)) {</span>
+<span class="nc" id="L913">      return Observable.error(new IllegalArgumentException(&quot;code or token is empty&quot;));</span>
+    }
+<span class="nc" id="L915">    Map&lt;String, String&gt; param = new HashMap&lt;String, String&gt;(2);</span>
+<span class="nc" id="L916">    param.put(&quot;captcha_code&quot;, code);</span>
+<span class="nc" id="L917">    param.put(&quot;captcha_token&quot;, token);</span>
+<span class="nc" id="L918">    return wrapObservable(apiService.verifyCaptcha(param));</span>
+  }
+
+  public Observable&lt;LCNull&gt; requestSMSCode(String mobilePhone, Map&lt;String, Object&gt; param) {
+<span class="fc" id="L922">    param.put(&quot;mobilePhoneNumber&quot;, mobilePhone);</span>
+<span class="fc" id="L923">    return wrapObservable(apiService.requestSMSCode(param));</span>
+  }
+
+  public Observable&lt;LCNull&gt; requestSMSCodeForUpdatingPhoneNumber(LCUser asUser, String mobilePhone, Map&lt;String, Object&gt; param) {
+<span class="fc" id="L927">    param.put(&quot;mobilePhoneNumber&quot;, mobilePhone);</span>
+<span class="fc" id="L928">    String sessionToken = getSessionToken(asUser);</span>
+<span class="fc" id="L929">    return wrapObservable(apiService.requestSMSCodeForUpdatingPhoneNumber(sessionToken, param));</span>
+  }
+
+  public Observable&lt;LCNull&gt; verifySMSCode(String code, String mobilePhone) {
+<span class="nc bnc" id="L933" title="All 4 branches missed.">    if (StringUtil.isEmpty(code) || StringUtil.isEmpty(mobilePhone)) {</span>
+<span class="nc" id="L934">      return Observable.error(new IllegalArgumentException(&quot;code or mobilePhone is empty&quot;));</span>
+    }
+<span class="nc" id="L936">    Map&lt;String, Object&gt; param = new HashMap&lt;String, Object&gt;(1);</span>
+<span class="nc" id="L937">    param.put(&quot;mobilePhoneNumber&quot;, mobilePhone);</span>
+<span class="nc" id="L938">    return wrapObservable(apiService.verifySMSCode(code, param));</span>
+  }
+
+  public Observable&lt;LCNull&gt; verifySMSCodeForUpdatingPhoneNumber(LCUser asUser, String code, String mobilePhone) {
+<span class="pc bpc" id="L942" title="2 of 4 branches missed.">    if (StringUtil.isEmpty(code) || StringUtil.isEmpty(mobilePhone)) {</span>
+<span class="nc" id="L943">      return Observable.error(new IllegalArgumentException(&quot;code or mobilePhone is empty&quot;));</span>
+    }
+<span class="fc" id="L945">    String sessionToken = getSessionToken(asUser);</span>
+<span class="fc" id="L946">    Map&lt;String, Object&gt; param = new HashMap&lt;String, Object&gt;(1);</span>
+<span class="fc" id="L947">    param.put(&quot;mobilePhoneNumber&quot;, mobilePhone);</span>
+<span class="fc" id="L948">    param.put(&quot;code&quot;, code);</span>
+<span class="fc" id="L949">    return wrapObservable(apiService.verifySMSCodeForUpdatingPhoneNumber(sessionToken, param));</span>
+  }
+
+  public Observable&lt;LCSearchResponse&gt; search(final LCUser authenticatedUser, Map&lt;String, String&gt; params) {
+<span class="fc" id="L953">    String authenticatedSession = getSessionToken(authenticatedUser);</span>
+<span class="fc" id="L954">    return wrapObservable(apiService.search(authenticatedSession, params));</span>
+  }
+
+  /**
+   * Leaderboard API
+   */
+
+  public Observable&lt;LCObject&gt; createLeaderboard(Map&lt;String, Object&gt; params) {
+<span class="nc" id="L962">    return wrapObservable(apiService.createLeaderboard(params));</span>
+  }
+  public Observable&lt;LCObject&gt; fetchLeaderboard(String name) {
+<span class="nc" id="L965">    return wrapObservable(apiService.fetchLeaderboard(name));</span>
+  }
+  public Observable&lt;LCObject&gt; updateLeaderboard(String name, Map&lt;String, Object&gt; params) {
+<span class="nc" id="L968">    return wrapObservable(apiService.updateLeaderboard(name, params));</span>
+  }
+  public Observable&lt;LCObject&gt; resetLeaderboard(String name) {
+<span class="nc" id="L971">    return wrapObservable(apiService.resetLeaderboard(name));</span>
+  }
+  public Observable&lt;Boolean&gt; destroyLeaderboard(String name) {
+<span class="nc" id="L974">    return wrapObservable(apiService.destroyLeaderboard(name)).map(new Function&lt;LCObject, Boolean&gt;() {</span>
+      @Override
+      public Boolean apply(LCObject object) throws Exception {
+<span class="nc bnc" id="L977" title="All 2 branches missed.">        return null != object;</span>
+      }
+    });
+  }
+  public Observable&lt;LCStatisticResult&gt; updateUserStatistics(final LCUser user,
+                                                     List&lt;Map&lt;String, Object&gt;&gt; params,
+                                                     boolean overwrite) {
+<span class="nc bnc" id="L984" title="All 2 branches missed.">    if (null == user) {</span>
+<span class="nc" id="L985">      return Observable.error(new IllegalArgumentException(&quot;user is null&quot;));</span>
+    }
+<span class="nc bnc" id="L987" title="All 4 branches missed.">    if (null == params || params.size() &lt; 1) {</span>
+<span class="nc" id="L988">      return Observable.error(new IllegalArgumentException(&quot;params is empty&quot;));</span>
+    }
+<span class="nc" id="L990">    String sessionToken = user.getSessionToken();</span>
+<span class="nc bnc" id="L991" title="All 2 branches missed.">    int overwriteFlag = overwrite? 1: 0;</span>
+<span class="nc bnc" id="L992" title="All 2 branches missed.">    if (user.isAuthenticated()) {</span>
+<span class="nc" id="L993">      return wrapObservable(apiService.updateAuthenticatedUserStatistics(sessionToken, params, overwriteFlag));</span>
+    } else {
+<span class="nc" id="L995">      return wrapObservable(apiService.updateUserStatistics(user.getObjectId(), params, overwriteFlag));</span>
+    }
+  }
+
+  public Observable&lt;LCStatisticResult&gt; updateObjectStatistics(final String objectId,
+                                                            List&lt;Map&lt;String, Object&gt;&gt; params,
+                                                            boolean overwrite) {
+<span class="nc bnc" id="L1002" title="All 2 branches missed.">    if (StringUtil.isEmpty(objectId)) {</span>
+<span class="nc" id="L1003">      return Observable.error(new IllegalArgumentException(&quot;objectId is invalid.&quot;));</span>
+    }
+<span class="nc bnc" id="L1005" title="All 4 branches missed.">    if (null == params || params.size() &lt; 1) {</span>
+<span class="nc" id="L1006">      return Observable.error(new IllegalArgumentException(&quot;params is invalid.&quot;));</span>
+    }
+<span class="nc bnc" id="L1008" title="All 2 branches missed.">    int overwriteFlag = overwrite? 1: 0;</span>
+<span class="nc" id="L1009">    return wrapObservable(apiService.updateObjectStatistics(objectId, params, overwriteFlag));</span>
+  }
+
+  public Observable&lt;LCStatisticResult&gt; updateEntityStatistics(final String entityId,
+                                                            List&lt;Map&lt;String, Object&gt;&gt; params,
+                                                            boolean overwrite) {
+<span class="nc bnc" id="L1015" title="All 2 branches missed.">    if (StringUtil.isEmpty(entityId)) {</span>
+<span class="nc" id="L1016">      return Observable.error(new IllegalArgumentException(&quot;entityId is invalid.&quot;));</span>
+    }
+<span class="nc bnc" id="L1018" title="All 4 branches missed.">    if (null == params || params.size() &lt; 1) {</span>
+<span class="nc" id="L1019">      return Observable.error(new IllegalArgumentException(&quot;params is invalid.&quot;));</span>
+    }
+<span class="nc bnc" id="L1021" title="All 2 branches missed.">    int overwriteFlag = overwrite? 1: 0;</span>
+<span class="nc" id="L1022">    return wrapObservable(apiService.updateEntityStatistics(entityId, params, overwriteFlag));</span>
+  }
+
+  public Observable&lt;LCStatisticResult&gt; getUserStatistics(final String userObjectId, List&lt;String&gt; statisticNames) {
+<span class="nc bnc" id="L1026" title="All 2 branches missed.">    if (StringUtil.isEmpty(userObjectId)) {</span>
+<span class="nc" id="L1027">      return Observable.error(new IllegalArgumentException(&quot;userObjectId is invalid.&quot;));</span>
+    }
+<span class="nc" id="L1029">    String statistics = StringUtil.join(&quot;,&quot;, statisticNames);</span>
+<span class="nc" id="L1030">    return wrapObservable(apiService.getUserStatistics(userObjectId, statistics));</span>
+  }
+
+  public Observable&lt;LCStatisticResult&gt; getEntityStatistics(final String entityId, List&lt;String&gt; statisticNames) {
+<span class="nc bnc" id="L1034" title="All 2 branches missed.">    if (StringUtil.isEmpty(entityId)) {</span>
+<span class="nc" id="L1035">      return Observable.error(new IllegalArgumentException(&quot;entityId is null&quot;));</span>
+    }
+<span class="nc" id="L1037">    String statistics = StringUtil.join(&quot;,&quot;, statisticNames);</span>
+<span class="nc" id="L1038">    return wrapObservable(apiService.getEntityStatistics(entityId, statistics));</span>
+  }
+
+  public Observable&lt;LCStatisticResult&gt; getObjectStatistics(final String objectId, List&lt;String&gt; statisticNames) {
+<span class="nc bnc" id="L1042" title="All 2 branches missed.">    if (StringUtil.isEmpty(objectId)) {</span>
+<span class="nc" id="L1043">      return Observable.error(new IllegalArgumentException(&quot;objectId is null&quot;));</span>
+    }
+<span class="nc" id="L1045">    String statistics = StringUtil.join(&quot;,&quot;, statisticNames);</span>
+<span class="nc" id="L1046">    return wrapObservable(apiService.getObjectStatistics(objectId, statistics));</span>
+  }
+
+  public Observable&lt;LCLeaderboardResult&gt; getLeaderboardResults(String leaderboardType, String statisticName, int skip, int limit,
+                                                      List&lt;String&gt; selectUserKeys,
+                                                      List&lt;String&gt; includeUserKeys,
+                                                      List&lt;String&gt; includeStatisticNames,
+                                                      int version, boolean withCount) {
+<span class="nc bnc" id="L1054" title="All 4 branches missed.">    if (StringUtil.isEmpty(leaderboardType) || StringUtil.isEmpty(statisticName)) {</span>
+<span class="nc" id="L1055">      return Observable.error(new IllegalArgumentException(&quot;memberType or statisticName is null&quot;));</span>
+    }
+<span class="nc" id="L1057">    String selectKeys = StringUtil.join(&quot;,&quot;, selectUserKeys);</span>
+<span class="nc" id="L1058">    String includeKeys = StringUtil.join(&quot;,&quot;, includeUserKeys);</span>
+<span class="nc" id="L1059">    String includeStatistics = StringUtil.join(&quot;,&quot;, includeStatisticNames);</span>
+<span class="nc" id="L1060">    Map&lt;String, Object&gt; params = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L1061" title="All 2 branches missed.">    if (skip &gt; 0) {</span>
+<span class="nc" id="L1062">      params.put(&quot;startPosition&quot;, skip);</span>
+    }
+<span class="nc bnc" id="L1064" title="All 2 branches missed.">    if (limit &gt; 0) {</span>
+<span class="nc" id="L1065">      params.put(&quot;maxResultsCount&quot;, limit);</span>
+    }
+<span class="nc bnc" id="L1067" title="All 2 branches missed.">    if (!StringUtil.isEmpty(selectKeys)) {</span>
+<span class="nc" id="L1068">      params.put(&quot;selectKeys&quot;, selectKeys);</span>
+    }
+<span class="nc bnc" id="L1070" title="All 2 branches missed.">    if (!StringUtil.isEmpty(includeKeys)) {</span>
+<span class="nc" id="L1071">      params.put(&quot;includeKeys&quot;, includeKeys);</span>
+    }
+<span class="nc bnc" id="L1073" title="All 2 branches missed.">    if (!StringUtil.isEmpty(includeStatistics)) {</span>
+<span class="nc" id="L1074">      params.put(&quot;includeStatistics&quot;, includeStatistics);</span>
+    }
+<span class="nc bnc" id="L1076" title="All 2 branches missed.">    if (version &gt; LCLeaderboard.INVALID_VERSION) {</span>
+<span class="nc" id="L1077">      params.put(&quot;version&quot;, version);</span>
+    }
+<span class="nc bnc" id="L1079" title="All 2 branches missed.">    if (withCount) {</span>
+<span class="nc" id="L1080">      params.put(&quot;count&quot;, 1);</span>
+    }
+<span class="nc" id="L1082">    return wrapObservable(apiService.getLeaderboardResults(leaderboardType, statisticName, params));</span>
+  }
+
+  public Observable&lt;LCLeaderboardResult&gt; getLeaderboardAroundResults(String leaderboardType, String statisticName, String targetId,
+                                                            int skip, int limit, List&lt;String&gt; selectUserKeys,
+                                                            List&lt;String&gt; includeUserKeys,
+                                                            List&lt;String&gt; includeStatisticNames, int version) {
+<span class="nc bnc" id="L1089" title="All 4 branches missed.">    if (StringUtil.isEmpty(leaderboardType) || StringUtil.isEmpty(statisticName)) {</span>
+<span class="nc" id="L1090">      return Observable.error(new IllegalArgumentException(&quot;memberType or statisticName is null&quot;));</span>
+    }
+<span class="nc" id="L1092">    String selectKeys = StringUtil.join(&quot;,&quot;, selectUserKeys);</span>
+<span class="nc" id="L1093">    String includeKeys = StringUtil.join(&quot;,&quot;, includeUserKeys);</span>
+<span class="nc" id="L1094">    String includeStatistics = StringUtil.join(&quot;,&quot;, includeStatisticNames);</span>
+<span class="nc" id="L1095">    Map&lt;String, Object&gt; params = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L1096" title="All 2 branches missed.">    if (skip &gt; 0) {</span>
+<span class="nc" id="L1097">      params.put(&quot;startPosition&quot;, skip);</span>
+    }
+<span class="nc bnc" id="L1099" title="All 2 branches missed.">    if (limit &gt; 0) {</span>
+<span class="nc" id="L1100">      params.put(&quot;maxResultsCount&quot;, limit);</span>
+    }
+<span class="nc bnc" id="L1102" title="All 2 branches missed.">    if (!StringUtil.isEmpty(selectKeys)) {</span>
+<span class="nc" id="L1103">      params.put(&quot;selectKeys&quot;, selectKeys);</span>
+    }
+<span class="nc bnc" id="L1105" title="All 2 branches missed.">    if (!StringUtil.isEmpty(includeKeys)) {</span>
+<span class="nc" id="L1106">      params.put(&quot;includeKeys&quot;, includeKeys);</span>
+    }
+<span class="nc bnc" id="L1108" title="All 2 branches missed.">    if (!StringUtil.isEmpty(includeStatistics)) {</span>
+<span class="nc" id="L1109">      params.put(&quot;includeStatistics&quot;, includeStatistics);</span>
+    }
+<span class="nc bnc" id="L1111" title="All 2 branches missed.">    if (version &gt; LCLeaderboard.INVALID_VERSION) {</span>
+<span class="nc" id="L1112">      params.put(&quot;version&quot;, version);</span>
+    }
+<span class="nc" id="L1114">    return wrapObservable(apiService.getLeaderboardAroundResults(leaderboardType, statisticName, targetId, params));</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

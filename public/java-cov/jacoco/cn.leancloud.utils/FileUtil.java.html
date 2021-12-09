@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.utils</a> &gt; <span class="el_source">FileUtil.java</span></div><h1>FileUtil.java</h1><pre class="source lang-java linenums">package cn.leancloud.utils;
+
+import cn.leancloud.LCFile;
+
+import java.util.regex.Pattern;
+
+<span class="nc" id="L7">public class FileUtil {</span>
+  public static final int DEFAULT_FILE_KEY_LEN = 40;
+  public static final String DEFAULT_MIME_TYPE = &quot;application/octet-stream&quot;;
+
+  public interface MimeTypeDetector {
+    String getMimeTypeFromUrl(String url);
+    String getMimeTypeFromPath(String filePath);
+    String getMimeTypeFromExtension(String extension);
+  }
+<span class="fc" id="L16">  private static MimeTypeDetector detector = new DefaultMimeTypeDetector();</span>
+  public static void config(MimeTypeDetector mimeTypeDetector) {
+<span class="nc" id="L18">    detector = mimeTypeDetector;</span>
+<span class="nc" id="L19">  }</span>
+
+  public static String getExtensionFromFilename(String filename) {
+<span class="pc bpc" id="L22" title="1 of 4 branches missed.">    if (!StringUtil.isEmpty(filename) &amp;&amp; Pattern.matches(&quot;[a-zA-Z_0-9\\.\\-\\(\\)\\%]+&quot;, filename)) {</span>
+<span class="fc" id="L23">      int dotPos = filename.lastIndexOf('.');</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">      if (0 &lt;= dotPos) {</span>
+<span class="fc" id="L25">        return filename.substring(dotPos + 1);</span>
+      }
+    }
+<span class="fc" id="L28">    return &quot;&quot;;</span>
+  }
+
+  public static String getFileMimeType(LCFile avFile) {
+<span class="nc" id="L32">    String fileName = avFile.getName();</span>
+<span class="nc" id="L33">    String fileUrl = avFile.getUrl();</span>
+<span class="nc" id="L34">    String mimeType = null;</span>
+<span class="nc bnc" id="L35" title="All 2 branches missed.">    if (!StringUtil.isEmpty(fileName)) {</span>
+<span class="nc" id="L36">      mimeType = getMimeTypeFromFilename(fileName);</span>
+<span class="nc bnc" id="L37" title="All 2 branches missed.">    } else if (!StringUtil.isEmpty(fileUrl)) {</span>
+<span class="nc" id="L38">      mimeType = getMimeTypeFromUrl(fileUrl);</span>
+    }
+<span class="nc bnc" id="L40" title="All 2 branches missed.">    if (StringUtil.isEmpty(mimeType)) {</span>
+<span class="nc" id="L41">      mimeType = DEFAULT_MIME_TYPE;</span>
+    }
+<span class="nc" id="L43">    return mimeType;</span>
+  }
+
+  public static String getMimeTypeFromFilename(String fileName) {
+<span class="fc" id="L47">    String extension = getExtensionFromFilename(fileName);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">    if (!StringUtil.isEmpty(extension)) {</span>
+<span class="fc" id="L49">      String result = detector.getMimeTypeFromExtension(extension);</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">      return null != result? result : &quot;&quot;;</span>
+    }
+<span class="fc" id="L52">    return &quot;&quot;;</span>
+  }
+
+  public static String getMimeTypeFromPath(String localPath) {
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(localPath)) {</span>
+<span class="fc" id="L57">      String result = detector.getMimeTypeFromPath(localPath);</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">      return null != result? result : &quot;&quot;;</span>
+    }
+<span class="nc" id="L60">    return &quot;&quot;;</span>
+  }
+
+  public static String getMimeTypeFromUrl(String url) {
+<span class="fc bfc" id="L64" title="All 2 branches covered.">    if (!StringUtil.isEmpty(url)) {</span>
+<span class="fc" id="L65">      String result = detector.getMimeTypeFromUrl(url);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">      return null != result? result : &quot;&quot;;</span>
+    }
+<span class="fc" id="L68">    return &quot;&quot;;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

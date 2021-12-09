@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AppConfiguration.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.core</a> &gt; <span class="el_source">AppConfiguration.java</span></div><h1>AppConfiguration.java</h1><pre class="source lang-java linenums">package cn.leancloud.core;
+
+import cn.leancloud.LCACL;
+import cn.leancloud.gson.GSONConverterFactory;
+import cn.leancloud.json.ConverterFactory;
+import cn.leancloud.json.JSONParser;
+import cn.leancloud.logging.InternalLoggerAdapter;
+import cn.leancloud.cache.InMemorySetting;
+import cn.leancloud.cache.LastModifyCache;
+import cn.leancloud.cache.SystemSetting;
+import cn.leancloud.logging.SimpleLoggerAdapter;
+import cn.leancloud.network.NetworkingDetector;
+import cn.leancloud.network.SimpleNetworkingDetector;
+import cn.leancloud.utils.FileUtil;
+import io.reactivex.Scheduler;
+
+import java.io.File;
+
+<span class="nc" id="L19">public class AppConfiguration {</span>
+  public interface SchedulerCreator{
+    Scheduler create();
+  }
+  public static final int DEFAULT_NETWORK_TIMEOUT = 30;
+
+  private static LCACL defaultACL;
+<span class="fc" id="L26">  private static int networkTimeout = DEFAULT_NETWORK_TIMEOUT;</span>
+<span class="fc" id="L27">  private static InternalLoggerAdapter logAdapter = new SimpleLoggerAdapter();</span>
+<span class="fc" id="L28">  private static boolean asynchronized = false;</span>
+<span class="fc" id="L29">  private static SchedulerCreator defaultScheduler = null;</span>
+<span class="fc" id="L30">  private static NetworkingDetector globalNetworkingDetector = new SimpleNetworkingDetector();</span>
+<span class="fc" id="L31">  private static String applicationPackageName = &quot;&quot;;</span>
+
+<span class="fc" id="L33">  private static String importantFileDir = &quot;./persistFiles/&quot;;</span>
+<span class="fc" id="L34">  private static String documentDir = &quot;./data/&quot;;</span>
+<span class="fc" id="L35">  private static String fileCacheDir = &quot;./file/&quot;;</span>
+<span class="fc" id="L36">  private static String commandCacheDir = &quot;./command/&quot;;</span>
+<span class="fc" id="L37">  private static String analyticsCacheDir = &quot;./stats/&quot;;</span>
+<span class="fc" id="L38">  private static String queryResultCacheDir = &quot;./PaasKeyValueCache&quot;;</span>
+<span class="fc" id="L39">  private static SystemSetting defaultSetting = new InMemorySetting();</span>
+
+<span class="fc" id="L41">  private static boolean enableLocalCache = true;</span>
+<span class="fc" id="L42">  private static boolean incognitoMode = false;</span>
+
+<span class="fc" id="L44">  private static ConverterFactory converterFactory = new GSONConverterFactory();</span>
+<span class="fc" id="L45">  private static retrofit2.Converter.Factory retrofitConverterFactory = converterFactory.generateRetrofitConverterFactory();</span>
+<span class="fc" id="L46">  private static JSONParser jsonParser = converterFactory.createJSONParser();</span>
+
+  private static final String SDK_VERSION = &quot;8.2.0&quot;;
+  private static final String DEFAULT_USER_AGENT = &quot;LeanCloud-Java-SDK/&quot; + SDK_VERSION;
+
+  public static void setNetworkTimeout(int seconds) {
+<span class="nc" id="L52">    networkTimeout = seconds;</span>
+<span class="nc" id="L53">  }</span>
+  public static int getNetworkTimeout() {
+<span class="nc" id="L55">    return networkTimeout;</span>
+  }
+
+  public static void setLastModifyEnabled(boolean val) {
+<span class="nc" id="L59">    LastModifyCache.getInstance().setLastModifyEnabled(val);</span>
+<span class="nc" id="L60">  }</span>
+  public static boolean isLastModifyEnabled() {
+<span class="nc" id="L62">    return LastModifyCache.getInstance().isLastModifyEnabled();</span>
+  }
+
+  public static LCACL getDefaultACL() {
+<span class="fc" id="L66">    return defaultACL;</span>
+  }
+  public static void setDefaultACL(LCACL acl) {
+<span class="nc" id="L69">    defaultACL = acl;</span>
+<span class="nc" id="L70">  }</span>
+
+  public static void setLogAdapter(InternalLoggerAdapter adapter) {
+<span class="nc" id="L73">    logAdapter = adapter;</span>
+<span class="nc" id="L74">  }</span>
+  public static InternalLoggerAdapter getLogAdapter() {
+<span class="fc" id="L76">    return logAdapter;</span>
+  }
+  public static String getUserAgent() {
+<span class="fc" id="L79">    return DEFAULT_USER_AGENT;</span>
+  }
+
+  public static void setIncognitoMode(boolean mode) {
+<span class="nc" id="L83">    incognitoMode = mode;</span>
+<span class="nc" id="L84">  }</span>
+
+  public static boolean isIncognitoMode() {
+<span class="fc" id="L87">    return incognitoMode;</span>
+  }
+
+  public static void setConverterFactory(ConverterFactory cf) {
+<span class="nc bnc" id="L91" title="All 2 branches missed.">    if (null == cf) {</span>
+<span class="nc" id="L92">      return;</span>
+    }
+<span class="nc" id="L94">    converterFactory = cf;</span>
+<span class="nc" id="L95">    retrofitConverterFactory = converterFactory.generateRetrofitConverterFactory();</span>
+<span class="nc" id="L96">    jsonParser = converterFactory.createJSONParser();</span>
+<span class="nc" id="L97">  }</span>
+
+  public static retrofit2.Converter.Factory getRetrofitConverterFactory() {
+<span class="fc" id="L100">    return retrofitConverterFactory;</span>
+  }
+
+  public static JSONParser getJsonParser() {
+<span class="fc" id="L104">    return jsonParser;</span>
+  }
+
+  public static void config(boolean asyncRequest, SchedulerCreator observerSchedulerCreator) {
+<span class="fc" id="L108">    asynchronized = asyncRequest;</span>
+<span class="fc" id="L109">    defaultScheduler = observerSchedulerCreator;</span>
+<span class="fc" id="L110">  }</span>
+
+  public static boolean isEnableLocalCache() {
+<span class="nc" id="L113">    return enableLocalCache;</span>
+  }
+
+  /**
+   * set flag to enable local cache or not.
+   * @param enableLocalCache flag to enable local cache or not
+   */
+  public static void setEnableLocalCache(boolean enableLocalCache) {
+<span class="nc" id="L121">    AppConfiguration.enableLocalCache = enableLocalCache;</span>
+<span class="nc" id="L122">  }</span>
+
+<span class="fc" id="L124">  private static boolean autoMergeOperationDataWhenSave = true;</span>
+
+  public static boolean isAutoMergeOperationDataWhenSave() {
+<span class="fc" id="L127">    return autoMergeOperationDataWhenSave;</span>
+  }
+
+  /**
+   * Set default behavior for object save operation.
+   *
+   * @param flag flag to indicate whether enable auto merge operation data or not, default is false
+   */
+  public static void setAutoMergeOperationDataWhenSave(boolean flag) {
+<span class="fc" id="L136">    AppConfiguration.autoMergeOperationDataWhenSave = flag;</span>
+<span class="fc" id="L137">  }</span>
+
+  public static boolean isAsynchronized() {
+<span class="fc" id="L140">    return asynchronized;</span>
+  }
+
+  public static SchedulerCreator getDefaultScheduler() {
+<span class="fc" id="L144">    return defaultScheduler;</span>
+  }
+
+  public static void makeSureCacheDirWorkable() {
+<span class="nc" id="L148">    makeSureDirExist(importantFileDir);</span>
+<span class="nc" id="L149">    makeSureDirExist(documentDir);</span>
+<span class="nc" id="L150">    makeSureDirExist(fileCacheDir);</span>
+<span class="nc" id="L151">    makeSureDirExist(queryResultCacheDir);</span>
+<span class="nc" id="L152">    makeSureDirExist(commandCacheDir);</span>
+<span class="nc" id="L153">    makeSureDirExist(analyticsCacheDir);</span>
+<span class="nc" id="L154">  }</span>
+
+  private static void makeSureDirExist(String dirPath) {
+<span class="fc" id="L157">    File dirFile = new File(dirPath);</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">    if (!dirFile.exists()) {</span>
+<span class="nc" id="L159">      dirFile.mkdirs();</span>
+    }
+<span class="fc" id="L161">  }</span>
+
+  /**
+   * config local cache setting.
+   * @param imFileDir im file cache directory.
+   * @param docDir   document cache directory.
+   * @param fileDir file cache directory.
+   * @param queryResultDir query result cache directory.
+   * @param commandDir command cache directory.
+   * @param analyticsDir analytics cache directory.
+   * @param setting other settings.
+   */
+  public static void configCacheSettings(String imFileDir, String docDir, String fileDir, String queryResultDir,
+         String commandDir, String analyticsDir, SystemSetting setting) {
+<span class="nc" id="L175">    importantFileDir = imFileDir;</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">    if (!importantFileDir.endsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L177">      importantFileDir += &quot;/&quot;;</span>
+    }
+
+<span class="nc" id="L180">    documentDir = docDir;</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">    if (!documentDir.endsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L182">      documentDir += &quot;/&quot;;</span>
+    }
+
+<span class="nc" id="L185">    fileCacheDir = fileDir;</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">    if (!fileCacheDir.endsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L187">      fileCacheDir += &quot;/&quot;;</span>
+    }
+
+<span class="nc" id="L190">    queryResultCacheDir = queryResultDir;</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">    if (!queryResultCacheDir.endsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L192">      queryResultCacheDir += &quot;/&quot;;</span>
+    }
+
+<span class="nc" id="L195">    commandCacheDir = commandDir;</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">    if (!commandCacheDir.endsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L197">      commandCacheDir += &quot;/&quot;;</span>
+    }
+
+<span class="nc" id="L200">    analyticsCacheDir = analyticsDir;</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">    if (!analyticsCacheDir.endsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L202">      analyticsCacheDir += &quot;/&quot;;</span>
+    }
+
+<span class="nc" id="L205">    makeSureCacheDirWorkable();</span>
+<span class="nc" id="L206">    defaultSetting = setting;</span>
+<span class="nc" id="L207">  }</span>
+
+  public static String getAnalyticsCacheDir() {
+<span class="nc bnc" id="L210" title="All 2 branches missed.">    if (!enableLocalCache) {</span>
+<span class="nc" id="L211">      return null;</span>
+    }
+<span class="nc" id="L213">    makeSureDirExist(analyticsCacheDir);</span>
+<span class="nc" id="L214">    return analyticsCacheDir;</span>
+  }
+
+  public static String getCommandCacheDir() {
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">    if (!enableLocalCache) {</span>
+<span class="nc" id="L219">      return null;</span>
+    }
+<span class="fc" id="L221">    makeSureDirExist(commandCacheDir);</span>
+<span class="fc" id="L222">    return commandCacheDir;</span>
+  }
+
+  public static String getImportantFileDir() {
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">    if (!enableLocalCache) {</span>
+<span class="nc" id="L227">      return null;</span>
+    }
+<span class="fc" id="L229">    makeSureDirExist(importantFileDir);</span>
+<span class="fc" id="L230">    return importantFileDir;</span>
+  }
+
+  public static String getDocumentDir() {
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">    if (!enableLocalCache) {</span>
+<span class="nc" id="L235">      return null;</span>
+    }
+<span class="fc" id="L237">    makeSureDirExist(documentDir);</span>
+<span class="fc" id="L238">    return documentDir;</span>
+  }
+
+  public static String getFileCacheDir() {
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">    if (!enableLocalCache) {</span>
+<span class="nc" id="L243">      return null;</span>
+    }
+<span class="fc" id="L245">    makeSureDirExist(fileCacheDir);</span>
+<span class="fc" id="L246">    return fileCacheDir;</span>
+  }
+
+  public static String getQueryResultCacheDir() {
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">    if (!enableLocalCache) {</span>
+<span class="nc" id="L251">      return null;</span>
+    }
+<span class="fc" id="L253">    makeSureDirExist(queryResultCacheDir);</span>
+<span class="fc" id="L254">    return queryResultCacheDir;</span>
+  }
+
+  public static String getApplicationPackageName() {
+<span class="fc" id="L258">    return applicationPackageName;</span>
+  }
+
+  public static void setApplicationPackageName(String applicationPackageName) {
+<span class="nc" id="L262">    AppConfiguration.applicationPackageName = applicationPackageName;</span>
+<span class="nc" id="L263">  }</span>
+
+  public static SystemSetting getDefaultSetting() {
+<span class="fc" id="L266">    return defaultSetting;</span>
+  }
+
+  public static NetworkingDetector getGlobalNetworkingDetector() {
+<span class="fc" id="L270">    return globalNetworkingDetector;</span>
+  }
+
+  public static void setGlobalNetworkingDetector(NetworkingDetector globalNetworkingDetector) {
+<span class="fc" id="L274">    AppConfiguration.globalNetworkingDetector = globalNetworkingDetector;</span>
+<span class="fc" id="L275">  }</span>
+
+  public static void setMimeTypeDetector(FileUtil.MimeTypeDetector detector) {
+<span class="nc bnc" id="L278" title="All 2 branches missed.">    if (null != detector) {</span>
+<span class="nc" id="L279">      FileUtil.config(detector);</span>
+    }
+<span class="nc" id="L281">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

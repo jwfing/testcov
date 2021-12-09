@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MDFive.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.codec</a> &gt; <span class="el_source">MDFive.java</span></div><h1>MDFive.java</h1><pre class="source lang-java linenums">package cn.leancloud.codec;
+
+import cn.leancloud.cache.PersistenceUtil;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
+public class MDFive {
+  private static final int MAX_FILE_BUF_SIZE = 1024*1024*2;
+
+  public static String computeMD5(String data) {
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">    if (null == data) {</span>
+<span class="nc" id="L16">      return null;</span>
+    }
+<span class="fc" id="L18">    return computeMD5(data.getBytes());</span>
+  }
+  public static String computeMD5(byte[] data) {
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">    if (null == data) {</span>
+<span class="nc" id="L22">      return &quot;&quot;;</span>
+    }
+    try {
+<span class="fc" id="L25">      MessageDigest md = MessageDigest.getInstance(&quot;MD5&quot;);</span>
+<span class="fc" id="L26">      md.update(data, 0, data.length);</span>
+<span class="fc" id="L27">      byte[] md5bytes = md.digest();</span>
+
+<span class="fc" id="L29">      return hexEncodeBytes(md5bytes);</span>
+<span class="nc" id="L30">    } catch (NoSuchAlgorithmException ex) {</span>
+<span class="nc" id="L31">      return &quot;&quot;;</span>
+    }
+  }
+
+  public static String computeFileMD5(File localFile) {
+<span class="pc bpc" id="L36" title="3 of 6 branches missed.">    if (null == localFile || !localFile.exists() || !localFile.isFile()) {</span>
+<span class="nc" id="L37">      return null;</span>
+    }
+    try {
+<span class="fc" id="L40">      String result = null;</span>
+<span class="fc" id="L41">      MessageDigest md5 = MessageDigest.getInstance(&quot;MD5&quot;);</span>
+<span class="fc" id="L42">      InputStream is = PersistenceUtil.getInputStreamFromFile(localFile);</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">      if (null != is) {</span>
+<span class="fc" id="L44">        byte buf[] = new byte[MAX_FILE_BUF_SIZE];</span>
+<span class="fc" id="L45">        int len  = 0;</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        while((len = is.read(buf)) != -1) {</span>
+<span class="fc" id="L47">          md5.update(buf, 0, len);</span>
+        }
+<span class="fc" id="L49">        byte[] md5bytes = md5.digest();</span>
+<span class="fc" id="L50">        result = MDFive.hexEncodeBytes(md5bytes);</span>
+<span class="fc" id="L51">        is.close();</span>
+      }
+<span class="fc" id="L53">      return result;</span>
+<span class="nc" id="L54">    } catch (IOException ex) {</span>
+<span class="nc" id="L55">      return null;</span>
+<span class="nc" id="L56">    } catch (NoSuchAlgorithmException ex) {</span>
+<span class="nc" id="L57">      return null;</span>
+    }
+  }
+
+  public static String hexEncodeBytes(byte[] md5bytes) {
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">    if (null == md5bytes) {</span>
+<span class="nc" id="L63">      return &quot;&quot;;</span>
+    }
+<span class="fc" id="L65">    StringBuffer hexString = new StringBuffer();</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">    for (int i = 0; i &lt; md5bytes.length; i++) {</span>
+<span class="fc" id="L67">      String hex = Integer.toHexString(0xff &amp; md5bytes[i]);</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">      if (hex.length() == 1) hexString.append('0');</span>
+<span class="fc" id="L69">      hexString.append(hex);</span>
+    }
+<span class="fc" id="L71">    return hexString.toString();</span>
+  }
+
+  public static MDFive getInstance() {
+<span class="nc" id="L75">    return new MDFive();</span>
+  }
+
+<span class="nc" id="L78">  private MessageDigest mdInstance = null;</span>
+<span class="nc" id="L79">  private MDFive() {</span>
+    try {
+<span class="nc" id="L81">      mdInstance = MessageDigest.getInstance(&quot;MD5&quot;);</span>
+<span class="nc" id="L82">    } catch (NoSuchAlgorithmException ex) {</span>
+<span class="nc" id="L83">    }</span>
+<span class="nc" id="L84">  }</span>
+
+  public boolean prepare() {
+<span class="nc bnc" id="L87" title="All 2 branches missed.">    if (null != mdInstance) {</span>
+<span class="nc" id="L88">      mdInstance.reset();</span>
+<span class="nc" id="L89">      return true;</span>
+    }
+<span class="nc" id="L91">    return false;</span>
+  }
+
+  public void update(byte[] input, int offset, int len) {
+<span class="nc bnc" id="L95" title="All 2 branches missed.">    if (null != mdInstance) {</span>
+<span class="nc" id="L96">      mdInstance.update(input, offset, len);</span>
+    }
+<span class="nc" id="L98">  }</span>
+
+  public byte[] digest() {
+<span class="nc bnc" id="L101" title="All 2 branches missed.">    if (null != mdInstance) {</span>
+<span class="nc" id="L102">      return mdInstance.digest();</span>
+    }
+<span class="nc" id="L104">    return null;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

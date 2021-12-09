@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CompoundOperation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.ops</a> &gt; <span class="el_source">CompoundOperation.java</span></div><h1>CompoundOperation.java</h1><pre class="source lang-java linenums">package cn.leancloud.ops;
+
+import cn.leancloud.LCObject;
+
+import java.util.*;
+
+public class CompoundOperation extends BaseOperation {
+<span class="fc" id="L8">  private List&lt;ObjectFieldOperation&gt; operations = new LinkedList&lt;ObjectFieldOperation&gt;();</span>
+
+  public CompoundOperation(String field) {
+<span class="fc" id="L11">    super(&quot;Compound&quot;, field, null, false);</span>
+<span class="fc" id="L12">  }</span>
+  public CompoundOperation(String field, ObjectFieldOperation... ops) {
+<span class="fc" id="L14">    this(field);</span>
+<span class="fc" id="L15">    operations.addAll(Arrays.asList(ops));</span>
+<span class="fc" id="L16">  }</span>
+
+  public List&lt;ObjectFieldOperation&gt; getSubOperations() {
+<span class="fc" id="L19">    return this.operations;</span>
+  }
+
+  @Override
+  public boolean checkCircleReference(Map&lt;LCObject, Boolean&gt; markMap) {
+<span class="fc" id="L24">    boolean result = false;</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">    for (ObjectFieldOperation op : operations) {</span>
+<span class="pc bpc" id="L26" title="2 of 4 branches missed.">      result = result || op.checkCircleReference(markMap);</span>
+<span class="fc" id="L27">    }</span>
+<span class="fc" id="L28">    return result;</span>
+  }
+
+  public Object apply(Object obj) {
+<span class="nc bnc" id="L32" title="All 2 branches missed.">    for (ObjectFieldOperation op: operations) {</span>
+<span class="nc" id="L33">      obj = op.apply(obj);</span>
+<span class="nc" id="L34">    }</span>
+<span class="nc" id="L35">    return obj;</span>
+  }
+
+  protected ObjectFieldOperation mergeWithPrevious(ObjectFieldOperation previous) {
+<span class="fc" id="L39">    operations.add(previous);</span>
+<span class="fc" id="L40">    return this;</span>
+  }
+
+  public List&lt;Map&lt;String, Object&gt;&gt; encodeRestOp(LCObject parent) {
+<span class="fc" id="L44">    List&lt;Map&lt;String, Object&gt;&gt; result = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">    if (null == parent) {</span>
+<span class="nc" id="L46">      return result;</span>
+    }
+<span class="fc" id="L48">    String requestEndPoint = parent.getRequestRawEndpoint();</span>
+<span class="fc" id="L49">    String requestMethod = parent.getRequestMethod();</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">    for (int i = 1; i &lt; this.operations.size(); i++) {</span>
+<span class="fc" id="L51">      ObjectFieldOperation tmp = this.operations.get(i);</span>
+<span class="fc" id="L52">      Map&lt;String, Object&gt; tmpOp = tmp.encode();</span>
+
+<span class="fc" id="L54">      Map&lt;String, Object&gt; tmpResult = Utils.makeCompletedRequest(parent.getObjectId(), requestEndPoint, requestMethod, tmpOp);</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">      if (null != tmpResult) {</span>
+<span class="fc" id="L56">        result.add(tmpResult);</span>
+      }
+    }
+<span class="fc" id="L59">    return result;</span>
+  }
+
+  private Map&lt;String, Object&gt; encodeHeadOp() {
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">    if (this.operations.size() &lt; 1) {</span>
+<span class="nc" id="L64">      return null;</span>
+    }
+    // just return the first Operation.
+<span class="fc" id="L67">    return this.operations.get(0).encode();</span>
+  }
+
+  public Map&lt;String, Object&gt; encode() {
+<span class="fc" id="L71">    return encodeHeadOp();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

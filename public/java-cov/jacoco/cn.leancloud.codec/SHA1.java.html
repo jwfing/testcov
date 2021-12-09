@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SHA1.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.codec</a> &gt; <span class="el_source">SHA1.java</span></div><h1>SHA1.java</h1><pre class="source lang-java linenums">package cn.leancloud.codec;
+
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
+<span class="nc" id="L6">public class SHA1 {</span>
+  private static String convertToHex(byte[] data) {
+<span class="fc" id="L8">    StringBuilder buf = new StringBuilder();</span>
+<span class="fc bfc" id="L9" title="All 2 branches covered.">    for (byte b : data) {</span>
+<span class="fc" id="L10">      int halfbyte = (b &gt;&gt;&gt; 4) &amp; 0x0F;</span>
+<span class="fc" id="L11">      int two_halfs = 0;</span>
+      do {
+<span class="pc bpc" id="L13" title="1 of 4 branches missed.">        buf.append((0 &lt;= halfbyte) &amp;&amp; (halfbyte &lt;= 9)</span>
+<span class="fc" id="L14">                ? (char) ('0' + halfbyte)</span>
+<span class="fc" id="L15">                : (char) ('a' + (halfbyte - 10)));</span>
+<span class="fc" id="L16">        halfbyte = b &amp; 0x0F;</span>
+<span class="fc bfc" id="L17" title="All 2 branches covered.">      } while (two_halfs++ &lt; 1);</span>
+    }
+<span class="fc" id="L19">    return buf.toString();</span>
+  }
+
+  public static String compute(byte[] data) throws NoSuchAlgorithmException {
+<span class="fc" id="L23">    MessageDigest md = MessageDigest.getInstance(&quot;SHA-1&quot;);</span>
+<span class="fc" id="L24">    md.update(data, 0, data.length);</span>
+<span class="fc" id="L25">    byte[] sha1hash = md.digest();</span>
+<span class="fc" id="L26">    return convertToHex(sha1hash);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

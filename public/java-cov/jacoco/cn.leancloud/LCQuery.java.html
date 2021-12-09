@@ -1,0 +1,1147 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LCQuery.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud</a> &gt; <span class="el_source">LCQuery.java</span></div><h1>LCQuery.java</h1><pre class="source lang-java linenums">package cn.leancloud;
+
+import cn.leancloud.cache.QueryResultCache;
+import cn.leancloud.core.PaasClient;
+import cn.leancloud.query.LCCloudQueryResult;
+import cn.leancloud.query.QueryConditions;
+import cn.leancloud.query.QueryOperation;
+import cn.leancloud.types.LCGeoPoint;
+import cn.leancloud.types.LCNull;
+import cn.leancloud.utils.LCUtils;
+import cn.leancloud.utils.LogUtil;
+import cn.leancloud.utils.StringUtil;
+
+import java.util.*;
+
+import io.reactivex.Observable;
+import io.reactivex.ObservableSource;
+import io.reactivex.functions.Function;
+
+public class LCQuery&lt;T extends LCObject&gt; implements Cloneable {
+<span class="fc" id="L21">  private static final LCLogger LOGGER = LogUtil.getLogger(LCQuery.class);</span>
+
+<span class="fc" id="L23">  public enum CachePolicy {</span>
+<span class="fc" id="L24">    CACHE_ELSE_NETWORK, CACHE_ONLY, CACHE_THEN_NETWORK, IGNORE_CACHE, NETWORK_ELSE_CACHE,</span>
+<span class="fc" id="L25">    NETWORK_ONLY;</span>
+  }
+
+  private Class&lt;T&gt; clazz;
+  private String className;
+  private java.lang.Boolean isRunning;
+<span class="fc" id="L31">  private CachePolicy cachePolicy = CachePolicy.IGNORE_CACHE;</span>
+<span class="fc" id="L32">  private long maxCacheAge = -1;</span>
+
+  QueryConditions conditions;
+
+  /**
+   * Constructs a query. A default query with no further parameters will retrieve all AVObjects of
+   * the provided class.
+   *
+   * @param theClassName The name of the class to retrieve AVObjects for.
+   */
+  public LCQuery(String theClassName) {
+<span class="fc" id="L43">    this(theClassName, null);</span>
+<span class="fc" id="L44">  }</span>
+
+  /**
+   * Clone a new query object, which fully same to this.
+   *
+   * @return a new AVQuery object.
+   */
+  public LCQuery clone() throws CloneNotSupportedException {
+<span class="fc" id="L52">    LCQuery query = (LCQuery) super.clone();</span>
+
+<span class="fc" id="L54">    query.isRunning = false;</span>
+<span class="fc" id="L55">    query.cachePolicy = this.cachePolicy;</span>
+<span class="fc" id="L56">    query.maxCacheAge = this.maxCacheAge;</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">    query.conditions = null != this.conditions? this.conditions.clone(): null;</span>
+<span class="fc" id="L58">    return query;</span>
+  }
+
+<span class="fc" id="L61">  LCQuery(String theClassName, Class&lt;T&gt; clazz) {</span>
+<span class="fc" id="L62">    Transformer.checkClassName(theClassName);</span>
+<span class="fc" id="L63">    this.className = theClassName;</span>
+<span class="fc" id="L64">    this.clazz = clazz;</span>
+<span class="fc" id="L65">    this.conditions = new QueryConditions();</span>
+<span class="fc" id="L66">  }</span>
+
+  /**
+   * Constructs a query. A default query with no further parameters will retrieve all AVObjects of
+   * the provided class.
+   *
+   * @param theClassName The name of the class to retrieve AVObjects for.
+   * @param &lt;T&gt; template type.
+   * @return the query object.
+   */
+  public static &lt;T extends LCObject&gt; LCQuery&lt;T&gt; getQuery(String theClassName) {
+<span class="fc" id="L77">    return new LCQuery&lt;T&gt;(theClassName);</span>
+  }
+
+  /**
+   * Create a AVQuery with special sub-class.
+   *
+   * @param clazz The AVObject subclass
+   * @param &lt;T&gt; template type.
+   * @return The AVQuery
+   */
+  public static &lt;T extends LCObject&gt; LCQuery&lt;T&gt; getQuery(Class&lt;T&gt; clazz) {
+<span class="fc" id="L88">    return new LCQuery&lt;T&gt;(Transformer.getSubClassName(clazz), clazz);</span>
+  }
+
+  Class&lt;T&gt; getClazz() {
+<span class="fc" id="L92">    return clazz;</span>
+  }
+
+  void setClazz(Class&lt;T&gt; clazz) {
+<span class="nc" id="L96">    this.clazz = clazz;</span>
+<span class="nc" id="L97">  }</span>
+
+  List&lt;String&gt; getInclude() {
+<span class="fc" id="L100">    return conditions.getInclude();</span>
+  }
+
+  void setInclude(List&lt;String&gt; include) {
+<span class="nc" id="L104">    conditions.setInclude(include);</span>
+<span class="nc" id="L105">  }</span>
+
+  Set&lt;String&gt; getSelectedKeys() {
+<span class="nc" id="L108">    return conditions.getSelectedKeys();</span>
+  }
+
+  void setSelectedKeys(Set&lt;String&gt; selectedKeys) {
+<span class="nc" id="L112">    conditions.setSelectedKeys(selectedKeys);</span>
+<span class="nc" id="L113">  }</span>
+
+  Map&lt;String, String&gt; getParameters() {
+<span class="nc" id="L116">    return conditions.getParameters();</span>
+  }
+
+  void setParameters(Map&lt;String, String&gt; parameters) {
+<span class="nc" id="L120">    conditions.setParameters(parameters);</span>
+<span class="nc" id="L121">  }</span>
+
+  Map&lt;String, List&lt;QueryOperation&gt;&gt; getWhere() {
+<span class="nc" id="L124">    return conditions.getWhere();</span>
+  }
+
+  /**
+   * Get class name
+   * @return class name.
+   */
+  public String getClassName() {
+<span class="fc" id="L132">    return className;</span>
+  }
+
+  /**
+   * Set class name
+   * @param className class name.
+   * @return current instance.
+   */
+  public LCQuery&lt;T&gt; setClassName(String className) {
+<span class="nc" id="L141">    this.className = className;</span>
+<span class="nc" id="L142">    return this;</span>
+  }
+
+  /**
+   * Accessor for the caching policy.
+   * @return cache policy
+   */
+  public CachePolicy getCachePolicy() {
+<span class="fc" id="L150">    return cachePolicy;</span>
+  }
+
+  /**
+   * Change the caching policy of this query.
+   *
+   * @param cachePolicy  cache policy.
+   * @return this query.
+   */
+  public LCQuery&lt;T&gt; setCachePolicy(CachePolicy cachePolicy) {
+<span class="fc" id="L160">    this.cachePolicy = cachePolicy;</span>
+<span class="fc" id="L161">    return this;</span>
+  }
+
+  /**
+   * Get cache policy.
+   * @return cache policy.
+   */
+  public CachePolicy getPolicy() {
+<span class="nc" id="L169">    return cachePolicy;</span>
+  }
+
+  /**
+   * Change the caching policy of this query.
+   *
+   * @param policy cache policy.
+   * @return this query.
+   */
+  public LCQuery&lt;T&gt; setPolicy(CachePolicy policy) {
+<span class="nc" id="L179">    this.cachePolicy = policy;</span>
+<span class="nc" id="L180">    return this;</span>
+  }
+
+  /**
+   * Gets the maximum age of cached data that will be considered in this query. The returned value
+   * is in milliseconds
+   * @return max cache age(milliseconds).
+   */
+  public long getMaxCacheAge() {
+<span class="fc" id="L189">    return maxCacheAge;</span>
+  }
+
+  /**
+   * Sets the maximum age of cached data that will be considered in this query.
+   *
+   * @param maxCacheAge  mac cached age.
+   * @return this query.
+   */
+  public LCQuery&lt;T&gt; setMaxCacheAge(long maxCacheAge) {
+<span class="nc" id="L199">    this.maxCacheAge = maxCacheAge;</span>
+<span class="nc" id="L200">    return this;</span>
+  }
+
+  /**
+   * Clears the cached result for all queries.
+   */
+  public static void clearAllCachedResults() {
+<span class="fc" id="L207">    QueryResultCache.getInstance().clearAllCachedFiles();</span>
+<span class="fc" id="L208">  }</span>
+
+  /**
+   * Removes the previously cached result for this query, forcing the next find() to hit the
+   * network. If there is no cached result for this query, then this is a no-op.
+   */
+  public void clearCachedResult() {
+<span class="fc" id="L215">    Map&lt;String, String&gt; query = assembleParameters();</span>
+<span class="fc" id="L216">    String cacheKey = QueryResultCache.generateKeyForQueryCondition(getClassName(), query);</span>
+<span class="fc" id="L217">    QueryResultCache.getInstance().clearCachedFile(cacheKey);</span>
+
+    // clear result for getFirstInBackground().
+<span class="fc" id="L220">    query.put(&quot;limit&quot;, &quot;1&quot;);</span>
+<span class="fc" id="L221">    cacheKey = QueryResultCache.generateKeyForQueryCondition(getClassName(), query);</span>
+<span class="fc" id="L222">    QueryResultCache.getInstance().clearCachedFile(cacheKey);</span>
+<span class="fc" id="L223">  }</span>
+
+  /**
+   * Accessor for the limit.
+   * @return query limit.
+   */
+  public int getLimit() {
+<span class="nc" id="L230">    return conditions.getLimit();</span>
+  }
+
+  /**
+   * Controls the maximum number of results that are returned. Setting a negative limit denotes
+   * retrieval without a limit. The default limit is 100, with a maximum of 1000 results being
+   * returned at a time.
+   *
+   * @param limit query limit.
+   * @return this query.
+   */
+  public LCQuery&lt;T&gt; setLimit(int limit) {
+<span class="fc" id="L242">    conditions.setLimit(limit);</span>
+<span class="fc" id="L243">    return this;</span>
+  }
+
+  /**
+   * @see #setLimit(int)
+   * @param limit query limit
+   * @return this query.
+   */
+  public LCQuery&lt;T&gt; limit(int limit) {
+<span class="fc" id="L252">    this.setLimit(limit);</span>
+<span class="fc" id="L253">    return this;</span>
+  }
+
+  /**
+   * @see #setSkip(int)
+   * @param skip qury skip
+   * @return this query.
+   */
+  public LCQuery&lt;T&gt; skip(int skip) {
+<span class="fc" id="L262">    setSkip(skip);</span>
+<span class="fc" id="L263">    return this;</span>
+  }
+
+  /**
+   * Accessor for the skip value.
+   * @return current skip value.
+   */
+  public int getSkip() {
+<span class="nc" id="L271">    return conditions.getSkip();</span>
+  }
+
+  /**
+   * Controls the number of results to skip before returning any results. This is useful for
+   * pagination. Default is to skip zero results.
+   *
+   * @param skip query skip.
+   * @return this query
+   */
+  public LCQuery&lt;T&gt; setSkip(int skip) {
+<span class="fc" id="L282">    conditions.setSkip(skip);</span>
+<span class="fc" id="L283">    return this;</span>
+  }
+
+  /**
+   * Get order string.
+   * @return order string.
+   */
+  public String getOrder() {
+<span class="fc" id="L291">    return conditions.getOrder();</span>
+  }
+
+  /**
+   * Set query order fields.
+   *
+   * @param order order string.
+   * @return this query.
+   */
+  public LCQuery&lt;T&gt; setOrder(String order) {
+<span class="nc" id="L301">    conditions.setOrder(order);</span>
+<span class="nc" id="L302">    return this;</span>
+  }
+
+  /**
+   * @see #setOrder(String)
+   * @param order order string.
+   * @return this query.
+   */
+  public LCQuery&lt;T&gt; order(String order) {
+<span class="nc" id="L311">    setOrder(order);</span>
+<span class="nc" id="L312">    return this;</span>
+  }
+
+  /**
+   * Also sorts the results in ascending order by the given key. The previous sort keys have
+   * precedence over this key.
+   *
+   * @param key The key to order by
+   * @return Returns the query so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; addAscendingOrder(String key) {
+<span class="nc" id="L323">    conditions.addAscendingOrder(key);</span>
+<span class="nc" id="L324">    return this;</span>
+  }
+
+  /**
+   * Also sorts the results in descending order by the given key. The previous sort keys have
+   * precedence over this key.
+   *
+   * @param key The key to order by
+   * @return Returns the query so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; addDescendingOrder(String key) {
+<span class="fc" id="L335">    conditions.addDescendingOrder(key);</span>
+<span class="fc" id="L336">    return this;</span>
+  }
+
+  /**
+   * Flag to indicate need ACL returned in result.
+   * @return include flag.
+   */
+  public boolean isIncludeACL() {
+<span class="nc" id="L344">    return conditions.isIncludeACL();</span>
+  }
+
+  /**
+   * set include ACL or not.
+   * @param includeACL Flag to indicate need ACL returned in result.
+   * @return this query.
+   */
+  public LCQuery&lt;T&gt; includeACL(boolean includeACL) {
+<span class="nc" id="L353">    conditions.includeACL(includeACL);</span>
+<span class="nc" id="L354">    return this;</span>
+  }
+
+  /**
+   * Include nested AVObjects for the provided key. You can use dot notation to specify which fields
+   * in the included object that are also fetched.
+   *
+   * @param key The key that should be included.
+   * @return this query.
+   */
+  public LCQuery&lt;T&gt; include(String key) {
+<span class="fc" id="L365">    conditions.include(key);</span>
+<span class="fc" id="L366">    return this;</span>
+  }
+
+  /**
+   * Restrict the fields of returned AVObjects to only include the provided keys. If this is called
+   * multiple times, then all of the keys specified in each of the calls will be included.
+   *
+   * @param keys The set of keys to include in the result.
+   * @return this query.
+   */
+  public LCQuery&lt;T&gt; selectKeys(Collection&lt;String&gt; keys) {
+<span class="fc" id="L377">    conditions.selectKeys(keys);</span>
+<span class="fc" id="L378">    return this;</span>
+  }
+
+  /**
+   * Sorts the results in ascending order by the given key.
+   *
+   * @param key The key to order by.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; orderByAscending(String key) {
+<span class="nc" id="L388">    conditions.orderByAscending(key);</span>
+<span class="nc" id="L389">    return this;</span>
+  }
+
+  /**
+   * Sorts the results in descending order by the given key.
+   *
+   * @param key The key to order by.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; orderByDescending(String key) {
+<span class="fc" id="L399">    conditions.orderByDescending(key);</span>
+<span class="fc" id="L400">    return this;</span>
+  }
+
+  /**
+   * Add a constraint to the query that requires a particular key's value to be contained in the
+   * provided list of values.
+   *
+   * @param key The key to check.
+   * @param values The values that will match.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereContainedIn(String key, Collection&lt;? extends Object&gt; values) {
+<span class="fc" id="L412">    conditions.whereContainedIn(key, values);</span>
+<span class="fc" id="L413">    return this;</span>
+  }
+
+  /**
+   * Add a constraint for finding string values that contain a provided string. This will be slow
+   * for large datasets.
+   *
+   * @param key The key that the string to match is stored in.
+   * @param substring The substring that the value must contain.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereContains(String key, String substring) {
+<span class="fc" id="L425">    conditions.whereContains(key, substring);</span>
+<span class="fc" id="L426">    return this;</span>
+  }
+
+  /**
+   * 添加查询约束条件，查找key类型是数组，该数组的长度匹配提供的数值。
+   *
+   * @since 2.0.2
+   * @param key 查询的key
+   * @param size 数组的长度
+   * @return this query.
+   */
+  public LCQuery&lt;T&gt; whereSizeEqual(String key, int size) {
+<span class="fc" id="L438">    conditions.whereSizeEqual(key, size);</span>
+<span class="fc" id="L439">    return this;</span>
+  }
+
+  /**
+   * Add a constraint to the query that requires a particular key's value match another AVQuery.
+   * This only works on keys whose values are AVObjects or lists of AVObjects. Add a constraint to
+   * the query that requires a particular key's value to contain every one of the provided list of
+   * values.
+   *
+   * @param key The key to check. This key's value must be an array.
+   * @param values The values that will match.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereContainsAll(String key, Collection&lt;?&gt; values) {
+<span class="fc" id="L453">    conditions.whereContainsAll(key, values);</span>
+<span class="fc" id="L454">    return this;</span>
+  }
+
+  /**
+   * Add a constraint for finding objects that do not contain a given key.
+   *
+   * @param key The key that should not exist
+   * @return this query.
+   */
+  public LCQuery&lt;T&gt; whereDoesNotExist(String key) {
+<span class="fc" id="L464">    conditions.whereDoesNotExist(key);</span>
+<span class="fc" id="L465">    return this;</span>
+  }
+
+
+
+  /**
+   * Add a constraint for finding string values that end with a provided string. This will be slow
+   * for large datasets.
+   *
+   * @param key The key that the string to match is stored in.
+   * @param suffix The substring that the value must end with.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereEndsWith(String key, String suffix) {
+<span class="fc" id="L479">    conditions.whereEndsWith(key, suffix);</span>
+<span class="fc" id="L480">    return this;</span>
+  }
+
+  /**
+   * Add a constraint to the query that requires a particular key's value to be equal to the
+   * provided value.
+   *
+   * @param key The key to check.
+   * @param value The value that the AVObject must contain.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereEqualTo(String key, Object value) {
+<span class="fc" id="L492">    conditions.whereEqualTo(key, value);</span>
+<span class="fc" id="L493">    return this;</span>
+  }
+
+  private LCQuery&lt;T&gt; addOrItems(QueryOperation op) {
+<span class="fc" id="L497">    conditions.addOrItems(op);</span>
+<span class="fc" id="L498">    return this;</span>
+  }
+
+  private LCQuery&lt;T&gt; addAndItems(LCQuery query) {
+<span class="nc" id="L502">    conditions.addAndItems(query.conditions);</span>
+<span class="nc" id="L503">    return this;</span>
+  }
+
+  protected LCQuery&lt;T&gt; addWhereItem(String key, String op, Object value) {
+<span class="fc" id="L507">    conditions.addWhereItem(key, op, value);</span>
+<span class="fc" id="L508">    return this;</span>
+  }
+
+  /**
+   * Add a constraint for finding objects that contain the given key.
+   *
+   * @param key The key that should exist.
+   * @return this query.
+   */
+  public LCQuery&lt;T&gt; whereExists(String key) {
+<span class="fc" id="L518">    conditions.whereExists(key);</span>
+<span class="fc" id="L519">    return this;</span>
+  }
+
+  /**
+   * Add a constraint to the query that requires a particular key's value to be greater than the
+   * provided value.
+   *w
+   * @param key The key to check.
+   * @param value The value that provides an lower bound.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereGreaterThan(String key, Object value) {
+<span class="fc" id="L531">    conditions.whereGreaterThan(key, value);</span>
+<span class="fc" id="L532">    return this;</span>
+  }
+
+  /**
+   * Add a constraint to the query that requires a particular key's value to be greater or equal to
+   * than the provided value.
+   *
+   * @param key The key to check.
+   * @param value The value that provides an lower bound.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereGreaterThanOrEqualTo(String key, Object value) {
+<span class="fc" id="L544">    conditions.whereGreaterThanOrEqualTo(key, value);</span>
+<span class="fc" id="L545">    return this;</span>
+  }
+
+  /**
+   * Add a constraint to the query that requires a particular key's value to be less than the
+   * provided value.
+   *
+   * @param key The key to check.
+   * @param value The value that provides an upper bound.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereLessThan(String key, Object value) {
+<span class="fc" id="L557">    conditions.whereLessThan(key, value);</span>
+<span class="fc" id="L558">    return this;</span>
+  }
+
+  /**
+   * Add a constraint to the query that requires a particular key's value to be less or equal to
+   * than the provided value.
+   *
+   * @param key The key to check.
+   * @param value The value that provides an lower bound.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereLessThanOrEqualTo(String key, Object value) {
+<span class="fc" id="L570">    conditions.whereLessThanOrEqualTo(key, value);</span>
+<span class="fc" id="L571">    return this;</span>
+  }
+
+  /**
+   * Add a regular expression constraint for finding string values that match the provided regular
+   * expression. This may be slow for large datasets.
+   *
+   * @param key The key that the string to match is stored in.
+   * @param regex The regular expression pattern to match.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereMatches(String key, String regex) {
+<span class="fc" id="L583">    conditions.whereMatches(key, regex);</span>
+<span class="fc" id="L584">    return this;</span>
+  }
+
+  /**
+   * Add a regular expression constraint for finding string values that match the provided regular
+   * expression. This may be slow for large datasets.
+   *
+   * @param key The key that the string to match is stored in.
+   * @param regex The regular expression pattern to match.
+   * @param modifiers Any of the following supported PCRE modifiers: i - Case insensitive search m -
+   *          Search across multiple lines of input
+   * @return this query.
+   */
+  public LCQuery&lt;T&gt; whereMatches(String key, String regex, String modifiers) {
+<span class="nc" id="L598">    conditions.whereMatches(key, regex, modifiers);</span>
+<span class="nc" id="L599">    return this;</span>
+  }
+
+  /**
+   * Add a proximity based constraint for finding objects with key point values near the point
+   * given.
+   *
+   * @param key The key that the AVGeoPoint is stored in.
+   * @param point The reference AVGeoPoint that is used.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereNear(String key, LCGeoPoint point) {
+<span class="nc" id="L611">    conditions.whereNear(key, point);</span>
+<span class="nc" id="L612">    return this;</span>
+  }
+
+  /**
+   * Add a constraint to the query that requires a particular key's value not be contained in the
+   * provided list of values.
+   *
+   * @param key The key to check.
+   * @param values The values that will not match.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereNotContainedIn(String key, Collection&lt;? extends Object&gt; values) {
+<span class="fc" id="L624">    conditions.whereNotContainedIn(key, values);</span>
+<span class="fc" id="L625">    return this;</span>
+  }
+
+  /**
+   * Add a constraint to the query that requires a particular key's value to be not equal to the
+   * provided value.
+   *
+   * @param key The key to check.
+   * @param value The value that must not be equalled.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereNotEqualTo(String key, Object value) {
+<span class="fc" id="L637">    conditions.whereNotEqualTo(key, value);</span>
+<span class="fc" id="L638">    return this;</span>
+  }
+
+  /**
+   * Add a constraint for finding string values that start with a provided string. This query will
+   * use the backend index, so it will be fast even for large datasets.
+   *
+   * @param key The key that the string to match is stored in.
+   * @param prefix The substring that the value must start with.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereStartsWith(String key, String prefix) {
+<span class="nc" id="L650">    conditions.whereStartsWith(key, prefix);</span>
+<span class="nc" id="L651">    return this;</span>
+  }
+
+  /**
+   * Add a constraint to the query that requires a particular key's coordinates be contained within
+   * a given rectangular geographic bounding box.
+   *
+   * @param key The key to be constrained.
+   * @param southwest The lower-left inclusive corner of the box.
+   * @param northeast The upper-right inclusive corner of the box.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereWithinGeoBox(String key, LCGeoPoint southwest, LCGeoPoint northeast) {
+<span class="nc" id="L664">    conditions.whereWithinGeoBox(key, southwest, northeast);</span>
+<span class="nc" id="L665">    return this;</span>
+  }
+
+  /**
+   * Add a proximity based constraint for finding objects with key point values near the point given
+   * and within the maximum distance given. Radius of earth used is 6371.0 kilometers.
+   *
+   * @param key The key that the AVGeoPoint is stored in.
+   * @param point The reference AVGeoPoint that is used.
+   * @param maxDistance Maximum distance (in kilometers) of results to return.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereWithinKilometers(String key, LCGeoPoint point, double maxDistance) {
+<span class="nc" id="L678">    conditions.whereWithinKilometers(key, point, maxDistance);</span>
+<span class="nc" id="L679">    return this;</span>
+  }
+
+  /**
+   * Add a proximity based constraint for finding objects with key point values near the point given
+   * and within the given ring area
+   *
+   * Radius of earth used is 6371.0 kilometers.
+   *
+   * @param key The key that the AVGeoPoint is stored in.
+   * @param point The reference AVGeoPoint that is used.
+   * @param maxDistance outer radius of the given ring in kilometers
+   * @param minDistance inner radius of the given ring in kilometers
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereWithinKilometers(String key, LCGeoPoint point, double maxDistance,
+                                          double minDistance) {
+<span class="nc" id="L696">    conditions.whereWithinKilometers(key, point, maxDistance, minDistance);</span>
+<span class="nc" id="L697">    return this;</span>
+  }
+
+  /**
+   * Add a proximity based constraint for finding objects with key point values near the point given
+   * and within the maximum distance given. Radius of earth used is 3958.8 miles.
+   * @param key The key that the AVGeoPoint is stored in.
+   * @param maxDistance outer radius of the given ring in miles.
+   * @param point The reference AVGeoPoint that is used.
+   * @return  Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereWithinMiles(String key, LCGeoPoint point, double maxDistance) {
+<span class="nc" id="L709">    conditions.whereWithinMiles(key, point, maxDistance);</span>
+<span class="nc" id="L710">    return this;</span>
+  }
+
+  /**
+   * Add a proximity based constraint for finding objects with key point values near the point
+   * given and within the given ring.
+   *
+   * Radius of earth used is 3958.8 miles.
+   *
+   * @param key The key that the AVGeoPoint is stored in.
+   * @param point The reference AVGeoPoint that is used.
+   * @param maxDistance outer radius of the given ring in miles.
+   * @param minDistance inner radius of the given ring in miles.
+   * @return  Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereWithinMiles(String key, LCGeoPoint point, double maxDistance,
+                                     double minDistance) {
+<span class="nc" id="L727">    conditions.whereWithinMiles(key, point, maxDistance, minDistance);</span>
+<span class="nc" id="L728">    return this;</span>
+  }
+
+
+  /**
+   * Add a proximity based constraint for finding objects with key point values near the point given
+   * and within the maximum distance given.
+   *
+   * @param key The key that the AVGeoPoint is stored in.
+   * @param point The reference AVGeoPoint that is used.
+   * @param maxDistance Maximum distance (in radians) of results to return.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereWithinRadians(String key, LCGeoPoint point, double maxDistance) {
+<span class="nc" id="L742">    conditions.whereWithinRadians(key, point, maxDistance);</span>
+<span class="nc" id="L743">    return this;</span>
+  }
+
+  /**
+   * Add a proximity based constraint for finding objects with key point values near the point given
+   * and within the maximum distance given.
+   *
+   * @param key The key that the AVGeoPoint is stored in.
+   * @param point The reference AVGeoPoint that is used.
+   * @param maxDistance outer radius of the given radians.
+   * @param minDistance inner radius of the given radians.
+   * @return  Returns the query, so you can chain this call.
+   */
+
+  public LCQuery&lt;T&gt; whereWithinRadians(String key, LCGeoPoint point, double maxDistance,
+                                       double minDistance) {
+<span class="nc" id="L759">    conditions.whereWithinRadians(key, point, maxDistance, minDistance);</span>
+<span class="nc" id="L760">    return this;</span>
+  }
+
+  /**
+   * Add a constraint to the query that requires a particular key's value matches a value for a key
+   * in the results of another AVQuery
+   *
+   * @param key The key whose value is being checked
+   * @param keyInQuery The key in the objects from the sub query to look in
+   * @param query The sub query to run
+   * @return Returns the query so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereMatchesKeyInQuery(String key, String keyInQuery, LCQuery&lt;?&gt; query) {
+<span class="nc" id="L773">    Map&lt;String, Object&gt; inner = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L774">    inner.put(&quot;className&quot;, query.getClassName());</span>
+<span class="nc" id="L775">    inner.put(&quot;where&quot;, query.conditions.compileWhereOperationMap());</span>
+<span class="nc bnc" id="L776" title="All 2 branches missed.">    if (query.conditions.getSkip() &gt; 0) inner.put(&quot;skip&quot;, query.conditions.getSkip());</span>
+<span class="nc bnc" id="L777" title="All 2 branches missed.">    if (query.conditions.getLimit() &gt; 0) inner.put(&quot;limit&quot;, query.conditions.getLimit());</span>
+<span class="nc bnc" id="L778" title="All 2 branches missed.">    if (!StringUtil.isEmpty(query.getOrder())) inner.put(&quot;order&quot;, query.getOrder());</span>
+
+<span class="nc" id="L780">    Map&lt;String, Object&gt; queryMap = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L781">    queryMap.put(&quot;query&quot;, inner);</span>
+<span class="nc" id="L782">    queryMap.put(&quot;key&quot;, keyInQuery);</span>
+<span class="nc" id="L783">    return addWhereItem(key, &quot;$select&quot;, queryMap);</span>
+  }
+
+  /**
+   * Add a constraint to the query that requires a particular key's value match another AVQuery.
+   * This only works on keys whose values are AVObjects or lists of AVObjects.
+   *
+   * @param key The key to check.
+   * @param query The query that the value should match
+   * @return Returns the query so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereMatchesQuery(String key, LCQuery&lt;?&gt; query) {
+<span class="fc" id="L795">    Map&lt;String, Object&gt; map =</span>
+<span class="fc" id="L796">            LCUtils.createMap(&quot;where&quot;, query.conditions.compileWhereOperationMap());</span>
+<span class="fc" id="L797">    map.put(&quot;className&quot;, query.className);</span>
+<span class="pc bpc" id="L798" title="1 of 2 branches missed.">    if (query.conditions.getSkip() &gt; 0) map.put(&quot;skip&quot;, query.conditions.getSkip());</span>
+<span class="pc bpc" id="L799" title="1 of 2 branches missed.">    if (query.conditions.getLimit() &gt; 0) map.put(&quot;limit&quot;, query.conditions.getLimit());</span>
+<span class="pc bpc" id="L800" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(query.getOrder())) map.put(&quot;order&quot;, query.getOrder());</span>
+<span class="fc" id="L801">    addWhereItem(key, &quot;$inQuery&quot;, map);</span>
+<span class="fc" id="L802">    return this;</span>
+  }
+
+  /**
+   * Add a constraint to the query that requires a particular key's value does not match any value
+   * for a key in the results of another AVQuery.
+   *
+   * @param key The key whose value is being checked and excluded
+   * @param keyInQuery The key in the objects from the sub query to look in
+   * @param query The sub query to run
+   * @return Returns the query so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereDoesNotMatchKeyInQuery(String key, String keyInQuery, LCQuery&lt;?&gt; query) {
+<span class="nc" id="L815">    Map&lt;String, Object&gt; map = LCUtils.createMap(&quot;className&quot;, query.className);</span>
+<span class="nc" id="L816">    map.put(&quot;where&quot;, query.conditions.compileWhereOperationMap());</span>
+
+<span class="nc" id="L818">    Map&lt;String, Object&gt; queryMap = LCUtils.createMap(&quot;query&quot;, map);</span>
+<span class="nc" id="L819">    queryMap.put(&quot;key&quot;, keyInQuery);</span>
+
+<span class="nc" id="L821">    addWhereItem(key, &quot;$dontSelect&quot;, queryMap);</span>
+<span class="nc" id="L822">    return this;</span>
+  }
+
+  /**
+   * Add a constraint to the query that requires a particular key's value does not match another
+   * AVQuery. This only works on keys whose values are AVObjects or lists of AVObjects.
+   *
+   * @param key The key to check.
+   * @param query The query that the value should not match
+   * @return Returns the query so you can chain this call.
+   */
+  public LCQuery&lt;T&gt; whereDoesNotMatchQuery(String key, LCQuery&lt;?&gt; query) {
+<span class="fc" id="L834">    Map&lt;String, Object&gt; map = LCUtils.createMap(&quot;className&quot;, query.className);</span>
+<span class="fc" id="L835">    map.put(&quot;where&quot;, query.conditions.compileWhereOperationMap());</span>
+
+<span class="fc" id="L837">    addWhereItem(key, &quot;$notInQuery&quot;, map);</span>
+<span class="fc" id="L838">    return this;</span>
+  }
+
+  LCQuery&lt;T&gt; setWhere(Map&lt;String, List&lt;QueryOperation&gt;&gt; value) {
+<span class="nc" id="L842">    conditions.setWhere(value);</span>
+<span class="nc" id="L843">    return this;</span>
+  }
+
+  /**
+   * Constructs a query that is the or of the given queries.
+   *
+   * @param queries The list of AVQueries to 'or' together
+   * @param &lt;T&gt; template type.
+   * @return A AVQuery that is the 'or' of the passed in queries
+   */
+  public static &lt;T extends LCObject&gt; LCQuery&lt;T&gt; or(List&lt;LCQuery&lt;T&gt;&gt; queries) {
+<span class="pc bpc" id="L854" title="2 of 4 branches missed.">    if (null == queries || queries.isEmpty()) {</span>
+<span class="nc" id="L855">      throw new IllegalArgumentException(&quot;queries must be non-empty.&quot;);</span>
+    }
+<span class="fc" id="L857">    String className = queries.get(0).getClassName();</span>
+
+<span class="fc" id="L859">    LCQuery&lt;T&gt; result = new LCQuery&lt;T&gt;(className);</span>
+<span class="pc bpc" id="L860" title="1 of 2 branches missed.">    if (queries.size() &gt; 1) {</span>
+<span class="fc bfc" id="L861" title="All 2 branches covered.">      for (LCQuery&lt;T&gt; query : queries) {</span>
+<span class="pc bpc" id="L862" title="1 of 2 branches missed.">        if (!className.equals(query.getClassName())) {</span>
+<span class="nc" id="L863">          throw new IllegalArgumentException(&quot;All queries must be for the same class&quot;);</span>
+        }
+<span class="fc" id="L865">        result.addOrItems(new QueryOperation(&quot;$or&quot;, &quot;$or&quot;, query.conditions</span>
+<span class="fc" id="L866">                .compileWhereOperationMap()));</span>
+<span class="fc" id="L867">      }</span>
+    } else {
+<span class="nc" id="L869">      result.setWhere(queries.get(0).conditions.getWhere());</span>
+    }
+
+<span class="fc" id="L872">    return result;</span>
+  }
+
+  /**
+   * Constructs a query that is the and of the given queries.
+   *
+   * @param queries The list of AVQueries to 'and' together
+   * @param &lt;T&gt; template type.
+   * @return A AVQuery that is the 'and' of the passed in queries
+   */
+  public static &lt;T extends LCObject&gt; LCQuery&lt;T&gt; and(List&lt;LCQuery&lt;T&gt;&gt; queries) {
+<span class="nc bnc" id="L883" title="All 4 branches missed.">    if (null == queries || queries.isEmpty()) {</span>
+<span class="nc" id="L884">      throw new IllegalArgumentException(&quot;queries must be non-empty.&quot;);</span>
+    }
+<span class="nc" id="L886">    String className = queries.get(0).getClassName();</span>
+
+<span class="nc" id="L888">    LCQuery&lt;T&gt; result = new LCQuery&lt;T&gt;(className);</span>
+<span class="nc bnc" id="L889" title="All 2 branches missed.">    if (queries.size() &gt; 1) {</span>
+<span class="nc bnc" id="L890" title="All 2 branches missed.">      for (LCQuery&lt;T&gt; query : queries) {</span>
+<span class="nc bnc" id="L891" title="All 2 branches missed.">        if (!className.equals(query.getClassName())) {</span>
+<span class="nc" id="L892">          throw new IllegalArgumentException(&quot;All queries must be for the same class&quot;);</span>
+        }
+<span class="nc" id="L894">        result.addAndItems(query);</span>
+<span class="nc" id="L895">      }</span>
+    } else {
+<span class="nc" id="L897">      result.setWhere(queries.get(0).conditions.getWhere());</span>
+    }
+
+<span class="nc" id="L900">    return result;</span>
+  }
+
+  /**
+   * Has cached result or not.
+   * @return cache result existed or not.
+   */
+  public boolean hasCachedResult() {
+<span class="fc" id="L908">    Map&lt;String, String&gt; query = assembleParameters();</span>
+<span class="fc" id="L909">    return PaasClient.getStorageClient().hasCachedResult(getClassName(), query, this.getMaxCacheAge());</span>
+  }
+
+  /**
+   * Execute query in blocking mode.
+   * @return result of list.
+   */
+  public List&lt;T&gt; find() {
+<span class="fc" id="L917">    return findInBackground().blockingLast();</span>
+  }
+
+  /**
+   * Execute query in async mode.
+   * @return observable instance.
+   */
+  public Observable&lt;List&lt;T&gt;&gt; findInBackground() {
+<span class="fc" id="L925">    return findInBackground(null);</span>
+  }
+
+  /**
+   * Execute query in async mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;List&lt;T&gt;&gt; findInBackground(LCUser asAuthenticatedUser) {
+<span class="fc" id="L936">    return findInBackground(asAuthenticatedUser, 0);</span>
+  }
+
+  protected Observable&lt;List&lt;T&gt;&gt; findInBackground(LCUser asAuthenticatedUser, int explicitLimit) {
+<span class="fc" id="L940">    Map&lt;String, String&gt; query = assembleParameters();</span>
+<span class="fc bfc" id="L941" title="All 2 branches covered.">    if (explicitLimit &gt; 0) {</span>
+<span class="fc" id="L942">      query.put(&quot;limit&quot;, Integer.toString(explicitLimit));</span>
+    }
+<span class="fc" id="L944">    LOGGER.d(&quot;Query: &quot; + query);</span>
+<span class="fc" id="L945">    return PaasClient.getStorageClient().queryObjects(asAuthenticatedUser, getClassName(), query, this.cachePolicy, this.maxCacheAge)</span>
+<span class="fc" id="L946">            .map(new Function&lt;List&lt;LCObject&gt;, List&lt;T&gt;&gt;() {</span>
+              public List&lt;T&gt; apply(List&lt;LCObject&gt; var1) throws Exception {
+<span class="fc" id="L948">                LOGGER.d(&quot;invoke within AVQuery.findInBackground(). resultSize=&quot; + var1.size());</span>
+<span class="fc" id="L949">                List&lt;T&gt; result = new ArrayList&lt;T&gt;(var1.size());</span>
+<span class="fc bfc" id="L950" title="All 2 branches covered.">                for (LCObject obj: var1) {</span>
+<span class="fc" id="L951">                  T tmp = Transformer.transform(obj, getClassName());</span>
+<span class="fc" id="L952">                  result.add(tmp);</span>
+<span class="fc" id="L953">                }</span>
+<span class="fc" id="L954">                return result;</span>
+              }
+            });
+  }
+
+  /**
+   * Get Object with specified objectId in blocking mode.
+   * @param objectId object id.
+   * @return object instance.
+   */
+  public T get(String objectId) {
+<span class="fc" id="L965">    return getInBackground(objectId).blockingFirst();</span>
+  }
+
+  /**
+   * Get Object with specified objectId in async mode.
+   * @param objectId object id.
+   * @return observable instance.
+   */
+  public Observable&lt;T&gt; getInBackground(String objectId) {
+<span class="fc" id="L974">    return getInBackground(null, objectId);</span>
+  }
+
+  /**
+   * Get Object with specified objectId in async mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param objectId object id.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;T&gt; getInBackground(LCUser asAuthenticatedUser, String objectId) {
+<span class="fc" id="L986">    List&lt;String&gt; include = getInclude();</span>
+<span class="fc" id="L987">    String includeKeys = null;</span>
+<span class="pc bpc" id="L988" title="1 of 4 branches missed.">    if (null != include &amp;&amp; include.size() &gt; 0) {</span>
+<span class="fc" id="L989">      includeKeys = StringUtil.join(&quot;,&quot;, include);</span>
+    }
+<span class="fc" id="L991">    return PaasClient.getStorageClient().fetchObject(asAuthenticatedUser, getClassName(), objectId, includeKeys)</span>
+<span class="fc" id="L992">            .map(new Function&lt;LCObject, T&gt;() {</span>
+      public T apply(LCObject LCObject) throws Exception {
+<span class="pc bpc" id="L994" title="1 of 4 branches missed.">        if (null == LCObject || StringUtil.isEmpty(LCObject.getObjectId())) {</span>
+<span class="fc" id="L995">          throw new LCException(LCException.OBJECT_NOT_FOUND, &quot;Object is not found.&quot;);</span>
+        }
+<span class="fc" id="L997">        return Transformer.transform(LCObject, getClassName());</span>
+      }
+    });
+  }
+
+  /**
+   * Get first result in blocking mode.
+   * @return first result.
+   */
+  public T getFirst() {
+<span class="fc" id="L1007">    return getFirst(null);</span>
+  }
+
+  /**
+   * Get first result in blocking mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @return first result.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public T getFirst(LCUser asAuthenticatedUser) {
+    try {
+<span class="fc" id="L1019">      return getFirstInBackground(asAuthenticatedUser).blockingFirst();</span>
+<span class="fc" id="L1020">    } catch (NoSuchElementException ex) {</span>
+<span class="fc" id="L1021">      return null;</span>
+    }
+  }
+
+  /**
+   * Get first result in async mode.
+   * @return observable instance.
+   */
+  public Observable&lt;T&gt; getFirstInBackground() {
+<span class="fc" id="L1030">    return getFirstInBackground(null);</span>
+  }
+
+  /**
+   * Get first result in async mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;T&gt; getFirstInBackground(LCUser asAuthenticatedUser) {
+<span class="fc" id="L1041">    return findInBackground(asAuthenticatedUser,1).flatMap(new Function&lt;List&lt;T&gt;, ObservableSource&lt;T&gt;&gt;() {</span>
+      @Override
+      public ObservableSource&lt;T&gt; apply(List&lt;T&gt; list) throws Exception {
+<span class="fc" id="L1044">        LOGGER.d(&quot;flatMap: &quot; + list);</span>
+<span class="fc" id="L1045">        return Observable.fromIterable(list);</span>
+      }
+    });
+  }
+
+  /**
+   * Get result count in blocking mode.
+   * @return result count.
+   */
+  public int count() {
+<span class="fc" id="L1055">    return count(null);</span>
+  }
+
+  /**
+   * Get result count in blocking mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @return result count.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public int count(LCUser asAuthenticatedUser) {
+<span class="fc" id="L1066">    return countInBackground(asAuthenticatedUser).blockingFirst();</span>
+  }
+
+  /**
+   * Get result count in async mode.
+   * @return observable instance.
+   */
+  public Observable&lt;Integer&gt; countInBackground() {
+<span class="fc" id="L1074">    return countInBackground(null);</span>
+  }
+
+  /**
+   * Get result count in async mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;Integer&gt; countInBackground(LCUser asAuthenticatedUser) {
+<span class="fc" id="L1085">    Map&lt;String, String&gt; query = assembleParameters();</span>
+<span class="fc" id="L1086">    query.put(&quot;count&quot;, &quot;1&quot;);</span>
+<span class="fc" id="L1087">    query.put(&quot;limit&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L1088">    return PaasClient.getStorageClient().queryCount(asAuthenticatedUser, getClassName(), query);</span>
+  }
+
+  /**
+   * Delete all query result in blocking mode.
+   */
+  public void deleteAll() {
+<span class="fc" id="L1095">    deleteAll(null);</span>
+<span class="fc" id="L1096">  }</span>
+
+  /**
+   * Delete all query result in blocking mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public void deleteAll(LCUser asAuthenticatedUser) {
+<span class="fc" id="L1105">    this.deleteAllInBackground(asAuthenticatedUser).blockingSubscribe();</span>
+<span class="fc" id="L1106">  }</span>
+
+  /**
+   * Delete all query result in async mode.
+   * @return observable instance.
+   */
+  public Observable&lt;LCNull&gt; deleteAllInBackground() {
+<span class="fc" id="L1113">    return deleteAllInBackground(null);</span>
+  }
+
+  /**
+   * Delete all query result in async mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;LCNull&gt; deleteAllInBackground(LCUser asAuthenticatedUser) {
+<span class="fc" id="L1124">    return findInBackground(asAuthenticatedUser).flatMap(new Function&lt;List&lt;T&gt;, ObservableSource&lt;LCNull&gt;&gt;() {</span>
+      @Override
+      public ObservableSource&lt;LCNull&gt; apply(List&lt;T&gt; list) {
+<span class="fc" id="L1127">        return LCObject.deleteAllInBackground(list);</span>
+      }
+    });
+  }
+
+  /**
+   * Assemble query parameters.
+   * @return map of query parameters.
+   */
+  public Map&lt;String, String&gt; assembleParameters() {
+<span class="fc" id="L1137">    conditions.assembleParameters();</span>
+<span class="fc" id="L1138">    return conditions.getParameters();</span>
+  }
+
+  protected Map&lt;String, Object&gt; assembleJsonParam() {
+<span class="fc" id="L1142">    Map&lt;String, Object&gt; result = conditions.assembleJsonParam();</span>
+<span class="fc" id="L1143">    result.put(&quot;className&quot;, getClassName());</span>
+<span class="fc" id="L1144">    return result;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

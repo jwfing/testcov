@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StringUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.utils</a> &gt; <span class="el_source">StringUtil.java</span></div><h1>StringUtil.java</h1><pre class="source lang-java linenums">package cn.leancloud.utils;
+
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+<span class="nc" id="L8">public class StringUtil {</span>
+  private static final String dateFormat = &quot;yyyy-MM-dd'T'HH:mm:ss.SSS'Z'&quot;;
+
+  public static boolean isEmpty(String str) {
+<span class="fc bfc" id="L12" title="All 4 branches covered.">    return null == str || str.trim().length() == 0;</span>
+  }
+
+  public static boolean isDigitString(String s) {
+<span class="pc bpc" id="L16" title="1 of 2 branches missed.">    if (s == null) return false;</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">    for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L18">      char c = s.charAt(i);</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">      if (!Character.isDigit(c)) {</span>
+<span class="fc" id="L20">        return false;</span>
+      }
+    }
+<span class="nc" id="L23">    return true;</span>
+  }
+
+  public static boolean equals(String left, String right) {
+<span class="nc bnc" id="L27" title="All 4 branches missed.">    if (null == left || null == right) {</span>
+<span class="nc" id="L28">      return false;</span>
+    }
+<span class="nc" id="L30">    return left.equals(right);</span>
+  }
+
+  public static boolean equals(List&lt;String&gt; left, List&lt;String&gt; right) {
+<span class="nc bnc" id="L34" title="All 4 branches missed.">    if (null == left || null == right) {</span>
+<span class="nc" id="L35">      return false;</span>
+    }
+<span class="nc bnc" id="L37" title="All 2 branches missed.">    if (left.size() != right.size()) {</span>
+<span class="nc" id="L38">      return false;</span>
+    }
+<span class="nc" id="L40">    return left.containsAll(right);</span>
+  }
+
+  public static boolean equalsIgnoreCase(String left, String right) {
+<span class="nc bnc" id="L44" title="All 4 branches missed.">    if (null == left || null == right) {</span>
+<span class="nc" id="L45">      return false;</span>
+    }
+<span class="nc" id="L47">    return left.equalsIgnoreCase(right);</span>
+  }
+
+  public static String stringFromDate(Date date) {
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">    if (null == date) {</span>
+<span class="nc" id="L52">      return null;</span>
+    }
+
+<span class="fc" id="L55">    SimpleDateFormat df = new SimpleDateFormat(dateFormat);</span>
+<span class="fc" id="L56">    df.setTimeZone(TimeZone.getTimeZone(&quot;UTC&quot;));</span>
+<span class="fc" id="L57">    return df.format(date);</span>
+  }
+
+  public static Date dateFromString(String content) {
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">    if (isEmpty(content)) return null;</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">    if (isDigitString(content)) {</span>
+<span class="nc" id="L63">      return new Date(Long.parseLong(content));</span>
+    }
+<span class="fc" id="L65">    Date date = null;</span>
+<span class="fc" id="L66">    SimpleDateFormat format = new SimpleDateFormat(dateFormat);</span>
+<span class="fc" id="L67">    format.setTimeZone(TimeZone.getTimeZone(&quot;UTC&quot;));</span>
+
+    try {
+<span class="fc" id="L70">      date = format.parse(content);</span>
+<span class="nc" id="L71">    } catch (Exception exception) {</span>
+<span class="fc" id="L72">    }</span>
+<span class="fc" id="L73">    return date;</span>
+  }
+
+  public static String stringFromBytes(byte[] data) {
+    try {
+<span class="fc" id="L78">      return new String(data, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L79">    } catch (Exception e) {</span>
+      // e.printStackTrace();
+    }
+<span class="nc" id="L82">    return null;</span>
+  }
+
+  private static String convertTimestamp(String kvPhrase) {
+<span class="fc" id="L86">    String dateFormBegin = &quot;new Date(&quot;;</span>
+<span class="fc" id="L87">    int index = kvPhrase.indexOf(dateFormBegin);</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">    if (index &lt; 0) {</span>
+<span class="nc" id="L89">      return kvPhrase;</span>
+    }
+<span class="fc" id="L91">    String key = kvPhrase.substring(0, index);</span>
+<span class="fc" id="L92">    String value = kvPhrase.substring(index).substring(dateFormBegin.length());</span>
+<span class="fc" id="L93">    String separator = value.substring(value.length() - 1);</span>
+<span class="fc" id="L94">    value = value.substring(0, value.length() - 2);</span>
+<span class="fc" id="L95">    Date realDate = new Date(Long.parseLong(value));</span>
+<span class="fc" id="L96">    return key + &quot;\&quot;&quot; + StringUtil.stringFromDate(realDate) + &quot;\&quot;&quot; + separator;</span>
+  }
+
+  public static String replaceFastjsonDateForm(String text) {
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(text)) {</span>
+<span class="nc" id="L101">      return text;</span>
+    }
+<span class="fc" id="L103">    String fastjsonDateSpecialForm = &quot;\&quot;[a-zA-Z0-9]+\&quot;:new Date\\(\\d+\\)[,})\\]]&quot;;</span>
+<span class="fc" id="L104">    Pattern fastjsonDateSpecialPattern = Pattern.compile(fastjsonDateSpecialForm);</span>
+<span class="fc" id="L105">    Matcher m = fastjsonDateSpecialPattern.matcher(text);</span>
+<span class="fc" id="L106">    Map&lt;String, String&gt; replaceKVs = new HashMap&lt;String, String&gt;();</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">    while (m.find()) {</span>
+<span class="fc" id="L108">      String subString = m.group();</span>
+<span class="fc" id="L109">      String replacedString = convertTimestamp(subString);</span>
+<span class="fc" id="L110">      replaceKVs.put(subString, replacedString);</span>
+<span class="fc" id="L111">    }</span>
+
+<span class="fc bfc" id="L113" title="All 2 branches covered.">    for (String k : replaceKVs.keySet()) {</span>
+<span class="fc" id="L114">      String replacedString = replaceKVs.get(k);</span>
+<span class="fc" id="L115">      text = text.replace(k, replacedString);</span>
+<span class="fc" id="L116">    }</span>
+
+<span class="fc" id="L118">    return text;</span>
+  }
+
+  public static String join(CharSequence delimiter,
+                            Iterable&lt;? extends CharSequence&gt; elements) {
+<span class="pc bpc" id="L123" title="2 of 4 branches missed.">    if (null == delimiter || null == elements) {</span>
+<span class="nc" id="L124">      return &quot;&quot;;</span>
+    }
+<span class="fc" id="L126">    StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L127">    boolean isFirstElem = true;</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">    for (CharSequence cs: elements) {</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">      if (!isFirstElem) {</span>
+<span class="fc" id="L130">        sb.append(delimiter);</span>
+      } else {
+<span class="fc" id="L132">        isFirstElem = false;</span>
+      }
+<span class="fc" id="L134">      sb.append(cs);</span>
+<span class="fc" id="L135">    }</span>
+<span class="fc" id="L136">    return sb.toString();</span>
+  }
+
+<span class="fc" id="L139">  static Random random = new Random(System.currentTimeMillis());</span>
+
+  public static String getRandomString(int length) {
+<span class="fc" id="L142">    String letters = &quot;abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789&quot;;</span>
+<span class="fc" id="L143">    StringBuilder randomString = new StringBuilder(length);</span>
+
+<span class="fc bfc" id="L145" title="All 2 branches covered.">    for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L146">      randomString.append(letters.charAt(random.nextInt(letters.length())));</span>
+    }
+
+<span class="fc" id="L149">    return randomString.toString();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

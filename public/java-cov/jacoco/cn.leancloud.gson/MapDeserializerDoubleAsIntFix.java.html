@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MapDeserializerDoubleAsIntFix.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.gson</a> &gt; <span class="el_source">MapDeserializerDoubleAsIntFix.java</span></div><h1>MapDeserializerDoubleAsIntFix.java</h1><pre class="source lang-java linenums">package cn.leancloud.gson;
+
+import com.google.gson.*;
+import com.google.gson.internal.LinkedTreeMap;
+
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+<span class="fc" id="L12">public class MapDeserializerDoubleAsIntFix implements JsonDeserializer&lt;Map&lt;String, Object&gt;&gt; {</span>
+
+  @Override  @SuppressWarnings(&quot;unchecked&quot;)
+  public Map&lt;String, Object&gt; deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
+<span class="fc" id="L16">    return (Map&lt;String, Object&gt;) read(json);</span>
+  }
+
+  public Object read(JsonElement in) {
+
+<span class="fc bfc" id="L21" title="All 2 branches covered.">    if(in.isJsonArray()){</span>
+<span class="fc" id="L22">      List&lt;Object&gt; list = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L23">      JsonArray arr = in.getAsJsonArray();</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">      for (JsonElement anArr : arr) {</span>
+<span class="fc" id="L25">        list.add(read(anArr));</span>
+<span class="fc" id="L26">      }</span>
+<span class="fc" id="L27">      return list;</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">    }else if(in.isJsonObject()){</span>
+<span class="fc" id="L29">      Map&lt;String, Object&gt; map = new LinkedTreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L30">      JsonObject obj = in.getAsJsonObject();</span>
+<span class="fc" id="L31">      Set&lt;Map.Entry&lt;String, JsonElement&gt;&gt; entitySet = obj.entrySet();</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">      for(Map.Entry&lt;String, JsonElement&gt; entry: entitySet){</span>
+<span class="fc" id="L33">        map.put(entry.getKey(), read(entry.getValue()));</span>
+<span class="fc" id="L34">      }</span>
+<span class="fc" id="L35">      return map;</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">    }else if( in.isJsonPrimitive()){</span>
+<span class="fc" id="L37">      JsonPrimitive prim = in.getAsJsonPrimitive();</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">      if(prim.isBoolean()){</span>
+<span class="fc" id="L39">        return prim.getAsBoolean();</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">      }else if(prim.isString()){</span>
+<span class="fc" id="L41">        return prim.getAsString();</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">      }else if(prim.isNumber()){</span>
+
+<span class="fc" id="L44">        Number num = prim.getAsNumber();</span>
+<span class="fc" id="L45">        return NumberDeserializerDoubleAsIntFix.parsePrecisionNumber(num);</span>
+      }
+    }
+<span class="fc" id="L48">    return null;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

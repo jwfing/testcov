@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AES.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.codec</a> &gt; <span class="el_source">AES.java</span></div><h1>AES.java</h1><pre class="source lang-java linenums">package cn.leancloud.codec;
+
+import cn.leancloud.LCLogger;
+import cn.leancloud.utils.LogUtil;
+
+import javax.crypto.*;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.spec.InvalidKeySpecException;
+
+public class AES {
+<span class="nc" id="L17">  private static final LCLogger Log = LogUtil.getLogger(AES.class);</span>
+
+  private static final String KEY_GENERATION_ALG = &quot;PBKDF2WithHmacSHA1&quot;;
+
+  private static final int HASH_ITERATIONS = 10000;
+  private static final int KEY_LENGTH = 256;
+
+<span class="nc" id="L24">  private char[] humanPassphrase = &quot;QxciDjdHjuAIf8VCsqhmGK3OZV7pBQTZ&quot;.toCharArray();</span>
+
+  // char[] humanPassphrase = { 'v', 't', 'i', 'o', 'n','s','f','o','t', '.',
+  // 'c', 'o', 'm',
+  // 'p'};
+<span class="nc" id="L29">  private byte[] salt = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xA, 0xB, 0xC, 0xD, 0xE, 0xF}; // must save</span>
+  // this for
+  // next time
+  // we want the
+  // key
+
+<span class="nc" id="L35">  private PBEKeySpec myKeyspec = new PBEKeySpec(humanPassphrase, salt, HASH_ITERATIONS, KEY_LENGTH);</span>
+  private static final String CIPHERMODEPADDING = &quot;AES/CBC/PKCS7Padding&quot;;
+
+<span class="nc" id="L38">  private SecretKeyFactory keyfactory = null;</span>
+<span class="nc" id="L39">  private SecretKey sk = null;</span>
+<span class="nc" id="L40">  private SecretKeySpec skforAES = null;</span>
+//  private byte[] iv = {0xA, 1, 0xB, 5, 4, 0xF, 7, 9, 0x17, 3, 1, 6, 8, 0xC, 0xD, 91};
+
+  private IvParameterSpec IV;
+
+<span class="nc" id="L45">  public AES() {</span>
+
+    try {
+<span class="nc" id="L48">      keyfactory = SecretKeyFactory.getInstance(KEY_GENERATION_ALG);</span>
+<span class="nc" id="L49">      sk = keyfactory.generateSecret(myKeyspec);</span>
+
+<span class="nc" id="L51">    } catch (NoSuchAlgorithmException nsae) {</span>
+<span class="nc" id="L52">      Log.e(&quot;no key factory support for PBEWITHSHAANDTWOFISH-CBC&quot;);</span>
+<span class="nc" id="L53">    } catch (InvalidKeySpecException ikse) {</span>
+<span class="nc" id="L54">      Log.e(&quot;invalid key spec for PBEWITHSHAANDTWOFISH-CBC&quot;);</span>
+<span class="nc" id="L55">    }</span>
+
+    // This is our secret key. We could just save this to a file instead of
+    // regenerating it
+    // each time it is needed. But that file cannot be on the device (too
+    // insecure). It could
+    // be secure if we kept it on a server accessible through https.
+<span class="nc" id="L62">    byte[] skAsByteArray = sk.getEncoded();</span>
+<span class="nc" id="L63">    skforAES = new SecretKeySpec(skAsByteArray, &quot;AES&quot;);</span>
+<span class="nc" id="L64">    SecureRandom random = new SecureRandom();</span>
+<span class="nc" id="L65">    byte[] iv = new byte[16];</span>
+<span class="nc" id="L66">    random.nextBytes(iv);</span>
+<span class="nc" id="L67">    IV = new IvParameterSpec(iv);</span>
+<span class="nc" id="L68">  }</span>
+
+  public String encrypt(byte[] plaintext) {
+
+<span class="nc" id="L72">    byte[] ciphertext = encrypt(CIPHERMODEPADDING, skforAES, IV, plaintext);</span>
+<span class="nc" id="L73">    String base64_ciphertext = Base64Encoder.encode(ciphertext);</span>
+<span class="nc" id="L74">    return base64_ciphertext;</span>
+  }
+
+  public String decrypt(String ciphertext_base64) {
+<span class="nc" id="L78">    byte[] s = Base64Decoder.decodeToBytes(ciphertext_base64);</span>
+<span class="nc" id="L79">    String decrypted = new String(decrypt(CIPHERMODEPADDING, skforAES, IV, s));</span>
+<span class="nc" id="L80">    return decrypted;</span>
+  }
+
+  // Use this method if you want to add the padding manually
+  // AES deals with messages in blocks of 16 bytes.
+  // This method looks at the length of the message, and adds bytes at the end
+  // so that the entire message is a multiple of 16 bytes.
+  // the padding is a series of bytes, each set to the total bytes added (a
+  // number in range 1..16).
+  private byte[] addPadding(byte[] plain) {
+<span class="nc" id="L90">    byte plainpad[] = null;</span>
+<span class="nc" id="L91">    int shortage = 16 - (plain.length % 16);</span>
+    // if already an exact multiple of 16, need to add another block of 16
+    // bytes
+<span class="nc bnc" id="L94" title="All 2 branches missed.">    if (shortage == 0) shortage = 16;</span>
+
+    // reallocate array bigger to be exact multiple, adding shortage bits.
+<span class="nc" id="L97">    plainpad = new byte[plain.length + shortage];</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">    for (int i = 0; i &lt; plain.length; i++) {</span>
+<span class="nc" id="L99">      plainpad[i] = plain[i];</span>
+    }
+<span class="nc bnc" id="L101" title="All 2 branches missed.">    for (int i = plain.length; i &lt; plain.length + shortage; i++) {</span>
+<span class="nc" id="L102">      plainpad[i] = (byte) shortage;</span>
+    }
+<span class="nc" id="L104">    return plainpad;</span>
+  }
+
+  // Use this method if you want to remove the padding manually
+  // This method removes the padding bytes
+  private byte[] dropPadding(byte[] plainpad) {
+<span class="nc" id="L110">    byte plain[] = null;</span>
+<span class="nc" id="L111">    int drop = plainpad[plainpad.length - 1]; // last byte gives number of</span>
+    // bytes to drop
+
+    // reallocate array smaller, dropping the pad bytes.
+<span class="nc" id="L115">    plain = new byte[plainpad.length - drop];</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">    for (int i = 0; i &lt; plain.length; i++) {</span>
+<span class="nc" id="L117">      plain[i] = plainpad[i];</span>
+<span class="nc" id="L118">      plainpad[i] = 0; // don't keep a copy of the decrypt</span>
+    }
+<span class="nc" id="L120">    return plain;</span>
+  }
+
+  private byte[] encrypt(String cmp, SecretKey sk, IvParameterSpec IV, byte[] msg) {
+    try {
+<span class="nc" id="L125">      Cipher c = Cipher.getInstance(cmp);</span>
+<span class="nc" id="L126">      c.init(Cipher.ENCRYPT_MODE, sk, IV);</span>
+<span class="nc" id="L127">      return c.doFinal(msg);</span>
+<span class="nc" id="L128">    } catch (NoSuchAlgorithmException nsae) {</span>
+<span class="nc" id="L129">      Log.e(&quot;no cipher getinstance support for &quot; + cmp);</span>
+<span class="nc" id="L130">    } catch (NoSuchPaddingException nspe) {</span>
+<span class="nc" id="L131">      Log.e(&quot;no cipher getinstance support for padding &quot; + cmp);</span>
+<span class="nc" id="L132">    } catch (InvalidKeyException e) {</span>
+<span class="nc" id="L133">      Log.e(&quot;invalid key exception&quot;);</span>
+<span class="nc" id="L134">    } catch (InvalidAlgorithmParameterException e) {</span>
+<span class="nc" id="L135">      Log.e(&quot;invalid algorithm parameter exception&quot;);</span>
+<span class="nc" id="L136">    } catch (IllegalBlockSizeException e) {</span>
+<span class="nc" id="L137">      Log.e(&quot;illegal block size exception&quot;);</span>
+<span class="nc" id="L138">    } catch (BadPaddingException e) {</span>
+<span class="nc" id="L139">      Log.e(&quot;bad padding exception&quot;);</span>
+<span class="nc" id="L140">    }</span>
+<span class="nc" id="L141">    return null;</span>
+  }
+
+  private byte[] decrypt(String cmp, SecretKey sk, IvParameterSpec IV, byte[] ciphertext) {
+    try {
+<span class="nc" id="L146">      Cipher c = Cipher.getInstance(cmp);</span>
+<span class="nc" id="L147">      c.init(Cipher.DECRYPT_MODE, sk, IV);</span>
+<span class="nc" id="L148">      return c.doFinal(ciphertext);</span>
+<span class="nc" id="L149">    } catch (NoSuchAlgorithmException nsae) {</span>
+<span class="nc" id="L150">      Log.e(&quot;no cipher getinstance support for &quot; + cmp);</span>
+<span class="nc" id="L151">    } catch (NoSuchPaddingException nspe) {</span>
+<span class="nc" id="L152">      Log.e(&quot;no cipher getinstance support for padding &quot; + cmp);</span>
+<span class="nc" id="L153">    } catch (InvalidKeyException e) {</span>
+<span class="nc" id="L154">      Log.e(&quot;invalid key exception&quot;);</span>
+<span class="nc" id="L155">    } catch (InvalidAlgorithmParameterException e) {</span>
+<span class="nc" id="L156">      Log.e(&quot;invalid algorithm parameter exception&quot;);</span>
+<span class="nc" id="L157">    } catch (IllegalBlockSizeException e) {</span>
+<span class="nc" id="L158">      Log.e(&quot;illegal block size exception&quot;);</span>
+<span class="nc" id="L159">    } catch (BadPaddingException e) {</span>
+<span class="nc" id="L160">      Log.e(&quot;bad padding exception&quot;);</span>
+<span class="nc" id="L161">    }</span>
+<span class="nc" id="L162">    return null;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

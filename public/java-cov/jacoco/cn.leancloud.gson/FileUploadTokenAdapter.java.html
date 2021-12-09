@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileUploadTokenAdapter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.gson</a> &gt; <span class="el_source">FileUploadTokenAdapter.java</span></div><h1>FileUploadTokenAdapter.java</h1><pre class="source lang-java linenums">package cn.leancloud.gson;
+
+import cn.leancloud.upload.FileUploadToken;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.TypeAdapter;
+import com.google.gson.internal.bind.TypeAdapters;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonWriter;
+
+import java.io.IOException;
+
+<span class="fc" id="L13">public class FileUploadTokenAdapter extends TypeAdapter&lt;FileUploadToken&gt; {</span>
+  private static final String FIELD_BUCKET = &quot;bucket&quot;;
+  private static final String FIELD_OBJECTID = &quot;objectId&quot;;
+  private static final String FIELD_UPLOAD_URL = &quot;upload_url&quot;;
+  private static final String FIELD_PROVIDER = &quot;provider&quot;;
+  private static final String FIELD_TOKEN = &quot;token&quot;;
+  private static final String FIELD_URL = &quot;url&quot;;
+  private static final String FIELD_KEY = &quot;key&quot;;
+
+  public void write(JsonWriter writer, FileUploadToken token) throws IOException {
+<span class="fc" id="L23">    JsonObject jsonObject = new JsonObject();</span>
+<span class="fc" id="L24">    jsonObject.addProperty(FIELD_BUCKET, token.getBucket());</span>
+<span class="fc" id="L25">    jsonObject.addProperty(FIELD_OBJECTID, token.getObjectId());</span>
+<span class="fc" id="L26">    jsonObject.addProperty(FIELD_UPLOAD_URL, token.getUploadUrl());</span>
+<span class="fc" id="L27">    jsonObject.addProperty(FIELD_PROVIDER, token.getProvider());</span>
+<span class="fc" id="L28">    jsonObject.addProperty(FIELD_TOKEN, token.getToken());</span>
+<span class="fc" id="L29">    jsonObject.addProperty(FIELD_URL, token.getUrl());</span>
+<span class="fc" id="L30">    jsonObject.addProperty(FIELD_KEY, token.getKey());</span>
+<span class="fc" id="L31">    TypeAdapters.JSON_ELEMENT.write(writer, jsonObject);</span>
+<span class="fc" id="L32">  }</span>
+
+  public FileUploadToken read(JsonReader reader) throws IOException {
+<span class="fc" id="L35">    JsonElement elem = TypeAdapters.JSON_ELEMENT.read(reader);</span>
+<span class="pc bpc" id="L36" title="2 of 4 branches missed.">    if (null != elem &amp;&amp; elem.isJsonObject()) {</span>
+<span class="fc" id="L37">      JsonObject jsonObject = elem.getAsJsonObject();</span>
+<span class="fc" id="L38">      FileUploadToken token = new FileUploadToken();</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">      if (jsonObject.has(FIELD_BUCKET)) {</span>
+<span class="fc" id="L40">        token.setBucket(jsonObject.get(FIELD_BUCKET).getAsString());</span>
+      }
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">      if (jsonObject.has(FIELD_OBJECTID)) {</span>
+<span class="fc" id="L43">        token.setObjectId(jsonObject.get(FIELD_OBJECTID).getAsString());</span>
+      }
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">      if (jsonObject.has(FIELD_UPLOAD_URL)) {</span>
+<span class="fc" id="L46">        token.setUploadUrl(jsonObject.get(FIELD_UPLOAD_URL).getAsString());</span>
+      }
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">      if (jsonObject.has(FIELD_PROVIDER)) {</span>
+<span class="fc" id="L49">        token.setProvider(jsonObject.get(FIELD_PROVIDER).getAsString());</span>
+      }
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">      if (jsonObject.has(FIELD_TOKEN)) {</span>
+<span class="fc" id="L52">        token.setToken(jsonObject.get(FIELD_TOKEN).getAsString());</span>
+      }
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">      if (jsonObject.has(FIELD_URL)) {</span>
+<span class="fc" id="L55">        token.setUrl(jsonObject.get(FIELD_URL).getAsString());</span>
+      }
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">      if (jsonObject.has(FIELD_KEY)) {</span>
+<span class="fc" id="L58">        token.setKey(jsonObject.get(FIELD_KEY).getAsString());</span>
+      }
+<span class="fc" id="L60">      return token;</span>
+    }
+<span class="nc" id="L62">    return null;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

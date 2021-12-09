@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Transformer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud</a> &gt; <span class="el_source">Transformer.java</span></div><h1>Transformer.java</h1><pre class="source lang-java linenums">package cn.leancloud;
+
+import cn.leancloud.annotation.LCClassName;
+import cn.leancloud.utils.LogUtil;
+import cn.leancloud.utils.StringUtil;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+public class Transformer {
+<span class="fc" id="L12">  private static LCLogger logger = LogUtil.getLogger(Transformer.class);</span>
+
+<span class="fc" id="L14">  private static Pattern classnamePattern = Pattern.compile(&quot;^[a-zA-Z_][a-zA-Z_0-9]*$&quot;);</span>
+<span class="fc" id="L15">  private static final Map&lt;String, Class&lt;? extends LCObject&gt;&gt; subClassesMAP =</span>
+          new HashMap&lt;String, Class&lt;? extends LCObject&gt;&gt;();
+<span class="fc" id="L17">  private static final Map&lt;Class&lt;? extends LCObject&gt;, String&gt; subClassesReverseMAP =</span>
+          new HashMap&lt;Class&lt;? extends LCObject&gt;, String&gt;();
+
+  static Class&lt;? extends LCObject&gt; getSubClass(String className) {
+<span class="nc" id="L21">    return subClassesMAP.get(className);</span>
+  }
+
+  public static String getSubClassName(Class clazz) {
+<span class="fc bfc" id="L25" title="All 2 branches covered.">    if (LCUser.class.isAssignableFrom(clazz)) {</span>
+<span class="fc" id="L26">      return LCUser.CLASS_NAME;</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">    } else if (LCRole.class.isAssignableFrom(clazz)) {</span>
+<span class="nc" id="L28">      return LCRole.CLASS_NAME;</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">    } else if (LCStatus.class.isAssignableFrom(clazz)) {</span>
+<span class="nc" id="L30">      return LCStatus.CLASS_NAME;</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">    } else if (LCFile.class.isAssignableFrom(clazz)) {</span>
+<span class="nc" id="L32">      return LCFile.CLASS_NAME;</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">    } else if (LCFriendship.class.isAssignableFrom(clazz)) {</span>
+<span class="fc" id="L34">      return LCFriendship.CLASS_NAME;</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">    } else if (LCFriendshipRequest.class.isAssignableFrom(clazz)) {</span>
+<span class="nc" id="L36">      return LCFriendshipRequest.CLASS_NAME;</span>
+    } else {
+<span class="fc" id="L38">      return subClassesReverseMAP.get(clazz);</span>
+    }
+  }
+
+  public static &lt;T extends LCObject&gt; void registerClass(Class&lt;T&gt; clazz) {
+<span class="fc" id="L43">    LCClassName LCClassName = clazz.getAnnotation(LCClassName.class);</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">    if (LCClassName == null) {</span>
+<span class="nc" id="L45">      throw new IllegalArgumentException(&quot;The class is not annotated by @AVClassName&quot;);</span>
+    }
+<span class="fc" id="L47">    String className = LCClassName.value();</span>
+<span class="fc" id="L48">    checkClassName(className);</span>
+<span class="fc" id="L49">    subClassesMAP.put(className, clazz);</span>
+<span class="fc" id="L50">    subClassesReverseMAP.put(clazz, className);</span>
+<span class="fc" id="L51">  }</span>
+
+  public static &lt;T extends LCObject&gt; T transform(LCObject rawObj, String className) {
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">    if (null == rawObj) {</span>
+<span class="nc" id="L55">      return null;</span>
+    }
+<span class="fc" id="L57">    LCObject result = objectFromClassName(className);</span>
+<span class="fc" id="L58">    result.resetByRawData(rawObj);</span>
+<span class="fc" id="L59">    return (T) result;</span>
+  }
+
+  public static &lt;T extends LCObject&gt; T transform(LCObject rawObj, Class&lt;T&gt; clazz) {
+<span class="fc bfc" id="L63" title="All 2 branches covered.">    if (null == rawObj) {</span>
+<span class="fc" id="L64">      return null;</span>
+    }
+<span class="fc" id="L66">    LCObject result = null;</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">    if (subClassesReverseMAP.containsKey(clazz)) {</span>
+      try {
+<span class="fc" id="L69">        result = clazz.newInstance();</span>
+<span class="nc" id="L70">      } catch (Exception ex) {</span>
+<span class="nc" id="L71">        logger.w(&quot;newInstance failed. cause: &quot; + ex.getMessage());</span>
+<span class="nc" id="L72">        result = new LCObject(clazz.getSimpleName());</span>
+<span class="pc" id="L73">      }</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">    } else if (LCUser.class.isAssignableFrom(clazz)) {</span>
+<span class="nc" id="L75">      result = new LCUser();</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">    } else if (LCRole.class.isAssignableFrom(clazz)) {</span>
+<span class="nc" id="L77">      result = new LCRole();</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">    } else if (LCStatus.class.isAssignableFrom(clazz)) {</span>
+<span class="nc" id="L79">      result = new LCStatus();</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">    } else if (LCFile.class.isAssignableFrom(clazz)) {</span>
+<span class="nc" id="L81">      result = new LCFile();</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">    } else if (LCFriendshipRequest.class.isAssignableFrom(clazz)) {</span>
+<span class="nc" id="L83">      result = new LCFriendshipRequest();</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">    } else if (LCFriendship.class.isAssignableFrom(clazz)) {</span>
+<span class="nc" id="L85">      result = new LCFriendship();</span>
+    } else {
+<span class="nc" id="L87">      result = new LCObject(clazz.getSimpleName());</span>
+    }
+<span class="fc" id="L89">    result.resetByRawData(rawObj);</span>
+<span class="fc" id="L90">    return (T)result;</span>
+  }
+
+  public static void checkClassName(String className) {
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(className))</span>
+<span class="nc" id="L95">      throw new IllegalArgumentException(&quot;Blank class name&quot;);</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">    if (!classnamePattern.matcher(className).matches())</span>
+<span class="nc" id="L97">      throw new IllegalArgumentException(&quot;Invalid class name&quot;);</span>
+<span class="fc" id="L98">  }</span>
+
+  public static LCObject objectFromClassName(String className) {
+<span class="fc" id="L101">    LCObject result = null;</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">    if (LCUser.CLASS_NAME.equals(className)) {</span>
+<span class="fc" id="L103">      result = new LCUser();</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">    } else if (LCStatus.CLASS_NAME.equals(className)) {</span>
+<span class="fc" id="L105">      result = new LCStatus();</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">    } else if (LCRole.CLASS_NAME.equals(className)) {</span>
+<span class="fc" id="L107">      result = new LCRole();</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">    } else if (LCFile.CLASS_NAME.equals(className)) {</span>
+<span class="fc" id="L109">      result = new LCFile();</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">    } else if (LCInstallation.CLASS_NAME.equals(className)) {</span>
+<span class="fc" id="L111">      result = new LCInstallation();</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">    } else if (LCFriendshipRequest.CLASS_NAME.equals(className)) {</span>
+<span class="fc" id="L113">      result = new LCFriendshipRequest();</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">    } else if (LCFriendship.CLASS_NAME.equals(className)) {</span>
+<span class="fc" id="L115">      result = new LCFriendship();</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">    } else if (subClassesMAP.containsKey(className)) {</span>
+      try {
+<span class="fc" id="L118">        result = subClassesMAP.get(className).newInstance();</span>
+<span class="nc" id="L119">      } catch (Exception ex) {</span>
+<span class="nc" id="L120">        logger.w(&quot;failed to create subClass: &quot; + className, ex);</span>
+<span class="nc" id="L121">        result = new LCObject(className);</span>
+<span class="pc" id="L122">      }</span>
+    } else {
+<span class="fc" id="L124">      result = new LCObject(className);</span>
+    }
+<span class="fc" id="L126">    return result;</span>
+  }
+
+  private Transformer() {
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

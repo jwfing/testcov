@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LCGeoPoint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.types</a> &gt; <span class="el_source">LCGeoPoint.java</span></div><h1>LCGeoPoint.java</h1><pre class="source lang-java linenums">package cn.leancloud.types;
+
+import cn.leancloud.utils.LCUtils;
+
+public class LCGeoPoint {
+<span class="fc" id="L6">  static double ONE_KM_TO_MILES = 1.609344;</span>
+  private double latitude;
+  private double longitude;
+
+<span class="fc" id="L10">  public LCGeoPoint() {</span>
+<span class="fc" id="L11">    latitude = 0.0;</span>
+<span class="fc" id="L12">    longitude = 0.0;</span>
+<span class="fc" id="L13">  }</span>
+
+<span class="fc" id="L15">  public LCGeoPoint(double latitude, double longitude) {</span>
+<span class="fc" id="L16">    this.latitude = latitude;</span>
+<span class="fc" id="L17">    this.longitude = longitude;</span>
+<span class="fc" id="L18">  }</span>
+
+  public double getLatitude() {
+<span class="fc" id="L21">    return latitude;</span>
+  }
+
+  public void setLatitude(double latitude) {
+<span class="nc" id="L25">    this.latitude = latitude;</span>
+<span class="nc" id="L26">  }</span>
+
+  public double getLongitude() {
+<span class="fc" id="L29">    return longitude;</span>
+  }
+
+  public void setLongitude(double longitude) {
+<span class="nc" id="L33">    this.longitude = longitude;</span>
+<span class="nc" id="L34">  }</span>
+
+  /**
+   * Get distance bw this point and another point in kilometers.
+   * @param point GeoPoint describing the other point being measured against.
+   * @return distance result.
+   */
+  public double distanceInKilometersTo(LCGeoPoint point) {
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">    if (null == point) {</span>
+<span class="nc" id="L43">      return 0.0f;</span>
+    }
+<span class="fc" id="L45">    return LCUtils.distance(latitude, point.latitude, longitude, point.longitude, 0, 0)/1000;</span>
+  }
+
+  /**
+   * Get distance between this point and another geopoint in miles.
+   *
+   * @param point GeoPoint describing the other point being measured against.
+   * @return distance
+   */
+  public double distanceInMilesTo(LCGeoPoint point) {
+<span class="fc" id="L55">    return this.distanceInKilometersTo(point) / ONE_KM_TO_MILES;</span>
+  }
+
+  /**
+   * Get distance in radians between this point and another GeoPoint. This is the smallest angular
+   * distance between the two points.
+   *
+   * @param point GeoPoint describing the other point being measured against.
+   * @return distance
+   */
+  public double distanceInRadiansTo(LCGeoPoint point) {
+<span class="fc" id="L66">    return this.distanceInKilometersTo(point) / LCUtils.earthMeanRadiusInKM;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

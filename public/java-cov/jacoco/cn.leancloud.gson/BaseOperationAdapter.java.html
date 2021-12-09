@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BaseOperationAdapter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.gson</a> &gt; <span class="el_source">BaseOperationAdapter.java</span></div><h1>BaseOperationAdapter.java</h1><pre class="source lang-java linenums">package cn.leancloud.gson;
+
+import cn.leancloud.LCObject;
+import cn.leancloud.json.JSON;
+import cn.leancloud.json.JSONObject;
+import cn.leancloud.ops.BaseOperation;
+import cn.leancloud.ops.CompoundOperation;
+import cn.leancloud.ops.ObjectFieldOperation;
+import cn.leancloud.ops.OperationBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.TypeAdapter;
+import com.google.gson.internal.bind.TypeAdapters;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonWriter;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+
+<span class="fc" id="L22">public class BaseOperationAdapter extends TypeAdapter&lt;BaseOperation&gt; {</span>
+  private static final String ATTR_OP = &quot;operation&quot;;
+  private static final String ATTR_FIELD = &quot;field&quot;;
+  private static final String ATTR_FINAL = &quot;final&quot;;
+  private static final String ATTR_OBJECT = &quot;value&quot;;
+  private static final String ATTR_SUBOPS = &quot;subOps&quot;;
+
+  public void write(JsonWriter writer, BaseOperation op) throws IOException {
+<span class="fc" id="L30">    JsonObject jsonObject = new JsonObject();</span>
+<span class="fc" id="L31">    jsonObject.addProperty(ATTR_OP, op.getOperation());</span>
+<span class="fc" id="L32">    jsonObject.addProperty(ATTR_FIELD, op.getField());</span>
+<span class="fc" id="L33">    jsonObject.addProperty(ATTR_FINAL, op.isFinal());</span>
+<span class="fc" id="L34">    jsonObject.add(ATTR_OBJECT, GsonWrapper.toJsonElement(op.getValue()));</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">    if (op instanceof CompoundOperation) {</span>
+<span class="fc" id="L36">      List&lt;ObjectFieldOperation&gt; subOps = ((CompoundOperation)op).getSubOperations();</span>
+<span class="fc" id="L37">      jsonObject.add(ATTR_SUBOPS, GsonWrapper.toJsonElement(subOps));</span>
+    }
+<span class="fc" id="L39">    TypeAdapters.JSON_ELEMENT.write(writer, jsonObject);</span>
+<span class="fc" id="L40">  }</span>
+
+  public BaseOperation read(JsonReader reader) throws IOException {
+<span class="fc" id="L43">    JsonElement elem = TypeAdapters.JSON_ELEMENT.read(reader);</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">    if (elem.isJsonObject()) {</span>
+<span class="fc" id="L45">      JsonObject jsonObject = elem.getAsJsonObject();</span>
+<span class="fc" id="L46">      return parseJSONObject(new GsonObject(jsonObject));</span>
+    } else {
+<span class="nc" id="L48">      return null;</span>
+    }
+  }
+
+  private Object getParsedObject(Object obj) {
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">    if (obj instanceof JSONObject) {</span>
+<span class="nc" id="L54">      JSONObject jsonObj = (JSONObject) obj;</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">      if (jsonObj.containsKey(LCObject.KEY_CLASSNAME)) {</span>
+        try {
+<span class="nc" id="L57">          return JSON.parseObject(JSON.toJSONString(jsonObj), LCObject.class);</span>
+<span class="nc" id="L58">        } catch (Exception ex){</span>
+<span class="nc" id="L59">          ex.printStackTrace();</span>
+<span class="nc" id="L60">          return obj;</span>
+        }
+      } else {
+<span class="nc" id="L63">        return obj;</span>
+      }
+<span class="fc bfc" id="L65" title="All 2 branches covered.">    } else if (obj instanceof Collection) {</span>
+<span class="fc" id="L66">      List&lt;Object&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">      for (Object o: ((Collection) obj).toArray()) {</span>
+<span class="fc" id="L68">        result.add(getParsedObject(o));</span>
+      }
+<span class="fc" id="L70">      return result;</span>
+    } else {
+<span class="fc" id="L72">      return obj;</span>
+    }
+  }
+
+  private &lt;T&gt; T parseJSONObject(JSONObject jsonObject) {
+<span class="pc bpc" id="L77" title="2 of 4 branches missed.">    if (jsonObject.containsKey(ATTR_OP) &amp;&amp; jsonObject.containsKey(ATTR_FIELD)) {</span>
+<span class="fc" id="L78">      String op = jsonObject.getString(ATTR_OP);</span>
+<span class="fc" id="L79">      String field = jsonObject.getString(ATTR_FIELD);</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">      boolean isFinal = jsonObject.containsKey(ATTR_FINAL)? jsonObject.getBoolean(ATTR_FINAL) : false;</span>
+
+<span class="fc" id="L82">      OperationBuilder.OperationType opType = OperationBuilder.OperationType.valueOf(op);</span>
+
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">      Object obj = jsonObject.containsKey(ATTR_OBJECT) ? jsonObject.get(ATTR_OBJECT) : null;</span>
+<span class="fc" id="L85">      Object parsedObj = getParsedObject(obj);</span>
+
+<span class="fc" id="L87">      BaseOperation result = OperationBuilder.gBuilder.create(opType, field, parsedObj);</span>
+<span class="fc" id="L88">      result.setFinal(isFinal);</span>
+
+<span class="pc bpc" id="L90" title="1 of 4 branches missed.">      if (jsonObject.containsKey(ATTR_SUBOPS) &amp;&amp; result instanceof CompoundOperation) {</span>
+<span class="fc" id="L91">        List&lt;JSONObject&gt; subOps = jsonObject.getJSONArray(ATTR_SUBOPS).toJavaList(JSONObject.class);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        for (JSONObject o : subOps) {</span>
+<span class="fc" id="L93">          result.merge((BaseOperation)parseJSONObject(o));</span>
+<span class="fc" id="L94">        }</span>
+      }
+
+<span class="fc" id="L97">      return (T) result;</span>
+    }
+<span class="nc" id="L99">    return null;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,649 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LCStatus.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud</a> &gt; <span class="el_source">LCStatus.java</span></div><h1>LCStatus.java</h1><pre class="source lang-java linenums">package cn.leancloud;
+
+import cn.leancloud.annotation.LCClassName;
+import cn.leancloud.core.PaasClient;
+import cn.leancloud.ops.Utils;
+import cn.leancloud.types.LCNull;
+import cn.leancloud.utils.ErrorUtils;
+import cn.leancloud.utils.StringUtil;
+import cn.leancloud.json.JSON;
+import cn.leancloud.json.JSONObject;
+import io.reactivex.Observable;
+import io.reactivex.functions.Function;
+
+import java.util.*;
+
+/**
+ * Status 预定义属性：
+ *  1. messageId, Integer, message sequence number, Receiver-side only
+ *  2. inboxType, String, identifier for multiple purpose, default is 'default' which stands for timeline.
+ *  3. source, Pointer, point to source user.
+ *  4. owner, Pointer, point to target user, Receiver-side only.
+ *
+ * status sample：
+ *
+ *
+ */
+@LCClassName(&quot;_Status&quot;)
+public class LCStatus extends LCObject {
+  public final static String CLASS_NAME = &quot;_Status&quot;;
+
+  public static final String ATTR_MESSAGE_ID = &quot;messageId&quot;;
+  public static final String ATTR_INBOX_TYPE = &quot;inboxType&quot;;
+  public static final String ATTR_SOURCE = &quot;source&quot;;
+  public static final String ATTR_OWNER = &quot;owner&quot;;
+  public static final String ATTR_IMAGE = &quot;image&quot;;
+  public static final String ATTR_MESSAGE = &quot;message&quot;;
+
+  public static final int INVALID_MESSAGE_ID = 0;
+
+<span class="fc" id="L40">  public enum INBOX_TYPE {</span>
+<span class="fc" id="L41">    TIMELINE(&quot;default&quot;), PRIVATE(&quot;private&quot;);</span>
+    private String type;
+
+<span class="fc" id="L44">    INBOX_TYPE(String type) {</span>
+<span class="fc" id="L45">      this.type = type;</span>
+<span class="fc" id="L46">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L50">      return this.type;</span>
+    }
+  }
+
+  /**
+   * create a status instance.
+   * @param imageUrl image url
+   * @param message  message text
+   * @return Return an instance of AVStatus
+   */
+  public static LCStatus createStatus(String imageUrl, String message) {
+<span class="fc" id="L61">    LCStatus status = new LCStatus();</span>
+<span class="fc" id="L62">    status.setImageUrl(imageUrl);</span>
+<span class="fc" id="L63">    status.setMessage(message);</span>
+<span class="fc" id="L64">    return status;</span>
+  }
+
+  /**
+   * create a status instance.
+   *
+   * @param data map data
+   * @return Return an instance of AVStatus
+   */
+  public static LCStatus createStatusWithData(Map&lt;String, Object&gt; data) {
+<span class="nc" id="L74">    LCStatus status = new LCStatus();</span>
+<span class="nc" id="L75">    status.resetServerData(data);</span>
+<span class="nc" id="L76">    return status;</span>
+  }
+
+  /**
+   * default constructor.
+   *
+   */
+  public LCStatus() {
+<span class="fc" id="L84">    super(CLASS_NAME);</span>
+<span class="fc" id="L85">    this.totallyOverwrite = true;</span>
+<span class="fc" id="L86">    this.endpointClassName = &quot;statuses&quot;;</span>
+<span class="fc" id="L87">  }</span>
+
+  /**
+   * constructor from AVObject instance.
+   * @param o object instance
+   */
+  public LCStatus(LCObject o) {
+<span class="fc" id="L94">    super(o);</span>
+<span class="fc" id="L95">    setClassName(CLASS_NAME);</span>
+<span class="fc" id="L96">  }</span>
+
+  /**
+   * set image url attribute.
+   * @param imageUrl image url
+   */
+  public void setImageUrl(final String imageUrl) {
+<span class="fc" id="L103">    put(ATTR_IMAGE, imageUrl);</span>
+<span class="fc" id="L104">  }</span>
+
+  /**
+   * get image url attribute.
+   * @return Return the value of image url
+   */
+  public String getImageUrl() {
+<span class="nc" id="L111">    return getString(ATTR_IMAGE);</span>
+  }
+
+  /**
+   * set message text
+   * @param msg the message text.
+   */
+  public void setMessage(String msg) {
+<span class="fc" id="L119">    put(ATTR_MESSAGE, msg);</span>
+<span class="fc" id="L120">  }</span>
+
+  /**
+   * get message text
+   * @return Return the message text.
+   */
+  public String getMessage() {
+<span class="nc" id="L127">    return getString(ATTR_MESSAGE);</span>
+  }
+
+  /**
+   * 此状态在用户 Inbox 中的 ID
+   *
+   * 注意: 仅用于分片查询,不具有唯一性
+   * @return Return the message id in inbox.
+   */
+  public long getMessageId() {
+<span class="fc" id="L137">    return getLong(ATTR_MESSAGE_ID);</span>
+  }
+
+  protected void setMessageId(long messageId) {
+<span class="nc" id="L141">    put(ATTR_MESSAGE_ID, messageId);</span>
+<span class="nc" id="L142">  }</span>
+
+  /**
+   * 到达收件箱类型, 默认是`default`,私信是`private`, 可以自定义任何类型
+   * @return inbox type.
+   */
+  public String getInboxType() {
+<span class="fc" id="L149">    return getString(ATTR_INBOX_TYPE);</span>
+  }
+
+  /**
+   * 获取 Status 的发送者
+   *
+   * @return source user of the status
+   */
+  public LCUser getSource() {
+<span class="nc" id="L158">    return (LCUser) getLCObject(ATTR_SOURCE);</span>
+  }
+
+  /**
+   * set source of status
+   * @param source source user of the status
+   */
+  public void setSource(LCObject source) {
+<span class="fc" id="L166">    put(ATTR_SOURCE, Utils.mapFromAVObject(source, false));</span>
+<span class="fc" id="L167">  }</span>
+
+  /**
+   * set inbox type.
+   * @param type inbox type
+   */
+  public void setInboxType(final String type) {
+<span class="nc bnc" id="L174" title="All 2 branches missed.">    if (!StringUtil.isEmpty(type)) {</span>
+<span class="nc" id="L175">      put(ATTR_INBOX_TYPE, type);</span>
+    }
+<span class="nc" id="L177">  }</span>
+
+  /**
+   * 添加 AVStatus 中的一对自定义内容
+   *
+   * @param key attribute key
+   * @param value attribute value
+   */
+  @Override
+  public void put(String key, Object value) {
+<span class="fc" id="L187">    this.serverData.put(key, value);</span>
+<span class="fc" id="L188">  }</span>
+
+  /**
+   * get customized key value.
+   * @param key attribute key
+   * @return attribute value
+   */
+  @Override
+  public Object get(String key) {
+<span class="fc" id="L197">    return this.serverData.get(key);</span>
+  }
+
+  /**
+   * 删除 AVStatus 中的一对自定义内容
+   *
+   * @param key attribute key
+   */
+  @Override
+  public void remove(String key) {
+<span class="nc" id="L207">    this.serverData.remove(key);</span>
+<span class="nc" id="L208">  }</span>
+
+  /**
+   * delete status
+   *
+   * @return Observable instance
+   */
+  @Override
+  public Observable&lt;LCNull&gt; deleteInBackground() {
+<span class="fc" id="L217">    return deleteInBackground(this);</span>
+  }
+
+  /**
+   * delete status(class method)
+   *
+   * @param status instance of AVStatus
+   * @return Observable instance
+   */
+  public static Observable&lt;LCNull&gt; deleteInBackground(LCStatus status) {
+<span class="fc" id="L227">    return deleteInBackground(LCUser.currentUser(), status);</span>
+  }
+
+  /**
+   * delete status(class method)
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param status instance of AVStatus
+   * @return Observable instance
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public static Observable&lt;LCNull&gt; deleteInBackground(LCUser asAuthenticatedUser, LCStatus status) {
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">    if (!checkUserAuthenticated(asAuthenticatedUser)) {</span>
+<span class="nc" id="L240">      return Observable.error(ErrorUtils.sessionMissingException());</span>
+    }
+
+<span class="fc" id="L243">    String currentUserObjectId = asAuthenticatedUser.getObjectId();</span>
+
+<span class="fc" id="L245">    LCObject source = null;</span>
+<span class="fc" id="L246">    Object sourceObject = status.get(ATTR_SOURCE);</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">    if (sourceObject instanceof LCObject) {</span>
+<span class="fc" id="L248">      source = (LCObject) sourceObject;</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">    } else if (sourceObject instanceof JSONObject) {</span>
+<span class="nc" id="L250">      JSONObject sourceJson = (JSONObject) sourceObject;</span>
+<span class="nc" id="L251">      source = LCObject.createWithoutData(sourceJson.getString(LCObject.KEY_CLASSNAME),</span>
+<span class="nc" id="L252">              sourceJson.getString(LCObject.KEY_OBJECT_ID));</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">    } else if (sourceObject instanceof HashMap) {</span>
+<span class="fc" id="L254">      HashMap&lt;String, Object&gt; sourceMap = (HashMap&lt;String, Object&gt;)sourceObject;</span>
+<span class="fc" id="L255">      source = LCObject.createWithoutData((String) sourceMap.get(LCObject.KEY_CLASSNAME),</span>
+<span class="fc" id="L256">              (String) sourceMap.get(LCObject.KEY_OBJECT_ID));</span>
+    }
+
+<span class="fc" id="L259">    String statusObjectId = status.getObjectId();</span>
+<span class="fc" id="L260">    long messageId = status.getMessageId();</span>
+
+<span class="pc bpc" id="L262" title="1 of 4 branches missed.">    if (null != source &amp;&amp; currentUserObjectId.equals(source.getString(LCObject.KEY_OBJECT_ID))) {</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">      if (StringUtil.isEmpty(statusObjectId)) {</span>
+<span class="nc" id="L264">        return Observable.error(ErrorUtils.invalidObjectIdException());</span>
+      } else {
+<span class="fc" id="L266">        return PaasClient.getStorageClient().deleteStatus(asAuthenticatedUser, statusObjectId);</span>
+      }
+    } else {
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">      if (INVALID_MESSAGE_ID == messageId) {</span>
+<span class="nc" id="L270">        return Observable.error(ErrorUtils.invalidObjectIdException());</span>
+      } else {
+<span class="fc" id="L272">        String ownerString = JSON.toJSONString(Utils.mapFromAVObject(asAuthenticatedUser, false));</span>
+<span class="fc" id="L273">        Map&lt;String, Object&gt; params = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L274">        params.put(ATTR_MESSAGE_ID, String.valueOf(messageId));</span>
+<span class="fc" id="L275">        params.put(ATTR_INBOX_TYPE, status.getInboxType());</span>
+<span class="fc" id="L276">        params.put(ATTR_OWNER, ownerString);</span>
+<span class="fc" id="L277">        return PaasClient.getStorageClient().deleteInboxStatus(asAuthenticatedUser, params);</span>
+      }
+    }
+  }
+
+  /**
+   * fetch status with specified objectId
+   *
+   * @param statusId status id.
+   * @return Observable instance
+   */
+  public static Observable&lt;LCStatus&gt; getStatusWithIdInBackground(String statusId) {
+<span class="nc" id="L289">    return getStatusWithIdInBackground(null, statusId);</span>
+  }
+
+  /**
+   * fetch status with specified objectId
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param statusId status id.
+   * @return Observable instance
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public static Observable&lt;LCStatus&gt; getStatusWithIdInBackground(LCUser asAuthenticatedUser, String statusId) {
+<span class="nc" id="L301">    return PaasClient.getStorageClient().fetchStatus(asAuthenticatedUser, statusId);</span>
+  }
+
+  /**
+   * send to user with query.
+   *
+   * @param query instance of AVQuery
+   * @return Observable instance
+   */
+  public Observable&lt;LCStatus&gt; sendToUsersInBackground(LCQuery query) {
+<span class="nc" id="L311">    return sendToUsersInBackground(INBOX_TYPE.TIMELINE.toString(), query);</span>
+  }
+
+  /**
+   * send to user with query and inboxType.
+   * @param inboxType inbox type
+   * @param query instance of AVQuery
+   * @return Observable instance
+   */
+  public Observable&lt;LCStatus&gt; sendToUsersInBackground(String inboxType, LCQuery query) {
+<span class="fc" id="L321">    return sendInBackground(inboxType, query);</span>
+  }
+
+  /**
+   * send status to followers.
+   * @return Observable instance
+   */
+  public Observable&lt;LCStatus&gt; sendToFollowersInBackground() {
+<span class="fc" id="L329">    return sendToFollowersInBackground(INBOX_TYPE.TIMELINE.toString());</span>
+  }
+
+  private LCQuery generateFollowerQuery(String userObjectId) {
+<span class="fc" id="L333">    LCUser user = new LCUser();</span>
+<span class="fc" id="L334">    user.setObjectId(userObjectId);</span>
+
+<span class="fc" id="L336">    List&lt;String&gt; keys = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L337">    keys.add(&quot;follower&quot;);</span>
+
+<span class="fc" id="L339">    LCQuery query = new LCQuery(&quot;_Follower&quot;);</span>
+<span class="fc" id="L340">    query.whereEqualTo(&quot;user&quot;, Utils.mapFromAVObject(user, false));</span>
+<span class="fc" id="L341">    query.selectKeys(keys);</span>
+<span class="fc" id="L342">    return query;</span>
+  }
+
+  /**
+   * send status with inboxType to followers.
+   * @param inboxType inbox type
+   * @return Observable instance
+   */
+  public Observable&lt;LCStatus&gt; sendToFollowersInBackground(String inboxType) {
+<span class="fc bfc" id="L351" title="All 2 branches covered.">    if (!checkCurrentUserAuthenticated()) {</span>
+<span class="fc" id="L352">      return Observable.error(ErrorUtils.sessionMissingException());</span>
+    }
+<span class="fc" id="L354">    LCQuery followerQuery = generateFollowerQuery(LCUser.currentUser().getObjectId());</span>
+<span class="fc" id="L355">    return sendInBackground(inboxType, followerQuery);</span>
+  }
+
+  /**
+   * send privately message.
+   *
+   * @param receiverObjectId receiver objectId
+   * @return Observable instance
+   */
+  public Observable&lt;LCStatus&gt; sendPrivatelyInBackground(final String receiverObjectId) {
+<span class="fc" id="L365">    LCQuery userQuery = LCUser.getQuery();</span>
+<span class="fc" id="L366">    userQuery.whereEqualTo(LCObject.KEY_OBJECT_ID, receiverObjectId);</span>
+<span class="fc" id="L367">    return sendInBackground(INBOX_TYPE.PRIVATE.toString(), userQuery);</span>
+  }
+
+  private Observable&lt;LCStatus&gt; sendInBackground(String inboxType, LCQuery query) {
+<span class="fc" id="L371">    return sendInBackground(LCUser.currentUser(), inboxType, query);</span>
+  }
+
+  private Observable&lt;LCStatus&gt; sendInBackground(LCUser asAuthenticatedUser, String inboxType, LCQuery query) {
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">    if (!checkUserAuthenticated(asAuthenticatedUser)) {</span>
+<span class="nc" id="L376">      return Observable.error(ErrorUtils.sessionMissingException());</span>
+    }
+<span class="fc" id="L378">    setSource(asAuthenticatedUser);</span>
+
+<span class="fc" id="L380">    Map&lt;String, Object&gt; param = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L381">    param.put(&quot;data&quot;, this.serverData);</span>
+<span class="fc" id="L382">    param.put(&quot;inboxType&quot;, inboxType);</span>
+
+<span class="fc" id="L384">    Map&lt;String, Object&gt; queryCondition = query.assembleJsonParam();</span>
+<span class="fc" id="L385">    param.put(&quot;query&quot;, queryCondition);</span>
+<span class="fc" id="L386">    return PaasClient.getStorageClient().postStatus(asAuthenticatedUser, param).map(new Function&lt;LCStatus, LCStatus&gt;() {</span>
+      @Override
+      public LCStatus apply(LCStatus avStatus) throws Exception {
+<span class="fc" id="L389">        LCStatus.this.mergeRawData(avStatus, true);</span>
+<span class="fc" id="L390">        return avStatus;</span>
+      }
+    });
+  }
+
+  /**
+   * query statuses sent by User owner.
+   * default query direction: from NEW to OLD.
+   *
+   * @param source source User
+   * @return instance of AVStatusQuery
+   */
+  public static LCStatusQuery statusQuery(LCUser source) {
+<span class="fc" id="L403">    LCStatusQuery query = new LCStatusQuery(LCStatusQuery.SourceType.OWNED);</span>
+<span class="fc" id="L404">    query.setSource(source);</span>
+<span class="fc" id="L405">    query.setDirection(LCStatusQuery.PaginationDirection.NEW_TO_OLD);</span>
+<span class="fc" id="L406">    query.setInboxType(INBOX_TYPE.TIMELINE.toString());</span>
+<span class="fc" id="L407">    return query;</span>
+  }
+
+  /**
+   * query statuses send to User owner and with inboxType
+   * default query direction: from NEW to OLD.
+   *
+   * @param owner owner user
+   * @param inboxType inbox type
+   * @return instance of AVStatusQuery
+   */
+  public static LCStatusQuery inboxQuery(LCUser owner, String inboxType) {
+<span class="fc" id="L419">    LCStatusQuery query = new LCStatusQuery(LCStatusQuery.SourceType.INBOX);</span>
+<span class="fc" id="L420">    query.setOwner(owner);</span>
+<span class="fc" id="L421">    query.setDirection(LCStatusQuery.PaginationDirection.NEW_TO_OLD);</span>
+<span class="fc" id="L422">    query.setInboxType(inboxType);</span>
+<span class="fc" id="L423">    return query;</span>
+  }
+
+  public LCObject toObject() {
+<span class="nc" id="L427">    return LCObject.createWithoutData(CLASS_NAME, this.objectId);</span>
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+<span class="nc bnc" id="L432" title="All 2 branches missed.">    if (this == obj) {</span>
+<span class="nc" id="L433">      return true;</span>
+    }
+<span class="nc bnc" id="L435" title="All 2 branches missed.">    if (obj == null) {</span>
+<span class="nc" id="L436">      return false;</span>
+    }
+<span class="nc bnc" id="L438" title="All 2 branches missed.">    if (getClass() != obj.getClass()) {</span>
+<span class="nc" id="L439">      return false;</span>
+    }
+<span class="nc bnc" id="L441" title="All 2 branches missed.">    if (StringUtil.isEmpty(this.objectId)) {</span>
+<span class="nc" id="L442">      return false;</span>
+    }
+<span class="nc" id="L444">    LCStatus other = (LCStatus) obj;</span>
+<span class="nc bnc" id="L445" title="All 2 branches missed.">    if (!objectId.equals(other.objectId)) {</span>
+<span class="nc" id="L446">      return false;</span>
+    }
+<span class="nc" id="L448">    return true;</span>
+  }
+
+  @Override
+  public int hashCode() {
+<span class="nc" id="L453">    return Objects.hash(getClassName(), getObjectId());</span>
+  }
+
+  private static boolean checkCurrentUserAuthenticated() {
+<span class="fc" id="L457">    LCUser currentUser = LCUser.getCurrentUser();</span>
+<span class="fc" id="L458">    return checkUserAuthenticated(currentUser);</span>
+  }
+
+  private static boolean checkUserAuthenticated(LCUser currentUser) {
+<span class="pc bpc" id="L462" title="1 of 4 branches missed.">    if (null != currentUser &amp;&amp; currentUser.isAuthenticated()) {</span>
+<span class="fc" id="L463">      return true;</span>
+    } else {
+<span class="fc" id="L465">      return false;</span>
+    }
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public void add(String key, Object value) {
+<span class="nc" id="L475">    throw new UnsupportedOperationException();</span>
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public synchronized LCACL getACL() {
+<span class="nc" id="L484">    throw new UnsupportedOperationException();</span>
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public synchronized void setACL(LCACL acl) {
+<span class="nc" id="L493">    throw new UnsupportedOperationException();</span>
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public void addAll(String key, Collection&lt;?&gt; values) {
+<span class="nc" id="L502">    throw new UnsupportedOperationException();</span>
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public void addAllUnique(String key, Collection&lt;?&gt; values) {
+<span class="nc" id="L511">    throw new UnsupportedOperationException();</span>
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public void addUnique(String key, Object value) {
+<span class="nc" id="L520">    throw new UnsupportedOperationException();</span>
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public LCObject fetch() {
+<span class="nc" id="L529">    throw new UnsupportedOperationException();</span>
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public LCObject fetch(String includedKeys) {
+<span class="nc" id="L538">    throw new UnsupportedOperationException();</span>
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public void refresh() {
+<span class="nc" id="L547">    throw new UnsupportedOperationException();</span>
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public void refresh(String includedKeys) {
+<span class="nc" id="L556">    throw new UnsupportedOperationException();</span>
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public LCObject fetchIfNeeded() {
+<span class="nc" id="L565">    throw new UnsupportedOperationException();</span>
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public Observable&lt;LCObject&gt; fetchIfNeededInBackground() {
+<span class="nc" id="L574">    throw new UnsupportedOperationException();</span>
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public Observable&lt;LCObject&gt; fetchInBackground() {
+<span class="nc" id="L583">    throw new UnsupportedOperationException();</span>
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public Observable&lt;LCObject&gt; refreshInBackground() {
+<span class="nc" id="L592">    throw new UnsupportedOperationException();</span>
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public Observable&lt;LCObject&gt; fetchInBackground(String includeKeys) {
+<span class="nc" id="L601">    throw new UnsupportedOperationException();</span>
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public void save() {
+<span class="nc" id="L610">    throw new UnsupportedOperationException();</span>
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public Observable&lt;? extends LCObject&gt; saveInBackground() {
+<span class="nc" id="L619">    throw new UnsupportedOperationException();</span>
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public void saveEventually() {
+<span class="nc" id="L628">    throw new UnsupportedOperationException();</span>
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public boolean isFetchWhenSave() {
+<span class="nc" id="L637">    return false;</span>
+  }
+
+  /**
+   * 此方法并没有实现，调用会抛出 UnsupportedOperationException
+   */
+  @Deprecated
+  @Override
+  public void setFetchWhenSave(boolean fetchWhenSave) {
+<span class="nc" id="L646">    throw new UnsupportedOperationException();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

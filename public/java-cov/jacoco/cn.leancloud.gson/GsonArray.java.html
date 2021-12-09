@@ -1,0 +1,435 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GsonArray.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.gson</a> &gt; <span class="el_source">GsonArray.java</span></div><h1>GsonArray.java</h1><pre class="source lang-java linenums">package cn.leancloud.gson;
+
+import cn.leancloud.json.JSONArray;
+import cn.leancloud.json.JSONObject;
+import com.google.gson.JsonArray;
+
+import java.lang.reflect.Type;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.sql.Timestamp;
+import java.util.*;
+
+public class GsonArray extends JSONArray {
+  private com.google.gson.JsonArray gsonArray;
+
+  static class InnerIterator implements Iterator&lt;Object&gt; {
+<span class="nc" id="L17">    private Iterator&lt;com.google.gson.JsonElement&gt; gsonIterator = null;</span>
+<span class="nc" id="L18">    public InnerIterator(Iterator&lt;com.google.gson.JsonElement&gt; jsonIterator) {</span>
+<span class="nc" id="L19">      gsonIterator = jsonIterator;</span>
+<span class="nc" id="L20">    }</span>
+
+    public boolean hasNext() {
+<span class="nc" id="L23">      return gsonIterator.hasNext();</span>
+    }
+
+    public Object next() {
+<span class="nc" id="L27">      com.google.gson.JsonElement elem = gsonIterator.next();</span>
+<span class="nc bnc" id="L28" title="All 2 branches missed.">      if (null == elem) {</span>
+<span class="nc" id="L29">        return null;</span>
+      }
+<span class="nc" id="L31">      return GsonWrapper.toJavaObject(elem);</span>
+    }
+
+    @Override
+    public void remove() {
+<span class="nc" id="L36">      throw new UnsupportedOperationException(&quot;remove&quot;);</span>
+    }
+  }
+
+<span class="fc" id="L40">  public GsonArray(com.google.gson.JsonArray array) {</span>
+<span class="fc" id="L41">    this.gsonArray = array;</span>
+<span class="fc" id="L42">  }</span>
+<span class="nc" id="L43">  public GsonArray(List&lt;Object&gt; list) {</span>
+<span class="nc" id="L44">    this.gsonArray = new com.google.gson.JsonArray(list.size());</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">    for (Object obj: list) {</span>
+<span class="nc" id="L46">      gsonArray.add(GsonWrapper.toJsonElement(obj));</span>
+<span class="nc" id="L47">    }</span>
+<span class="nc" id="L48">  }</span>
+
+<span class="fc" id="L50">  public GsonArray() {</span>
+<span class="fc" id="L51">    this.gsonArray = new com.google.gson.JsonArray();</span>
+<span class="fc" id="L52">  }</span>
+
+  public JsonArray getRawObject() {
+<span class="fc" id="L55">    return gsonArray;</span>
+  }
+  public int size() {
+<span class="fc" id="L58">    return gsonArray.size();</span>
+  }
+
+  public boolean isEmpty() {
+<span class="nc bnc" id="L62" title="All 2 branches missed.">    return size() &lt;= 0;</span>
+  }
+  public boolean contains(Object o) {
+<span class="nc" id="L65">    com.google.gson.JsonElement elem = GsonWrapper.toJsonElement(o);</span>
+<span class="nc" id="L66">    return gsonArray.contains(elem);</span>
+  }
+
+  public Iterator&lt;Object&gt; iterator() {
+<span class="nc" id="L70">    return new GsonArray.InnerIterator(gsonArray.iterator());</span>
+  }
+
+  public Object[] toArray() {
+<span class="nc" id="L74">    List&lt;Object&gt; list = new ArrayList&lt;&gt;(size());</span>
+<span class="nc" id="L75">    Iterator&lt;Object&gt; it = iterator();</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">    while (it.hasNext()) {</span>
+<span class="nc" id="L77">      list.add(it.next());</span>
+    }
+<span class="nc" id="L79">    return list.toArray();</span>
+  }
+
+  public &lt;T&gt; T[] toArray(T[] a) {
+<span class="nc" id="L83">    List&lt;Object&gt; list = new ArrayList&lt;&gt;(size());</span>
+<span class="nc" id="L84">    Iterator&lt;Object&gt; it = iterator();</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">    while (it.hasNext()) {</span>
+<span class="nc" id="L86">      list.add(it.next());</span>
+    }
+<span class="nc" id="L88">    return list.toArray(a);</span>
+  }
+
+  public boolean add(Object obj) {
+<span class="fc" id="L92">    gsonArray.add(GsonWrapper.toJsonElement(obj));</span>
+<span class="fc" id="L93">    return true;</span>
+  }
+
+  public JSONArray fluentAdd(Object e) {
+<span class="nc" id="L97">    add(e);</span>
+<span class="nc" id="L98">    return this;</span>
+  }
+
+  public boolean remove(Object o) {
+<span class="nc" id="L102">    return gsonArray.remove(GsonWrapper.toJsonElement(o));</span>
+  }
+
+  public JSONArray fluentRemove(Object o) {
+<span class="nc" id="L106">    remove(o);</span>
+<span class="nc" id="L107">    return this;</span>
+  }
+
+  public boolean containsAll(Collection&lt;? extends Object&gt; c) {
+<span class="nc bnc" id="L111" title="All 2 branches missed.">    for (Object o: c) {</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">      if (!gsonArray.contains(GsonWrapper.toJsonElement(o))) {</span>
+<span class="nc" id="L113">        return false;</span>
+      }
+<span class="nc" id="L115">    }</span>
+<span class="nc" id="L116">    return true;</span>
+  }
+
+  public boolean addAll(Collection&lt;? extends Object&gt; c) {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">    for (Object o : c) {</span>
+<span class="nc" id="L121">      gsonArray.add(GsonWrapper.toJsonElement(o));</span>
+<span class="nc" id="L122">    }</span>
+<span class="nc" id="L123">    return true;</span>
+  }
+
+  public JSONArray fluentAddAll(Collection&lt;? extends Object&gt; c) {
+<span class="nc" id="L127">    addAll(c);</span>
+<span class="nc" id="L128">    return this;</span>
+  }
+
+  public boolean addAll(int index, Collection&lt;? extends Object&gt; c) {
+<span class="nc" id="L132">    throw new UnsupportedOperationException(&quot;addAll with specified index.&quot;);</span>
+  }
+
+  public JSONArray fluentAddAll(int index, Collection&lt;? extends Object&gt; c) {
+<span class="nc" id="L136">    addAll(index, c);</span>
+<span class="nc" id="L137">    return this;</span>
+  }
+
+  public boolean removeAll(Collection&lt;? extends Object&gt; c) {
+<span class="nc bnc" id="L141" title="All 2 branches missed.">    for (Object o : c) {</span>
+<span class="nc" id="L142">      gsonArray.remove(GsonWrapper.toJsonElement(o));</span>
+<span class="nc" id="L143">    }</span>
+<span class="nc" id="L144">    return true;</span>
+  }
+
+  public JSONArray fluentRemoveAll(Collection&lt;?&gt; c) {
+<span class="nc" id="L148">    removeAll(c);</span>
+<span class="nc" id="L149">    return this;</span>
+  }
+
+  public boolean retainAll(Collection&lt;?&gt; c) {
+<span class="nc" id="L153">    return false;</span>
+  }
+
+  public JSONArray fluentRetainAll(Collection&lt;?&gt; c) {
+<span class="nc" id="L157">    retainAll(c);</span>
+<span class="nc" id="L158">    return this;</span>
+  }
+
+  public void clear() {
+<span class="nc" id="L162">    int total = size();</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">    while (total &gt;= 1) {</span>
+<span class="nc" id="L164">      gsonArray.remove(total -1);</span>
+<span class="nc" id="L165">      total--;</span>
+    }
+<span class="nc" id="L167">  }</span>
+
+  public JSONArray fluentClear() {
+<span class="nc" id="L170">    clear();</span>
+<span class="nc" id="L171">    return this;</span>
+  }
+
+  public Object set(int index, Object element) {
+<span class="nc" id="L175">    gsonArray.set(index, GsonWrapper.toJsonElement(element));</span>
+<span class="nc" id="L176">    return element;</span>
+  }
+
+  public JSONArray fluentSet(int index, Object element) {
+<span class="nc" id="L180">    set(index, element);</span>
+<span class="nc" id="L181">    return this;</span>
+  }
+
+  public void add(int index, Object element) {
+<span class="nc" id="L185">    com.google.gson.JsonElement elem = gsonArray.get(index);</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">    if (elem.isJsonArray()) {</span>
+<span class="nc" id="L187">      ((com.google.gson.JsonArray)elem).add(GsonWrapper.toJsonElement(element));</span>
+    }
+<span class="nc" id="L189">  }</span>
+
+  public JSONArray fluentAdd(int index, Object element) {
+<span class="nc" id="L192">    add(index, element);</span>
+<span class="nc" id="L193">    return this;</span>
+  }
+
+  public Object remove(int index) {
+<span class="nc" id="L197">    return gsonArray.remove(index);</span>
+  }
+
+  public JSONArray fluentRemove(int index) {
+<span class="nc" id="L201">    remove(index);</span>
+<span class="nc" id="L202">    return this;</span>
+  }
+
+  public int indexOf(Object o) {
+<span class="nc" id="L206">    com.google.gson.JsonElement elem = GsonWrapper.toJsonElement(o);</span>
+<span class="nc bnc" id="L207" title="All 2 branches missed.">    for (int i = 0;i &lt; size();i ++) {</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">      if (elem.equals(gsonArray.get(i))) {</span>
+<span class="nc" id="L209">        return i;</span>
+      }
+    }
+<span class="nc" id="L212">    return -1;</span>
+  }
+
+  public int lastIndexOf(Object o) {
+<span class="nc" id="L216">    com.google.gson.JsonElement elem = GsonWrapper.toJsonElement(o);</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">    for (int i = size() - 1;i &gt;= 0;i --) {</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">      if (elem.equals(gsonArray.get(i))) {</span>
+<span class="nc" id="L219">        return i;</span>
+      }
+    }
+<span class="nc" id="L222">    return -1;</span>
+  }
+
+  public ListIterator&lt;Object&gt; listIterator() {
+<span class="nc" id="L226">    throw new UnsupportedOperationException(&quot;remove&quot;);</span>
+  }
+
+  public ListIterator&lt;Object&gt; listIterator(int index) {
+<span class="nc" id="L230">    throw new UnsupportedOperationException(&quot;remove&quot;);</span>
+  }
+
+  public List&lt;Object&gt; subList(int fromIndex, int toIndex) {
+<span class="nc" id="L234">    List&lt;Object&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L235" title="All 6 branches missed.">    for (int i = fromIndex; i &gt;= 0 &amp;&amp; i &lt; size() &amp;&amp; i &lt; toIndex; i++) {</span>
+<span class="nc" id="L236">      result.add(GsonWrapper.toJavaObject(gsonArray.get(i)));</span>
+    }
+<span class="nc" id="L238">    return result;</span>
+  }
+
+  public Object get(int index) {
+<span class="nc" id="L242">    return GsonWrapper.toJavaObject(getElement(index));</span>
+  }
+
+  public JSONObject getJSONObject(int index) {
+<span class="nc" id="L246">    com.google.gson.JsonElement result = getElement(index);</span>
+<span class="nc bnc" id="L247" title="All 4 branches missed.">    if (null == result || !result.isJsonObject()) {</span>
+<span class="nc" id="L248">      return null;</span>
+    }
+<span class="nc" id="L250">    return new GsonObject(result.getAsJsonObject());</span>
+  }
+
+  public JSONArray getJSONArray(int index) {
+<span class="nc" id="L254">    com.google.gson.JsonElement result = getElement(index);</span>
+<span class="nc bnc" id="L255" title="All 4 branches missed.">    if (null == result || !result.isJsonArray()) {</span>
+<span class="nc" id="L256">      return null;</span>
+    }
+<span class="nc" id="L258">    return new GsonArray(result.getAsJsonArray());</span>
+  }
+
+  public &lt;T&gt; T getObject(int index, Class&lt;T&gt; clazz) {
+<span class="fc" id="L262">    com.google.gson.JsonElement result = getElement(index);</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">    if (null == result) {</span>
+<span class="nc" id="L264">      return null;</span>
+    }
+<span class="fc" id="L266">    return GsonWrapper.toJavaObject(result, clazz);</span>
+  }
+
+  public &lt;T&gt; T getObject(int index, Type type) {
+<span class="nc" id="L270">    return getObject(index, (Class&lt;? extends T&gt;) com.google.gson.reflect.TypeToken.get(type).getRawType());</span>
+  }
+
+  private com.google.gson.JsonElement getElement(int index) {
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">    if (index &gt;= size()) {</span>
+<span class="nc" id="L275">      return null;</span>
+    }
+<span class="fc" id="L277">    return gsonArray.get(index);</span>
+  }
+
+  public Boolean getBoolean(int index) {
+<span class="nc" id="L281">    com.google.gson.JsonElement elem = getElement(index);</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">    if (null == elem) {</span>
+<span class="nc" id="L283">      return false;</span>
+    }
+<span class="nc" id="L285">    return elem.getAsBoolean();</span>
+  }
+
+  public boolean getBooleanValue(int index) {
+<span class="nc" id="L289">    return getBoolean(index).booleanValue();</span>
+  }
+
+  public Byte getByte(int index) {
+<span class="nc" id="L293">    com.google.gson.JsonElement elem = getElement(index);</span>
+<span class="nc bnc" id="L294" title="All 2 branches missed.">    if (null == elem) {</span>
+<span class="nc" id="L295">      return 0;</span>
+    }
+<span class="nc" id="L297">    return elem.getAsByte();</span>
+  }
+
+  public byte getByteValue(int index) {
+<span class="nc" id="L301">    return getByte(index).byteValue();</span>
+  }
+
+  public Short getShort(int index) {
+<span class="nc" id="L305">    com.google.gson.JsonElement elem = getElement(index);</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">    if (null == elem) {</span>
+<span class="nc" id="L307">      return 0;</span>
+    }
+<span class="nc" id="L309">    return elem.getAsShort();</span>
+  }
+
+  public short getShortValue(int index) {
+<span class="nc" id="L313">    return getShort(index).shortValue();</span>
+  }
+
+  public Integer getInteger(int index) {
+<span class="nc" id="L317">    com.google.gson.JsonElement elem = getElement(index);</span>
+<span class="nc bnc" id="L318" title="All 2 branches missed.">    if (null == elem) {</span>
+<span class="nc" id="L319">      return 0;</span>
+    }
+<span class="nc" id="L321">    return elem.getAsInt();</span>
+  }
+
+  public int getIntValue(int index) {
+<span class="nc" id="L325">    return getInteger(index).intValue();</span>
+  }
+
+  public Long getLong(int index) {
+<span class="nc" id="L329">    com.google.gson.JsonElement elem = getElement(index);</span>
+<span class="nc bnc" id="L330" title="All 2 branches missed.">    if (null == elem) {</span>
+<span class="nc" id="L331">      return 0l;</span>
+    }
+<span class="nc" id="L333">    return elem.getAsLong();</span>
+  }
+
+  public long getLongValue(int index) {
+<span class="nc" id="L337">    return getLong(index).longValue();</span>
+  }
+
+  public Float getFloat(int index) {
+<span class="nc" id="L341">    com.google.gson.JsonElement elem = getElement(index);</span>
+<span class="nc bnc" id="L342" title="All 2 branches missed.">    if (null == elem) {</span>
+<span class="nc" id="L343">      return 0f;</span>
+    }
+<span class="nc" id="L345">    return elem.getAsFloat();</span>
+  }
+
+  public float getFloatValue(int index) {
+<span class="nc" id="L349">    return getFloat(index).floatValue();</span>
+  }
+
+  public Double getDouble(int index) {
+<span class="nc" id="L353">    com.google.gson.JsonElement elem = getElement(index);</span>
+<span class="nc bnc" id="L354" title="All 2 branches missed.">    if (null == elem) {</span>
+<span class="nc" id="L355">      return 0d;</span>
+    }
+<span class="nc" id="L357">    return elem.getAsDouble();</span>
+  }
+
+  public double getDoubleValue(int index) {
+<span class="nc" id="L361">    return getDouble(index).doubleValue();</span>
+  }
+
+  public BigDecimal getBigDecimal(int index) {
+<span class="nc" id="L365">    com.google.gson.JsonElement elem = getElement(index);</span>
+<span class="nc bnc" id="L366" title="All 2 branches missed.">    if (null == elem) {</span>
+<span class="nc" id="L367">      return null;</span>
+    }
+<span class="nc" id="L369">    return elem.getAsBigDecimal();</span>
+  }
+
+  public BigInteger getBigInteger(int index) {
+<span class="nc" id="L373">    com.google.gson.JsonElement elem = getElement(index);</span>
+<span class="nc bnc" id="L374" title="All 2 branches missed.">    if (null == elem) {</span>
+<span class="nc" id="L375">      return null;</span>
+    }
+<span class="nc" id="L377">    return elem.getAsBigInteger();</span>
+  }
+
+  public String getString(int index) {
+<span class="nc" id="L381">    com.google.gson.JsonElement elem = getElement(index);</span>
+<span class="nc bnc" id="L382" title="All 2 branches missed.">    if (null == elem) {</span>
+<span class="nc" id="L383">      return null;</span>
+    }
+<span class="nc" id="L385">    return elem.getAsString();</span>
+  }
+
+  public Date getDate(int index) {
+<span class="nc" id="L389">    Object val = get(index);</span>
+<span class="nc" id="L390">    return GsonWrapper.castToDate(val);</span>
+  }
+
+  public java.sql.Date getSqlDate(int index) {
+<span class="nc" id="L394">    throw new UnsupportedOperationException(&quot;getSqlDate is not supported.&quot;);</span>
+  }
+
+  public Timestamp getTimestamp(int index) {
+<span class="nc" id="L398">    throw new UnsupportedOperationException(&quot;getTimestamp is not supported.&quot;);</span>
+  }
+
+  public &lt;T&gt; List&lt;T&gt; toJavaList(Class&lt;T&gt; clazz) {
+<span class="fc" id="L402">    List&lt;T&gt; result = new ArrayList&lt;&gt;(size());</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">    for ( int i = 0;i &lt; size(); i++) {</span>
+<span class="fc" id="L404">      result.add(getObject(i, clazz));</span>
+    }
+<span class="fc" id="L406">    return result;</span>
+  }
+
+  public Object clone() {
+<span class="nc" id="L410">    return new GsonArray(gsonArray.deepCopy());</span>
+  }
+
+  public boolean equals(Object obj) {
+<span class="nc bnc" id="L414" title="All 2 branches missed.">    if (null == obj) {</span>
+<span class="nc" id="L415">      return false;</span>
+    }
+<span class="nc bnc" id="L417" title="All 2 branches missed.">    if (obj == this) {</span>
+<span class="nc" id="L418">      return true;</span>
+    }
+<span class="nc bnc" id="L420" title="All 2 branches missed.">    if (!(obj instanceof GsonArray)) {</span>
+<span class="nc" id="L421">      return false;</span>
+    }
+
+<span class="nc" id="L424">    return gsonArray.equals(((GsonArray) obj).gsonArray);</span>
+  }
+
+  public int hashCode() {
+<span class="nc" id="L428">    return gsonArray.hashCode();</span>
+  }
+
+  public String toJSONString() {
+<span class="nc" id="L432">    return gsonArray.toString();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

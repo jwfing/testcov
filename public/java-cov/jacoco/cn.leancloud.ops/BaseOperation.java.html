@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BaseOperation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.ops</a> &gt; <span class="el_source">BaseOperation.java</span></div><h1>BaseOperation.java</h1><pre class="source lang-java linenums">package cn.leancloud.ops;
+
+import cn.leancloud.*;
+import cn.leancloud.codec.Base64;
+import cn.leancloud.types.LCGeoPoint;
+import cn.leancloud.utils.LogUtil;
+import cn.leancloud.utils.StringUtil;
+import cn.leancloud.json.JSONArray;
+import cn.leancloud.json.JSONObject;
+
+import java.util.*;
+
+//@JSONType(deserializer = BaseOperationAdapter.class, serializer = BaseOperationAdapter.class)
+public abstract class BaseOperation implements ObjectFieldOperation {
+<span class="fc" id="L15">  static final LCLogger LOGGER = LogUtil.getLogger(BaseOperation.class);</span>
+  static final String KEY_OP = &quot;__op&quot;;
+  static final String KEY_OBJECTS = &quot;objects&quot;;
+  static final String KEY_AMOUNT = &quot;amount&quot;;
+  static final String KEY_VALUE = &quot;value&quot;;
+  public static final String KEY_INTERNAL_ID = &quot;__internalId&quot;;
+  public static final String KEY_BODY = &quot;body&quot;;
+  public static final String KEY_PATH = &quot;path&quot;;
+  public static final String KEY_HTTP_METHOD = &quot;method&quot;;
+
+<span class="pc" id="L25">  protected String op = null;</span>
+<span class="pc" id="L26">  protected String field = null;</span>
+<span class="pc" id="L27">  protected Object value = null;</span>
+<span class="pc" id="L28">  protected boolean isFinal = false;</span>
+
+<span class="nc" id="L30">  public BaseOperation() {</span>
+<span class="nc" id="L31">  }</span>
+
+<span class="fc" id="L33">  public BaseOperation(String op, String field, Object value, boolean isFinal) {</span>
+<span class="fc" id="L34">    this.op = op;</span>
+<span class="fc" id="L35">    this.field = field;</span>
+<span class="fc" id="L36">    this.value = value;</span>
+<span class="fc" id="L37">    this.isFinal = isFinal;</span>
+<span class="fc" id="L38">  }</span>
+
+  public String getOperation() {
+<span class="fc" id="L41">    return this.op;</span>
+  }
+  public String getField() {
+<span class="fc" id="L44">    return this.field;</span>
+  }
+  public Object getValue() {
+<span class="fc" id="L47">    return this.value;</span>
+  }
+
+  public void setOp(String op) {
+<span class="nc" id="L51">    this.op = op;</span>
+<span class="nc" id="L52">  }</span>
+  public void setField(String field) {
+<span class="nc" id="L54">    this.field = field;</span>
+<span class="nc" id="L55">  }</span>
+  public void setValue(Object value) {
+<span class="nc" id="L57">    this.value = value;</span>
+<span class="nc" id="L58">  }</span>
+
+<span class="fc" id="L60">  public boolean isFinal() {return this.isFinal;}</span>
+  public void setFinal(boolean isFinal) {
+<span class="fc" id="L62">    this.isFinal = isFinal;</span>
+<span class="fc" id="L63">  }</span>
+
+  public boolean checkCircleReference(Map&lt;LCObject, Boolean&gt; markMap) {
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">    if (null == markMap) {</span>
+<span class="nc" id="L67">      return false;</span>
+    }
+<span class="fc" id="L69">    return checkValueCircleReference(markMap, this.value);</span>
+  }
+
+  private static boolean checkValueCircleReference(Map&lt;LCObject, Boolean&gt; markMap, Object value) {
+<span class="pc bpc" id="L73" title="1 of 4 branches missed.">    if (null == value || null == markMap) {</span>
+<span class="fc" id="L74">      return false;</span>
+    }
+<span class="fc bfc" id="L76" title="All 2 branches covered.">    if (value instanceof LCObject) {</span>
+<span class="fc" id="L77">      LCObject v = (LCObject)value;</span>
+<span class="pc bpc" id="L78" title="1 of 4 branches missed.">      if (markMap.containsKey(v) &amp;&amp; markMap.get(v) == true) {</span>
+<span class="fc" id="L79">        return true;</span>
+      }
+<span class="fc" id="L81">      boolean rst = v.hasCircleReference(markMap);</span>
+<span class="fc" id="L82">      markMap.put(v, rst);</span>
+<span class="fc" id="L83">      return rst;</span>
+    }
+<span class="fc bfc" id="L85" title="All 2 branches covered.">    if (value instanceof Collection) {</span>
+<span class="fc" id="L86">      Collection&lt;Object&gt; collection = (Collection&lt;Object&gt;) value;</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">      for (Object o : collection) {</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (checkValueCircleReference(markMap, o)) {</span>
+<span class="fc" id="L89">          return true;</span>
+        }
+<span class="fc" id="L91">      }</span>
+    }
+<span class="fc" id="L93">    return false;</span>
+  }
+
+  /**
+   * apply operation to object, in order to generate new attribute value.
+   *
+   * @param obj
+   * @return
+   */
+  public abstract Object apply(Object obj);
+
+  public abstract Map&lt;String, Object&gt; encode();
+
+  /**
+   * merge with previous operations.
+   *
+   * @param previous
+   * @return
+   */
+  protected ObjectFieldOperation mergeWithPrevious(ObjectFieldOperation previous) {
+<span class="nc" id="L113">    return NullOperation.gInstance;</span>
+  }
+
+  public ObjectFieldOperation merge(ObjectFieldOperation other) {
+<span class="pc bpc" id="L117" title="1 of 4 branches missed.">    if (null == other || other instanceof NullOperation) {</span>
+<span class="fc" id="L118">      return this;</span>
+    }
+<span class="fc bfc" id="L120" title="All 2 branches covered.">    if (isFinal) {</span>
+      // ignore all previous operations.
+<span class="fc" id="L122">      return this;</span>
+    }
+<span class="fc" id="L124">    return mergeWithPrevious(other);</span>
+  }
+
+  protected Object concatCollections(Object left, Object right) {
+<span class="pc bpc" id="L128" title="2 of 4 branches missed.">    if (null == left || null == right) {</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">      return null == left? right : left;</span>
+    }
+<span class="fc" id="L131">    List&lt;Object&gt; result = new ArrayList&lt;Object&gt;();</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">    if (left instanceof Collection) {</span>
+<span class="fc" id="L133">      result.addAll((Collection&lt;?&gt;) left);</span>
+    } else {
+<span class="nc" id="L135">      result.add(left);</span>
+    }
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">    if (right instanceof Collection) {</span>
+<span class="fc" id="L138">      result.addAll((Collection&lt;?&gt;) right);</span>
+    } else {
+<span class="nc" id="L140">      result.add(right);</span>
+    }
+    try {
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">      if (null != result) {</span>
+<span class="fc" id="L144">        HashSet uniqueSet = new HashSet(result.size());</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        for (Object o:result) {</span>
+<span class="fc" id="L146">          uniqueSet.add(o);</span>
+<span class="fc" id="L147">        }</span>
+<span class="fc" id="L148">        result = Arrays.asList(uniqueSet.toArray());</span>
+      }
+<span class="nc" id="L150">    } catch (Exception ex) {</span>
+<span class="nc" id="L151">      LOGGER.w(&quot;failed to concat collections.&quot;, ex);</span>
+<span class="fc" id="L152">    }</span>
+<span class="fc" id="L153">    return result;</span>
+  }
+
+  protected void reportIllegalOperations(ObjectFieldOperation current, ObjectFieldOperation prev) {
+<span class="nc" id="L157">    LOGGER.w(&quot;illegal operations. current=&quot; + current.getClass().getSimpleName() + &quot;, prev=&quot; + prev.getClass().getSimpleName());</span>
+<span class="nc" id="L158">  }</span>
+
+  public static Object encodeObject(Object o) {
+<span class="fc" id="L161">    return encodeObject(o, false);</span>
+  }
+
+  protected static Object encodeObject(Object o, boolean isTop) {
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">    if (null == o) {</span>
+<span class="nc" id="L166">      return null;</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">    } else if (o instanceof Map) {</span>
+<span class="fc" id="L168">      return encodeMap((Map&lt;String, Object&gt;)o, isTop);</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">    } else if (o instanceof Collection) {</span>
+<span class="fc" id="L170">      return encodeCollection((Collection)o, isTop);</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">    } else if (o instanceof LCObject) {</span>
+<span class="fc" id="L172">      return encodeAVObject((LCObject)o, isTop);</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">    } else if (o instanceof LCGeoPoint) {</span>
+<span class="fc" id="L174">      return encodeGeoPointer((LCGeoPoint) o);</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">    }else if (o instanceof LCACL) {</span>
+<span class="fc" id="L176">      return ((LCACL) o).toJSONObject();</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">    } else if (o instanceof LCFile) {</span>
+<span class="nc" id="L178">      return encodeAVFile((LCFile) o);</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">    } else if (o instanceof Date) {</span>
+<span class="fc" id="L180">      return encodeDate((Date) o);</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">    } else if (o instanceof byte[]) {</span>
+<span class="fc" id="L182">      return encodeByteArray((byte[])o);</span>
+<span class="pc bpc" id="L183" title="2 of 4 branches missed.">    } else if (o instanceof JSONObject || o instanceof JSONArray) {</span>
+<span class="nc" id="L184">      return o;</span>
+    } else {
+      ;
+    }
+<span class="fc" id="L188">    return o;</span>
+  }
+
+  protected static Object encodeMap(Map&lt;String, Object&gt; map, boolean isTop) {
+<span class="fc" id="L192">    Map newMap = new HashMap&lt;String, Object&gt;(map.size());</span>
+
+<span class="fc bfc" id="L194" title="All 2 branches covered.">    for (Map.Entry&lt;String, Object&gt; entry : map.entrySet()) {</span>
+<span class="fc" id="L195">      final String key = entry.getKey();</span>
+<span class="fc" id="L196">      Object o = entry.getValue();</span>
+<span class="fc" id="L197">      newMap.put(key, encodeObject(o, isTop));</span>
+<span class="fc" id="L198">    }</span>
+
+<span class="fc" id="L200">    return newMap;</span>
+  }
+
+  protected static Object encodeCollection(Collection collection, boolean isTop) {
+<span class="fc" id="L204">    List result = new ArrayList(collection.size());</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">    for (Object o: collection) {</span>
+<span class="fc" id="L206">      result.add(encodeObject(o, isTop));</span>
+<span class="fc" id="L207">    }</span>
+<span class="fc" id="L208">    return result;</span>
+  }
+
+  protected static Object encodeAVObject(LCObject o, boolean isTop) {
+<span class="fc" id="L212">    Map&lt;String, Object&gt; result = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L213">    result.put(&quot;className&quot;, o.getClassName());</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(o.getObjectId())) {</span>
+<span class="fc" id="L215">      result.put(&quot;objectId&quot;, o.getObjectId());</span>
+    }
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">    if (isTop) {</span>
+<span class="nc" id="L218">      result.put(&quot;__type&quot;, &quot;Object&quot;);</span>
+<span class="nc" id="L219">      Map&lt;String, Object&gt; serverData = (Map&lt;String, Object&gt;) encodeMap(o.getServerData(), false);</span>
+<span class="nc bnc" id="L220" title="All 4 branches missed.">      if (serverData != null &amp;&amp; !serverData.isEmpty()) {</span>
+<span class="nc" id="L221">        result.putAll(serverData);</span>
+      }
+<span class="nc" id="L223">    } else {</span>
+<span class="fc" id="L224">      result.put(&quot;__type&quot;, &quot;Pointer&quot;);</span>
+    }
+<span class="fc" id="L226">    return result;</span>
+  }
+
+  protected static Object encodeGeoPointer(LCGeoPoint o) {
+<span class="fc" id="L230">    Map&lt;String, Object&gt; result = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L231">    result.put(&quot;__type&quot;, &quot;GeoPoint&quot;);</span>
+<span class="fc" id="L232">    result.put(&quot;latitude&quot;, o.getLatitude());</span>
+<span class="fc" id="L233">    result.put(&quot;longitude&quot;, o.getLongitude());</span>
+<span class="fc" id="L234">    return result;</span>
+  }
+
+  protected static Object encodeAVFile(LCFile o) {
+<span class="nc" id="L238">    Map&lt;String, Object&gt; result = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L239">    result.put(&quot;__type&quot;, &quot;_File&quot;);</span>
+<span class="nc" id="L240">    result.put(&quot;metaData&quot;, o.getMetaData());</span>
+<span class="nc" id="L241">    result.put(&quot;id&quot;, o.getName());</span>
+<span class="nc" id="L242">    return result;</span>
+  }
+
+  protected static Object encodeByteArray(byte[] o) {
+<span class="fc" id="L246">    Map&lt;String, Object&gt; result = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L247">    result.put(&quot;__type&quot;, &quot;Bytes&quot;);</span>
+<span class="fc" id="L248">    result.put(&quot;base64&quot;, Base64.encodeToString(o, Base64.NO_WRAP));</span>
+<span class="fc" id="L249">    return result;</span>
+  }
+
+  public static Map&lt;String, Object&gt; encodeDate(Date date) {
+<span class="fc" id="L253">    Map&lt;String, Object&gt; result = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L254">    result.put(&quot;__type&quot;, &quot;Date&quot;);</span>
+<span class="fc" id="L255">    result.put(&quot;iso&quot;, StringUtil.stringFromDate(date));</span>
+<span class="fc" id="L256">    return result;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

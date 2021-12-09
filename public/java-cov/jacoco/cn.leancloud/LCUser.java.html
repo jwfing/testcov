@@ -1,0 +1,1681 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LCUser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud</a> &gt; <span class="el_source">LCUser.java</span></div><h1>LCUser.java</h1><pre class="source lang-java linenums">package cn.leancloud;
+
+import cn.leancloud.annotation.LCClassName;
+import cn.leancloud.cache.PersistenceUtil;
+import cn.leancloud.callback.LCCallback;
+import cn.leancloud.callback.FollowersAndFolloweesCallback;
+import cn.leancloud.core.AppConfiguration;
+import cn.leancloud.core.PaasClient;
+import cn.leancloud.core.StorageClient;
+import cn.leancloud.gson.ObjectDeserializer;
+import cn.leancloud.ops.Utils;
+import cn.leancloud.query.QueryConditions;
+import cn.leancloud.sms.LCSMS;
+import cn.leancloud.sms.LCSMSOption;
+import cn.leancloud.types.LCNull;
+import cn.leancloud.utils.LCUtils;
+import cn.leancloud.utils.ErrorUtils;
+import cn.leancloud.utils.StringUtil;
+import cn.leancloud.json.JSON;
+import cn.leancloud.json.JSONObject;
+import io.reactivex.Observable;
+import io.reactivex.Observer;
+import io.reactivex.annotations.NonNull;
+import io.reactivex.disposables.Disposable;
+import io.reactivex.functions.Function;
+
+import java.io.File;
+import java.util.*;
+
+// TODO: need transfer Anonymous User/Common User
+
+@LCClassName(&quot;_User&quot;)
+public class LCUser extends LCObject {
+  public static final String ATTR_USERNAME = &quot;username&quot;;
+  private static final String ATTR_PASSWORD = &quot;password&quot;;
+  public static final String ATTR_EMAIL = &quot;email&quot;;
+  public static final String ATTR_MOBILEPHONE = &quot;mobilePhoneNumber&quot;;
+  private static final String ATTR_SMSCODE = &quot;smsCode&quot;;
+  private static final String ATTR_MOBILEPHONE_VERIFIED = &quot;mobilePhoneVerified&quot;;
+  public static final String ATTR_SESSION_TOKEN = &quot;sessionToken&quot;;
+
+  private static final String PARAM_ATTR_FRIENDSHIP = &quot;friendship&quot;;
+
+  private static final String AUTHDATA_TAG = &quot;authData&quot;;
+  private static final String AUTHDATA_PLATFORM_ANONYMOUS = &quot;anonymous&quot;;
+
+  private static final String AUTHDATA_ATTR_UNIONID = &quot;unionid&quot;;
+  private static final String AUTHDATA_ATTR_UNIONID_PLATFORM = &quot;platform&quot;;
+  private static final String AUTHDATA_ATTR_MAIN_ACCOUNT = &quot;main_account&quot;;
+
+  private static final String ILLEGALARGUMENT_MSG_FORMAT = &quot;illegal parameter. %s must not null/empty.&quot;;
+
+  public static final String CLASS_NAME = &quot;_User&quot;;
+  public static final String FOLLOWER_TAG = &quot;follower&quot;;
+  public static final String FOLLOWEE_TAG = &quot;followee&quot;;
+
+<span class="fc" id="L57">  private static Class&lt;? extends LCUser&gt; subClazz = null;</span>
+
+<span class="nc" id="L59">  public enum SNS_PLATFORM {</span>
+<span class="nc" id="L60">    FACEBOOK(&quot;facebook&quot;), TWITTER(&quot;twitter&quot;), QQ(&quot;qq&quot;), WEIBO(&quot;weibo&quot;), WECHAT(&quot;weixin&quot;);</span>
+<span class="nc" id="L61">    SNS_PLATFORM(String name) {</span>
+<span class="nc" id="L62">      this.name = name;</span>
+<span class="nc" id="L63">    }</span>
+    private String name;
+    public String getName() {
+<span class="nc" id="L66">      return this.name;</span>
+    }
+  }
+
+  /**
+   * constructor
+   */
+  public LCUser() {
+<span class="fc" id="L74">    super(CLASS_NAME);</span>
+<span class="fc" id="L75">  }</span>
+
+  /**
+   * 获取当前登录用户
+   *
+   * @return current user.
+   *
+   * Notice: you SHOULDN'T invoke this method to get current user in lean engine.
+   */
+  public static LCUser currentUser() {
+<span class="fc" id="L85">    return getCurrentUser();</span>
+  }
+
+  /**
+   * get user email.
+   * @return user email.
+   */
+  public String getEmail() {
+<span class="fc" id="L93">    return (String) get(ATTR_EMAIL);</span>
+  }
+
+  /**
+   * set user email
+   *
+   * @param email user email.
+   */
+  public void setEmail(String email) {
+<span class="fc" id="L102">    put(ATTR_EMAIL, email);</span>
+<span class="fc" id="L103">  }</span>
+
+  /**
+   * get user name.
+   *
+   * @return user name
+   */
+  public String getUsername() {
+<span class="fc" id="L111">    return (String) get(ATTR_USERNAME);</span>
+  }
+
+  /**
+   * set user name.
+   *
+   * @param name username
+   */
+  public void setUsername(String name) {
+<span class="fc" id="L120">    put(ATTR_USERNAME, name);</span>
+<span class="fc" id="L121">  }</span>
+
+  /**
+   * get user password.
+   * @return user password.
+   */
+  public String getPassword() {
+<span class="nc" id="L128">    return (String) get(ATTR_PASSWORD);</span>
+  }
+
+  /**
+   * set user password.
+   *
+   * @param password user password.
+   */
+  public void setPassword(String password) {
+<span class="fc" id="L137">    put(ATTR_PASSWORD, password);</span>
+<span class="fc" id="L138">  }</span>
+
+  /**
+   * get user mobilephone.
+   *
+   * @return user mobilephone number.
+   */
+  public String getMobilePhoneNumber() {
+<span class="fc" id="L146">    return (String) get(ATTR_MOBILEPHONE);</span>
+  }
+
+  /**
+   * set user mobilephone.
+   *
+   * @param mobile user mobilephone number.
+   */
+  public void setMobilePhoneNumber(String mobile) {
+<span class="nc" id="L155">    put(ATTR_MOBILEPHONE, mobile);</span>
+<span class="nc" id="L156">  }</span>
+
+  /**
+   * whether user's mobilephone is verified or not.
+   *
+   * @return flag to indicate user's mobilephone is verified or not
+   */
+  public boolean isMobilePhoneVerified() {
+<span class="nc" id="L164">    return getBoolean(ATTR_MOBILEPHONE_VERIFIED);</span>
+  }
+
+  /**
+   * get user session token.
+   * if user not login, session token is null.
+   *
+   * @return user session token, null if not login.
+   */
+  public String getSessionToken() {
+<span class="fc" id="L174">    return (String)get(ATTR_SESSION_TOKEN);</span>
+  }
+
+  /**
+   * not use it!
+   * @param token user token.
+   */
+  public void internalChangeSessionToken(String token) {
+<span class="nc" id="L182">    getServerData().put(ATTR_SESSION_TOKEN, token);</span>
+<span class="nc" id="L183">  }</span>
+
+  /**
+   * whether user is authenticated or not.
+   * @return flag to indicate user is authenticated or not.
+   */
+  public boolean isAuthenticated() {
+    // TODO: need to support thirdparty login.
+<span class="fc" id="L191">    String sessionToken = getSessionToken();</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">    return !StringUtil.isEmpty(sessionToken);</span>
+  }
+
+  private void updateCurrentUserCache() {
+<span class="fc" id="L196">    String sessionToken = getSessionToken();</span>
+<span class="fc" id="L197">    LCUser currentUser = LCUser.currentUser();</span>
+<span class="pc bpc" id="L198" title="1 of 4 branches missed.">    if (null != currentUser &amp;&amp; !StringUtil.isEmpty(currentUser.getObjectId())</span>
+<span class="fc bfc" id="L199" title="All 4 branches covered.">            &amp;&amp; currentUser.getObjectId().equals(getObjectId()) &amp;&amp; !StringUtil.isEmpty(sessionToken)) {</span>
+<span class="fc" id="L200">      changeCurrentUser(this, true);</span>
+    }
+<span class="fc" id="L202">  }</span>
+
+  @Override
+  protected void onSaveSuccess() {
+<span class="fc" id="L206">    super.onSaveSuccess();</span>
+<span class="fc" id="L207">    updateCurrentUserCache();</span>
+<span class="fc" id="L208">  }</span>
+
+  @Override
+  protected void onSaveFailure() {
+<span class="nc" id="L212">    super.onSaveFailure();</span>
+<span class="nc" id="L213">  }</span>
+
+  @Override
+  protected void onDataSynchronized() {
+<span class="fc" id="L217">    super.onDataSynchronized();</span>
+<span class="fc" id="L218">    updateCurrentUserCache();</span>
+<span class="fc" id="L219">  }</span>
+
+  /**
+   * Whether is anonymous or not.
+   * @return flag to indicate current user is anonymous or not.
+   */
+  public boolean isAnonymous() {
+<span class="fc" id="L226">    JSONObject existedAuthData = this.getJSONObject(AUTHDATA_TAG);</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">    if (existedAuthData != null) {</span>
+<span class="pc bpc" id="L228" title="2 of 4 branches missed.">      if (existedAuthData.size() == 1 &amp;&amp; existedAuthData.containsKey(AUTHDATA_PLATFORM_ANONYMOUS)) {</span>
+<span class="fc" id="L229">        return true;</span>
+      }
+    }
+<span class="nc" id="L232">    return false;</span>
+  }
+
+  /**
+   * sign up(blocking).
+   */
+  public void signUp() {
+<span class="fc" id="L239">    signUpInBackground().blockingSubscribe();</span>
+<span class="fc" id="L240">  }</span>
+
+  /**
+   * sign up in background.
+   * @return observable instance.
+   */
+  public Observable&lt;LCUser&gt; signUpInBackground() {
+<span class="fc" id="L247">    JSONObject paramData = generateChangedParam();</span>
+<span class="fc" id="L248">    logger.d(&quot;signup param: &quot; + paramData.toJSONString());</span>
+<span class="fc" id="L249">    return PaasClient.getStorageClient().signUp(paramData).map(new Function&lt;LCUser, LCUser&gt;() {</span>
+      @Override
+      public LCUser apply(LCUser avUser) throws Exception {
+<span class="fc" id="L252">        LCUser.this.mergeRawData(avUser, true);</span>
+<span class="fc" id="L253">        LCUser.this.onSaveSuccess();</span>
+<span class="fc" id="L254">        return LCUser.this;</span>
+      }
+    });
+  }
+
+  /**
+   * signUpOrLoginByMobilePhone
+   *
+   * @param mobilePhoneNumber mobile phone
+   * @param smsCode sms code
+   * @return user instance.
+   */
+  public static LCUser signUpOrLoginByMobilePhone(String mobilePhoneNumber, String smsCode) {
+<span class="nc" id="L267">    return signUpOrLoginByMobilePhone(mobilePhoneNumber, smsCode, internalUserClazz());</span>
+  }
+
+  /**
+   * signUpOrLoginByMobilePhone
+   * @param mobilePhoneNumber mobile phone number
+   * @param smsCode sms code
+   * @param clazz class name
+   * @param &lt;T&gt; template type.
+   * @return user instance.
+   */
+  public static &lt;T extends LCUser&gt; T signUpOrLoginByMobilePhone(String mobilePhoneNumber, String smsCode, Class&lt;T&gt; clazz) {
+<span class="nc" id="L279">    return signUpOrLoginByMobilePhoneInBackground(mobilePhoneNumber, smsCode, clazz).blockingSingle();</span>
+  }
+
+  /**
+   * signUpOrLoginByMobilePhoneInBackground
+   * @param mobilePhoneNumber mobile phone number.
+   * @param smsCode sms code
+   * @return observable instance.
+   */
+  public static Observable&lt;? extends LCUser&gt; signUpOrLoginByMobilePhoneInBackground(String mobilePhoneNumber, String smsCode) {
+<span class="fc" id="L289">    return signUpOrLoginByMobilePhoneInBackground(mobilePhoneNumber, smsCode, internalUserClazz());</span>
+  }
+
+  /**
+   * signUpOrLoginByMobilePhoneInBackground
+   *
+   * @param mobilePhoneNumber mobile phone number
+   * @param smsCode sms code
+   * @param clazz class name
+   * @param &lt;T&gt; template type.
+   * @return observable instance.
+   */
+  public static &lt;T extends LCUser&gt; Observable&lt;T&gt; signUpOrLoginByMobilePhoneInBackground(String mobilePhoneNumber,
+                                                                                        String smsCode, Class&lt;T&gt; clazz) {
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(mobilePhoneNumber)) {</span>
+<span class="fc" id="L304">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;mobilePhoneNumber&quot;)));</span>
+    }
+<span class="nc bnc" id="L306" title="All 2 branches missed.">    if (StringUtil.isEmpty(smsCode)) {</span>
+<span class="nc" id="L307">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;smsCode&quot;)));</span>
+    }
+<span class="nc bnc" id="L309" title="All 2 branches missed.">    if (null == clazz) {</span>
+<span class="nc" id="L310">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;clazz&quot;)));</span>
+    }
+<span class="nc" id="L312">    Map&lt;String, Object&gt; params = createUserMap(null, null, null, mobilePhoneNumber, smsCode);</span>
+<span class="nc" id="L313">    JSONObject data = JSONObject.Builder.create(params);</span>
+<span class="nc" id="L314">    return PaasClient.getStorageClient().signUpOrLoginByMobilephone(data, clazz);</span>
+  }
+
+  /**
+   * logIn in background
+   *
+   * @param username username
+   * @param password user password
+   * @return observable instance.
+   */
+  public static Observable&lt;? extends LCUser&gt; logIn(String username, String password) {
+<span class="fc" id="L325">    return logIn(username, password, internalUserClazz());</span>
+  }
+
+  /**
+   * login as anonymous user in background.
+   * @return observable instance.
+   */
+  public static Observable&lt;? extends LCUser&gt; logInAnonymously() {
+<span class="fc" id="L333">    String anonymousId = LCInstallation.getCurrentInstallation().getInstallationId();</span>
+<span class="fc" id="L334">    Map&lt;String, Object&gt; param = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L335">    param.put(&quot;id&quot;, anonymousId);</span>
+<span class="fc" id="L336">    return loginWithAuthData(param, AUTHDATA_PLATFORM_ANONYMOUS);</span>
+  }
+
+  /**
+   * logIn in background
+   *
+   * @param username username
+   * @param password user password
+   * @param clazz user class name
+   * @param &lt;T&gt; template type.
+   * @return observable instance.
+   */
+  public static &lt;T extends LCUser&gt; Observable&lt;T&gt; logIn(String username, String password, final Class&lt;T&gt; clazz) {
+<span class="fc" id="L349">    Map&lt;String, Object&gt; params = createUserMap(username, password, null, null, null);</span>
+<span class="fc" id="L350">    JSONObject data = JSONObject.Builder.create(params);</span>
+<span class="fc" id="L351">    return PaasClient.getStorageClient().logIn(data, clazz);</span>
+  }
+
+  /**
+   * logIn with mobile phone and password.
+   * @param mobile mobile phone
+   * @param password password
+   * @return observable instance.
+   */
+  public static Observable&lt;? extends LCUser&gt; loginByMobilePhoneNumber(String mobile, String password) {
+<span class="nc" id="L361">    return loginByMobilePhoneNumber(mobile, password, internalUserClazz());</span>
+  }
+
+  /**
+   * logIn with email and password
+   * @param email email.
+   * @param password password.
+   * @return observable instance.
+   */
+  public static Observable&lt;? extends LCUser&gt; loginByEmail(String email, String password) {
+<span class="fc" id="L371">    HashMap&lt;String, Object&gt; params = createUserMapAFAP(null, password, email, null, null);</span>
+<span class="fc" id="L372">    return PaasClient.getStorageClient().logIn(JSONObject.Builder.create(params), internalUserClazz());</span>
+  }
+
+  /**
+   * logIn with mobile phone and password.
+   * @param mobile mobile phone.
+   * @param password user password.
+   * @param clazz user class.
+   * @param &lt;T&gt; template type.
+   * @return observable instance.
+   */
+  public static &lt;T extends LCUser&gt; Observable&lt;T&gt; loginByMobilePhoneNumber(String mobile, String password,
+                                                                          final Class&lt;T&gt; clazz) {
+<span class="nc" id="L385">    Map&lt;String, Object&gt; params = createUserMap(null, password, null, mobile, null);</span>
+<span class="nc" id="L386">    JSONObject data = JSONObject.Builder.create(params);</span>
+<span class="nc" id="L387">    return PaasClient.getStorageClient().logIn(data, clazz);</span>
+  }
+
+  /**
+   * logIn with mobile phone and sms code.
+   * @param mobile mobile phone.
+   * @param smsCode sms code.
+   * @return observable instance.
+   */
+  public static Observable&lt;? extends LCUser&gt; loginBySMSCode(String mobile, String smsCode) {
+<span class="nc" id="L397">    return loginBySMSCode(mobile, smsCode, internalUserClazz());</span>
+  }
+
+  /**
+   * logIn with mobile phone and sms code.
+   * @param mobile mobile phone.
+   * @param smsCode sms code.
+   * @param clazz user class.
+   * @param &lt;T&gt; template type.
+   * @return observable instance.
+   */
+  public static &lt;T extends LCUser&gt; Observable&lt;T&gt; loginBySMSCode(String mobile, String smsCode, Class&lt;T&gt; clazz) {
+<span class="nc" id="L409">    Map&lt;String, Object&gt; params = createUserMap(null, null, null, mobile, smsCode);</span>
+<span class="nc" id="L410">    JSONObject data = JSONObject.Builder.create(params);</span>
+<span class="nc" id="L411">    return PaasClient.getStorageClient().logIn(data, clazz);</span>
+  }
+
+  private static Map&lt;String, Object&gt; createUserMap(String username, String password, String email,
+                                                   String phoneNumber, String smsCode) {
+<span class="fc" id="L416">    Map&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();</span>
+
+<span class="pc bpc" id="L418" title="3 of 4 branches missed.">    if (StringUtil.isEmpty(username) &amp;&amp; StringUtil.isEmpty(phoneNumber)) {</span>
+<span class="nc" id="L419">      throw new IllegalArgumentException(&quot;Blank username and blank mobile phone number&quot;);</span>
+    }
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(username)) {</span>
+<span class="fc" id="L422">      map.put(ATTR_USERNAME, username);</span>
+    }
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(password)) {</span>
+<span class="fc" id="L425">      map.put(ATTR_PASSWORD, password);</span>
+    }
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(email)) {</span>
+<span class="nc" id="L428">      map.put(ATTR_EMAIL, email);</span>
+    }
+<span class="pc bpc" id="L430" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(phoneNumber)) {</span>
+<span class="nc" id="L431">      map.put(ATTR_MOBILEPHONE, phoneNumber);</span>
+    }
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(smsCode)) {</span>
+<span class="nc" id="L434">      map.put(ATTR_SMSCODE, smsCode);</span>
+    }
+<span class="fc" id="L436">    return map;</span>
+  }
+
+  private static HashMap&lt;String, Object&gt; createUserMapAFAP(String username, String password, String email,
+                                                       String phoneNumber, String smsCode) {
+<span class="fc" id="L441">    HashMap&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();</span>
+
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(username)) {</span>
+<span class="nc" id="L444">      map.put(ATTR_USERNAME, username);</span>
+    }
+<span class="fc bfc" id="L446" title="All 2 branches covered.">    if (!StringUtil.isEmpty(password)) {</span>
+<span class="fc" id="L447">      map.put(ATTR_PASSWORD, password);</span>
+    }
+<span class="fc bfc" id="L449" title="All 2 branches covered.">    if (!StringUtil.isEmpty(email)) {</span>
+<span class="fc" id="L450">      map.put(ATTR_EMAIL, email);</span>
+    }
+<span class="pc bpc" id="L452" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(phoneNumber)) {</span>
+<span class="nc" id="L453">      map.put(ATTR_MOBILEPHONE, phoneNumber);</span>
+    }
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(smsCode)) {</span>
+<span class="nc" id="L456">      map.put(ATTR_SMSCODE, smsCode);</span>
+    }
+<span class="fc" id="L458">    return map;</span>
+  }
+
+  /**
+   * third-party login methods.
+   */
+
+  /**
+   * login with auth data.
+   * @param authData auth data.
+   * @param platform platform string.
+   * @return observable instance.
+   */
+  public static Observable&lt;? extends LCUser&gt; loginWithAuthData(final Map&lt;String, Object&gt; authData, final String platform) {
+<span class="fc" id="L472">    return loginWithAuthData(internalUserClazz(), authData, platform);</span>
+  }
+
+  /**
+   * login with auth data.
+   * @param authData auth data.
+   * @param platform platform string.
+   * @param unionId unionid.
+   * @param unionIdPlatform unionid platform string.
+   * @param asMainAccount flag to treat as main account.
+   * @return observable instance.
+   */
+  public static Observable&lt;? extends LCUser&gt; loginWithAuthData(final Map&lt;String, Object&gt; authData, final String platform,
+                                                               final String unionId, final String unionIdPlatform,
+                                                               final boolean asMainAccount) {
+<span class="nc" id="L487">    return loginWithAuthData(internalUserClazz(), authData, platform, unionId, unionIdPlatform, asMainAccount);</span>
+  }
+
+  /**
+   * login with auth data.
+   * @param authData auth data.
+   * @param platform platform string.
+   * @param clazz user class name.
+   * @param &lt;T&gt; template type.
+   * @return observable instance.
+   */
+  public static &lt;T extends LCUser&gt; Observable&lt;T&gt; loginWithAuthData(final Class&lt;T&gt; clazz,
+                                                                   final Map&lt;String, Object&gt; authData,
+                                                                   final String platform) {
+<span class="pc bpc" id="L501" title="1 of 2 branches missed.">    if (null == clazz) {</span>
+<span class="nc" id="L502">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;clazz&quot;)));</span>
+    }
+<span class="pc bpc" id="L504" title="2 of 4 branches missed.">    if (null == authData || authData.isEmpty()) {</span>
+<span class="nc" id="L505">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;authData&quot;)));</span>
+    }
+<span class="pc bpc" id="L507" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(platform)) {</span>
+<span class="nc" id="L508">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;platform&quot;)));</span>
+    }
+<span class="fc" id="L510">    Map&lt;String, Object&gt; data = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L511">    Map&lt;String, Object&gt; authMap = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L512">    authMap.put(platform, authData);</span>
+<span class="fc" id="L513">    data.put(AUTHDATA_TAG, authMap);</span>
+<span class="fc" id="L514">    JSONObject param = JSONObject.Builder.create(data);</span>
+<span class="fc" id="L515">    return PaasClient.getStorageClient().signUp(param).map(new Function&lt;LCUser, T&gt;() {</span>
+      @Override
+      public T apply(LCUser avUser) throws Exception {
+<span class="fc" id="L518">        T result = Transformer.transform(avUser, clazz);</span>
+<span class="fc" id="L519">        LCUser.changeCurrentUser(result, true);</span>
+<span class="fc" id="L520">        return result;</span>
+      }
+    });
+  }
+
+  /**
+   * login with auth data.
+   * @param authData auth data.
+   * @param platform platform string.
+   * @param unionId unionid.
+   * @param unionIdPlatform unionid platform string.
+   * @param asMainAccount flag to treat as main account.
+   * @param clazz user class name.
+   * @param &lt;T&gt; template type.
+   * @return observable instance.
+   */
+  public static &lt;T extends LCUser&gt; Observable&lt;T&gt; loginWithAuthData(final Class&lt;T&gt; clazz, final Map&lt;String, Object&gt; authData,
+                                                                   final String platform, final String unionId,
+                                                                   final String unionIdPlatform, final boolean asMainAccount) {
+<span class="nc bnc" id="L539" title="All 2 branches missed.">    if (StringUtil.isEmpty(unionId)) {</span>
+<span class="nc" id="L540">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;unionId&quot;)));</span>
+    }
+<span class="nc bnc" id="L542" title="All 2 branches missed.">    if (StringUtil.isEmpty(unionIdPlatform)) {</span>
+<span class="nc" id="L543">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;unionIdPlatform&quot;)));</span>
+    }
+<span class="nc bnc" id="L545" title="All 4 branches missed.">    if (null == authData || authData.isEmpty()) {</span>
+<span class="nc" id="L546">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;authData&quot;)));</span>
+    }
+<span class="nc" id="L548">    authData.put(AUTHDATA_ATTR_UNIONID, unionId);</span>
+<span class="nc" id="L549">    authData.put(AUTHDATA_ATTR_UNIONID_PLATFORM, unionIdPlatform);</span>
+<span class="nc bnc" id="L550" title="All 2 branches missed.">    if (asMainAccount) {</span>
+<span class="nc" id="L551">      authData.put(AUTHDATA_ATTR_MAIN_ACCOUNT, asMainAccount);</span>
+    }
+<span class="nc" id="L553">    return loginWithAuthData(clazz, authData, platform);</span>
+  }
+
+  /**
+   * login with auth data.
+   * @param authData auth data.
+   * @param platform platform string.
+   * @param failOnNotExist flag to indicate to exit if failed or not.
+   * @return observable instance.
+   */
+  public Observable&lt;LCUser&gt; loginWithAuthData(final Map&lt;String, Object&gt; authData, final String platform,
+                                              final boolean failOnNotExist) {
+<span class="pc bpc" id="L565" title="2 of 4 branches missed.">    if (null == authData || authData.isEmpty()) {</span>
+<span class="nc" id="L566">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;authData&quot;)));</span>
+    }
+<span class="pc bpc" id="L568" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(platform)) {</span>
+<span class="nc" id="L569">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;platform&quot;)));</span>
+    }
+
+<span class="fc" id="L572">    HashMap&lt;String, Object&gt; data = createUserMapAFAP(getUsername(), null, getEmail(), getMobilePhoneNumber(), null);</span>
+<span class="fc" id="L573">    Map&lt;String, Object&gt; authMap = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L574">    authMap.put(platform, authData);</span>
+<span class="fc" id="L575">    data.put(AUTHDATA_TAG, authMap);</span>
+<span class="fc" id="L576">    JSONObject param = JSONObject.Builder.create(data);</span>
+<span class="fc" id="L577">    return PaasClient.getStorageClient().signUpWithFlag(param, failOnNotExist).map(new Function&lt;LCUser, LCUser&gt;() {</span>
+      @Override
+      public LCUser apply(LCUser avUser) throws Exception {
+<span class="nc" id="L580">        LCUser.this.resetByRawData(avUser);</span>
+<span class="nc" id="L581">        LCUser.changeCurrentUser(LCUser.this, true);</span>
+<span class="nc" id="L582">        return LCUser.this;</span>
+      }
+    });
+  }
+
+  /**
+   * login with auth data.
+   * @param authData auth data.
+   * @param platform platform string.
+   * @param unionId union id.
+   * @param unionIdPlatform the platform which union id is binding with.
+   * @param asMainAccount flag indicating that whether current platform is main account or not.
+   * @param failOnNotExist flag to indicate to exit if failed or not.
+   * @return observable instance.
+   */
+  public Observable&lt;LCUser&gt; loginWithAuthData(final Map&lt;String, Object&gt; authData, final String platform,
+                                              final String unionId, final String unionIdPlatform,
+                                              final boolean asMainAccount, final boolean failOnNotExist) {
+<span class="nc bnc" id="L600" title="All 4 branches missed.">    if (null == authData || authData.isEmpty()) {</span>
+<span class="nc" id="L601">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;authData&quot;)));</span>
+    }
+<span class="nc bnc" id="L603" title="All 2 branches missed.">    if (StringUtil.isEmpty(unionId)) {</span>
+<span class="nc" id="L604">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;unionId&quot;)));</span>
+    }
+<span class="nc bnc" id="L606" title="All 2 branches missed.">    if (StringUtil.isEmpty(unionIdPlatform)) {</span>
+<span class="nc" id="L607">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;unionIdPlatform&quot;)));</span>
+    }
+<span class="nc" id="L609">    authData.put(AUTHDATA_ATTR_UNIONID, unionId);</span>
+<span class="nc" id="L610">    authData.put(AUTHDATA_ATTR_UNIONID_PLATFORM, unionIdPlatform);</span>
+<span class="nc bnc" id="L611" title="All 2 branches missed.">    if (asMainAccount) {</span>
+<span class="nc" id="L612">      authData.put(AUTHDATA_ATTR_MAIN_ACCOUNT, asMainAccount);</span>
+    }
+<span class="nc" id="L614">    return loginWithAuthData(authData, platform, failOnNotExist);</span>
+  }
+
+  /**
+   * associate with third party data.
+   * @param authData auth data.
+   * @param platform platform name.
+   * @return observable instance.
+   */
+  public Observable&lt;LCUser&gt; associateWithAuthData(Map&lt;String, Object&gt; authData, String platform) {
+<span class="pc bpc" id="L624" title="2 of 4 branches missed.">    if (null == authData || authData.isEmpty()) {</span>
+<span class="nc" id="L625">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;authData&quot;)));</span>
+    }
+<span class="pc bpc" id="L627" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(platform)) {</span>
+<span class="nc" id="L628">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;platform&quot;)));</span>
+    }
+<span class="fc" id="L630">    Map&lt;String, Object&gt; authDataAttr = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L631">    authDataAttr.put(platform, authData);</span>
+<span class="fc" id="L632">    Object existedAuthData = this.get(AUTHDATA_TAG);</span>
+<span class="fc bfc" id="L633" title="All 2 branches covered.">    if (existedAuthData instanceof Map) {</span>
+<span class="fc" id="L634">      authDataAttr.putAll((Map&lt;String, Object&gt;)existedAuthData);</span>
+    }
+<span class="fc" id="L636">    this.put(AUTHDATA_TAG, authDataAttr);</span>
+<span class="fc" id="L637">    return (Observable&lt;LCUser&gt;) saveInBackground(new LCSaveOption().setFetchWhenSave(true));</span>
+  }
+
+  /**
+   * associate with third party data.
+   * @param authData auth data.
+   * @param platform platform name.
+   * @param unionId union id.
+   * @param unionIdPlatform the platform which union id is binding with.
+   * @param asMainAccount flag indicating that whether current platform is main account or not.
+   * @return observable instance.
+   */
+  public Observable&lt;LCUser&gt; associateWithAuthData(Map&lt;String, Object&gt; authData, String platform, String unionId, String unionIdPlatform,
+                                                  boolean asMainAccount) {
+<span class="nc bnc" id="L651" title="All 4 branches missed.">    if (null == authData || authData.isEmpty()) {</span>
+<span class="nc" id="L652">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;authData&quot;)));</span>
+    }
+<span class="nc bnc" id="L654" title="All 2 branches missed.">    if (StringUtil.isEmpty(unionId)) {</span>
+<span class="nc" id="L655">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;unionId&quot;)));</span>
+    }
+<span class="nc bnc" id="L657" title="All 2 branches missed.">    if (StringUtil.isEmpty(unionIdPlatform)) {</span>
+<span class="nc" id="L658">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;unionIdPlatform&quot;)));</span>
+    }
+<span class="nc" id="L660">    authData.put(AUTHDATA_ATTR_UNIONID, unionId);</span>
+<span class="nc" id="L661">    authData.put(AUTHDATA_ATTR_UNIONID_PLATFORM, unionIdPlatform);</span>
+<span class="nc bnc" id="L662" title="All 2 branches missed.">    if (asMainAccount) {</span>
+<span class="nc" id="L663">      authData.put(AUTHDATA_ATTR_MAIN_ACCOUNT, true);</span>
+    }
+<span class="nc" id="L665">    return this.associateWithAuthData(authData, platform);</span>
+  }
+
+  /**
+   * dissociate with third party data.
+   * @param platform platform name.
+   * @return observable instance.
+   */
+  public Observable&lt;LCUser&gt; dissociateWithAuthData(final String platform) {
+<span class="pc bpc" id="L674" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(platform)) {</span>
+<span class="nc" id="L675">      return Observable.error(new IllegalArgumentException(String.format(ILLEGALARGUMENT_MSG_FORMAT, &quot;platform&quot;)));</span>
+    }
+
+<span class="fc" id="L678">    String objectId = getObjectId();</span>
+<span class="pc bpc" id="L679" title="2 of 4 branches missed.">    if (StringUtil.isEmpty(objectId) || !isAuthenticated()) {</span>
+<span class="nc" id="L680">      return Observable.error(new LCException(LCException.SESSION_MISSING,</span>
+              &quot;the user object missing a valid session&quot;));
+    }
+<span class="fc" id="L683">    this.remove(AUTHDATA_TAG + &quot;.&quot; + platform);</span>
+<span class="fc" id="L684">    return this.saveInBackground().map(new Function&lt;LCObject, LCUser&gt;() {</span>
+      public LCUser apply(@NonNull LCObject var1) throws Exception {
+<span class="fc" id="L686">        Map&lt;String, Object&gt; authData = (Map&lt;String, Object&gt;) LCUser.this.get(AUTHDATA_TAG);</span>
+<span class="pc bpc" id="L687" title="1 of 2 branches missed.">        if (authData != null) {</span>
+<span class="fc" id="L688">          authData.remove(platform);</span>
+        }
+<span class="fc" id="L690">        return LCUser.this;</span>
+      }
+    });
+  }
+
+  /**
+   * Session token operations
+   * @return observable instance.
+   */
+
+  /**
+   * check authenticated status in background.
+   * @return observable instance.
+   */
+  public Observable&lt;Boolean&gt; checkAuthenticatedInBackground() {
+<span class="fc" id="L705">    String sessionToken = getSessionToken();</span>
+<span class="fc bfc" id="L706" title="All 2 branches covered.">    if (StringUtil.isEmpty(sessionToken)) {</span>
+<span class="fc" id="L707">      logger.d(&quot;sessionToken is not existed.&quot;);</span>
+<span class="fc" id="L708">      return Observable.just(false);</span>
+    }
+<span class="fc" id="L710">    return PaasClient.getStorageClient().checkAuthenticated(sessionToken);</span>
+  }
+
+  /**
+   * refresh session token in background.
+   * @return observable instance.
+   */
+  public Observable&lt;Boolean&gt; refreshSessionTokenInBackground() {
+<span class="nc" id="L718">    return PaasClient.getStorageClient().refreshSessionToken(this);</span>
+  }
+
+  /**
+   * instantiate AVUser object with sessionToken(synchronized)
+   * @param sessionToken session token
+   * @return AVUser instance.
+   *
+   * this method DOES NOT change AVUser#currentUser, it makes sense for being called in lean engine.
+   */
+  public static LCUser becomeWithSessionToken(String sessionToken) {
+<span class="fc" id="L729">    return becomeWithSessionToken(sessionToken, false);</span>
+  }
+
+  /**
+   * instantiate AVUser object with sessionToken(synchronized)
+   * @param sessionToken session token
+   * @param saveToCurrentUser flag indicating whether change current user or not.
+   *                          true - save user to AVUser#currentUser.
+   *                          false - not save.
+   * @return AVUser instance.
+   *
+   */
+  public static LCUser becomeWithSessionToken(String sessionToken, boolean saveToCurrentUser) {
+<span class="fc" id="L742">    LCUser usr = becomeWithSessionTokenInBackground(sessionToken, saveToCurrentUser).blockingFirst();</span>
+<span class="fc" id="L743">    return usr;</span>
+  }
+
+  /**
+   * instantiate AVUser object with sessionToken(asynchronous)
+   * @param sessionToken session token
+   * @return Observable instance.
+   *
+   * this method DOES NOT change AVUser#currentUser, it makes sense for being called in lean engine.
+   */
+  public static Observable&lt;? extends LCUser&gt; becomeWithSessionTokenInBackground(String sessionToken) {
+<span class="nc" id="L754">    return becomeWithSessionTokenInBackground(sessionToken, false);</span>
+  }
+
+  /**
+   * instantiate AVUser object with sessionToken(asynchronous)
+   * @param sessionToken session token
+   * @param saveToCurrentUser flag indicating whether change current user or not.
+   *                          true - save user to AVUser#currentUser.
+   *                          false - not save.
+   * @return Observable instance.
+   *
+   */
+  public static Observable&lt;? extends LCUser&gt; becomeWithSessionTokenInBackground(String sessionToken,
+                                                                                boolean saveToCurrentUser) {
+<span class="fc" id="L768">    return becomeWithSessionTokenInBackground(sessionToken, saveToCurrentUser, internalUserClazz());</span>
+  }
+
+  /**
+   * instantiate AVUser object with sessionToken(synchronized)
+   * @param sessionToken session token
+   * @param clazz class name.
+   * @return AVUser instance.
+   *
+   * this method DOES NOT change AVUser#currentUser, it makes sense for being called in lean engine.
+   */
+  public static &lt;T extends LCUser&gt; T becomeWithSessionToken(String sessionToken, Class&lt;T&gt; clazz) {
+<span class="nc" id="L780">    return becomeWithSessionToken(sessionToken, false, clazz);</span>
+  }
+
+  /**
+   * instantiate AVUser object with sessionToken(synchronized)
+   * @param sessionToken session token
+   * @param saveToCurrentUser flag indicating whether change current user or not.
+   *                          true - save user to AVUser#currentUser.
+   *                          false - not save.
+   * @param clazz class name.
+   * @param &lt;T&gt; template.
+   * @return AVUser instance.
+   *
+   */
+  public static &lt;T extends LCUser&gt; T becomeWithSessionToken(String sessionToken, boolean saveToCurrentUser,
+                                                            Class&lt;T&gt; clazz) {
+<span class="nc" id="L796">    T result = becomeWithSessionTokenInBackground(sessionToken, saveToCurrentUser, clazz).blockingFirst();</span>
+<span class="nc" id="L797">    return result;</span>
+  }
+
+  /**
+   * instantiate AVUser object with sessionToken(asynchronous)
+   * @param sessionToken session token
+   * @param clazz class name
+   * @param &lt;T&gt; generic type.
+   * @return Observable instance.
+   *
+   * this method DOES NOT change AVUser#currentUser, it makes sense for being called in lean engine.
+   */
+  public static &lt;T extends LCUser&gt; Observable&lt;T&gt; becomeWithSessionTokenInBackground(String sessionToken, Class&lt;T&gt; clazz) {
+<span class="nc" id="L810">    return becomeWithSessionTokenInBackground(sessionToken, false, clazz);</span>
+  }
+
+  /**
+   * instantiate AVUser object with sessionToken(asynchronous)
+   * @param sessionToken session token
+   * @param saveToCurrentUser flag indicating whether change current user or not.
+   *                          true - save user to AVUser#currentUser.
+   *                          false - not save.
+   * @param clazz class name
+   * @param &lt;T&gt; generic type
+   * @return Observable instance.
+   */
+  public static &lt;T extends LCUser&gt; Observable&lt;T&gt; becomeWithSessionTokenInBackground(String sessionToken,
+                                                                                    final boolean saveToCurrentUser,
+                                                                                    Class&lt;T&gt; clazz) {
+<span class="fc" id="L826">    return PaasClient.getStorageClient().createUserBySession(sessionToken, clazz).map(new Function&lt;T, T&gt;() {</span>
+      @Override
+      public T apply(T result) throws Exception {
+<span class="fc bfc" id="L829" title="All 2 branches covered.">        if (saveToCurrentUser) {</span>
+<span class="fc" id="L830">          LCUser.changeCurrentUser(result, true);</span>
+        }
+<span class="fc" id="L832">        return result;</span>
+      }
+    });
+  }
+
+  /**
+   * user logout.
+   */
+  public static void logOut() {
+<span class="fc" id="L841">    LCUser.changeCurrentUser(null, true);</span>
+<span class="fc" id="L842">  }</span>
+
+  /**
+   * Get User Query
+   * @param clazz class name.
+   * @param &lt;T&gt; template type.
+   * @return query instance.
+   */
+  public static &lt;T extends LCUser&gt; LCQuery&lt;T&gt; getUserQuery(Class&lt;T&gt; clazz) {
+<span class="nc" id="L851">    return new LCQuery&lt;T&gt;(CLASS_NAME, clazz);</span>
+  }
+
+  /**
+   * Get User Query
+   * @return query instance.
+   */
+  public static LCQuery&lt;LCUser&gt; getQuery() {
+<span class="fc" id="L859">    return getQuery(LCUser.class);</span>
+  }
+
+  /**
+   * Get User list by query with conditions
+   * @param queryConditions
+   * @return query result
+   */
+  public static Observable&lt;List&lt;LCUser&gt;&gt; strictlyFind(QueryConditions queryConditions){
+<span class="fc" id="L868">      Map&lt;String, String&gt; query = new HashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L869" title="1 of 2 branches missed.">      if(queryConditions != null){</span>
+<span class="fc" id="L870">        query.putAll(queryConditions.assembleParameters());</span>
+      }
+<span class="fc" id="L872">      return PaasClient.getStorageClient().strictlyQueryUsers(LCUser.getCurrentUser(),query);</span>
+  }
+
+  /**
+   * Get roles in background.
+   * @return observable instance.
+   */
+  public Observable&lt;List&lt;LCRole&gt;&gt; getRolesInBackground() {
+<span class="nc" id="L880">    LCQuery&lt;LCRole&gt; roleQuery = new LCQuery&lt;LCRole&gt;(LCRole.CLASS_NAME);</span>
+<span class="nc" id="L881">    roleQuery.whereEqualTo(&quot;users&quot;, this);</span>
+<span class="nc" id="L882">    return roleQuery.findInBackground();</span>
+  }
+
+  /**
+   * Current User Cache
+   */
+<span class="fc" id="L888">  transient private static boolean enableAutomatic = false;</span>
+
+  public static void enableAutomaticUser() {
+<span class="nc" id="L891">    enableAutomatic = true;</span>
+<span class="nc" id="L892">  }</span>
+
+  public static boolean isEnableAutomatic() {
+<span class="nc" id="L895">    return enableAutomatic;</span>
+  }
+
+  public static void disableAutomaticUser() {
+<span class="fc" id="L899">    enableAutomatic = false;</span>
+<span class="fc" id="L900">  }</span>
+
+  private static File currentUserArchivePath() {
+<span class="fc" id="L903">    return new File(AppConfiguration.getDocumentDir() + &quot;/currentUser&quot;);</span>
+  }
+
+  private static boolean userArchiveExist() {
+<span class="fc" id="L907">    return currentUserArchivePath().exists();</span>
+  }
+
+  /**
+   * change current user instance.
+   * @param newUser new instance.
+   * @param save flag indicating that whether save current user to cache or not.
+   */
+  public static synchronized void changeCurrentUser(LCUser newUser, boolean save) {
+<span class="pc bpc" id="L916" title="1 of 2 branches missed.">    if (AppConfiguration.isIncognitoMode()) {</span>
+      // disable current user in incognito mode.
+<span class="nc" id="L918">      return;</span>
+    }
+<span class="fc bfc" id="L920" title="All 2 branches covered.">    if (null != newUser) {</span>
+<span class="fc" id="L921">      newUser.removeOperationForKey(ATTR_PASSWORD);</span>
+    }
+<span class="fc" id="L923">    File currentUserArchivePath = currentUserArchivePath();</span>
+<span class="pc bpc" id="L924" title="1 of 4 branches missed.">    if (null != newUser &amp;&amp; save) {</span>
+<span class="fc" id="L925">      String jsonString = newUser.toJSONString();</span>
+<span class="fc" id="L926">      logger.d(jsonString);</span>
+<span class="fc" id="L927">      PersistenceUtil.sharedInstance().saveContentToFile(jsonString, currentUserArchivePath);</span>
+<span class="fc bfc" id="L928" title="All 2 branches covered.">    } else if (save) {</span>
+<span class="fc" id="L929">      PersistenceUtil.sharedInstance().removeLock(currentUserArchivePath.getAbsolutePath());</span>
+<span class="fc" id="L930">      boolean deleteRst = currentUserArchivePath.delete();</span>
+<span class="fc bfc" id="L931" title="All 2 branches covered.">      if (!deleteRst) {</span>
+<span class="fc" id="L932">        logger.w(&quot;failed to delete currentUser cache file.&quot;);</span>
+      }
+    }
+<span class="fc" id="L935">    PaasClient.getStorageClient().setCurrentUser(newUser);</span>
+<span class="fc" id="L936">  }</span>
+
+  /**
+   * get current user, null if non-login.
+   * @return user instance.
+   */
+  public static LCUser getCurrentUser() {
+<span class="fc" id="L943">    return getCurrentUser(internalUserClazz());</span>
+  }
+
+  /**
+   * get current user, null if non-login.
+   * @param userClass user object class.
+   * @param &lt;T&gt; template type.
+   * @return user instance.
+   */
+  public static &lt;T extends LCUser&gt; T getCurrentUser(Class&lt;T&gt; userClass) {
+<span class="pc bpc" id="L953" title="1 of 2 branches missed.">    if (AppConfiguration.isIncognitoMode()) {</span>
+      // disable current user in incognito mode.
+<span class="nc" id="L955">      return null;</span>
+    }
+<span class="fc" id="L957">    LCUser user = PaasClient.getStorageClient().getCurrentUser();</span>
+<span class="pc bpc" id="L958" title="1 of 4 branches missed.">    if (null != user &amp;&amp; userClass.isAssignableFrom(user.getClass())) {</span>
+<span class="fc" id="L959">      return (T) user;</span>
+<span class="fc bfc" id="L960" title="All 2 branches covered.">    } else if (userArchiveExist()) {</span>
+<span class="fc" id="L961">      File currentUserArchivePath = currentUserArchivePath();</span>
+<span class="fc" id="L962">      synchronized (LCUser.class) {</span>
+<span class="fc" id="L963">        String jsonString = PersistenceUtil.sharedInstance().readContentFromFile(currentUserArchivePath);</span>
+<span class="pc bpc" id="L964" title="1 of 2 branches missed.">        if (!StringUtil.isEmpty(jsonString)) {</span>
+<span class="pc bpc" id="L965" title="2 of 4 branches missed.">          if (jsonString.indexOf(&quot;@type&quot;) &gt;= 0 || jsonString.indexOf(ObjectDeserializer.KEY_VERSION) &gt;= 0) {</span>
+            // new version.
+            try {
+<span class="nc" id="L968">              user = (LCUser) LCObject.parseLCObject(jsonString);;</span>
+<span class="nc" id="L969">              PaasClient.getStorageClient().setCurrentUser(user);</span>
+<span class="nc" id="L970">            } catch (Exception ex) {</span>
+<span class="nc" id="L971">              logger.w(&quot;failed to deserialize AVUser instance.&quot;, ex);</span>
+<span class="nc" id="L972">            }</span>
+          } else {
+            // older format
+            try {
+<span class="fc" id="L976">              LCObject rawData = JSON.parseObject(jsonString, LCObject.class);</span>
+<span class="fc" id="L977">              T newUser = Transformer.transform(rawData, userClass);</span>
+
+<span class="fc" id="L979">              changeCurrentUser(newUser, true);</span>
+<span class="fc" id="L980">              user = newUser;</span>
+<span class="nc" id="L981">            } catch (Exception ex) {</span>
+<span class="nc" id="L982">              logger.w(ex);</span>
+<span class="fc" id="L983">            }</span>
+          }
+        }
+<span class="fc" id="L986">      }</span>
+    }
+<span class="pc bpc" id="L988" title="3 of 4 branches missed.">    if (enableAutomatic &amp;&amp; null == user) {</span>
+      try {
+<span class="nc" id="L990">        user = userClass.newInstance();</span>
+<span class="nc" id="L991">        changeCurrentUser(user, true);</span>
+<span class="nc" id="L992">      } catch (Exception ex) {</span>
+<span class="nc" id="L993">        logger.w(ex);</span>
+<span class="nc" id="L994">      }</span>
+    }
+<span class="fc" id="L996">    return (T) Transformer.transform(user, userClass);</span>
+  }
+
+  /**
+   * Password-relative operations
+   * @param email user email.
+   * @return observable instance.
+   */
+  public static Observable&lt;LCNull&gt; requestPasswordResetInBackground(String email) {
+<span class="nc" id="L1005">    return PaasClient.getStorageClient().requestResetPassword(email);</span>
+  }
+
+  /**
+   * request sms code for resetting password
+   * @param phoneNumber mobile phone number
+   * @return observable instance
+   */
+  public static Observable&lt;LCNull&gt; requestPasswordResetBySmsCodeInBackground(String phoneNumber) {
+<span class="nc" id="L1014">    return requestPasswordResetBySmsCodeInBackground(phoneNumber, null);</span>
+  }
+
+  /**
+   * request sms code for resetting password, collaborating with AVCaptcha
+   * @param phoneNumber mobile phone number
+   * @param validateToken validated token, retrieved after invoking AVCaptcha#verifyCaptchaCodeInBackground
+   * @return observable instance
+   */
+  public static Observable&lt;LCNull&gt; requestPasswordResetBySmsCodeInBackground(String phoneNumber, String validateToken) {
+<span class="nc" id="L1024">    return PaasClient.getStorageClient().requestResetPasswordBySmsCode(phoneNumber, validateToken);</span>
+  }
+
+  /**
+   * reset password with sms code for current user.
+   * @param smsCode sms code
+   * @param newPassword new password
+   * @return observable instance
+   */
+  public static Observable&lt;LCNull&gt; resetPasswordBySmsCodeInBackground(String smsCode, String newPassword) {
+<span class="nc" id="L1034">    return PaasClient.getStorageClient().resetPasswordBySmsCode(smsCode, newPassword);</span>
+  }
+
+  /**
+   * update current user's password
+   * @param oldPass old password
+   * @param newPass new password
+   * @return observable instance
+   */
+  public Observable&lt;LCNull&gt; updatePasswordInBackground(String oldPass, String newPass) {
+<span class="nc" id="L1044">    return PaasClient.getStorageClient().updatePassword(this, oldPass, newPass);</span>
+  }
+
+  /**
+   * request verified email
+   * @param email email address
+   * @return observable instance
+   */
+  public static Observable&lt;LCNull&gt; requestEmailVerifyInBackground(String email) {
+<span class="nc" id="L1053">    return PaasClient.getStorageClient().requestEmailVerify(email);</span>
+  }
+
+  /**
+   * request sms code for verification mobile phone.
+   * @param mobilePhone mobile phone number.
+   * @return observable instance
+   */
+  public static Observable&lt;LCNull&gt; requestMobilePhoneVerifyInBackground(String mobilePhone) {
+<span class="nc bnc" id="L1062" title="All 4 branches missed.">    if (StringUtil.isEmpty(mobilePhone) || !LCSMS.checkMobilePhoneNumber(mobilePhone)) {</span>
+<span class="nc" id="L1063">      return Observable.error(new IllegalArgumentException(&quot;mobile phone number is empty or invalid&quot;));</span>
+    }
+<span class="nc" id="L1065">    return requestMobilePhoneVerifyInBackground(mobilePhone, null);</span>
+  }
+
+  /**
+   * request sms code for verification mobile phone, collaborating with AVCaptcha
+   * @param mobilePhone mobile phone number.
+   * @param validateToken validated token, retrieved after invoking AVCaptcha#verifyCaptchaCodeInBackground
+   * @return observable instance.
+   */
+  public static Observable&lt;LCNull&gt; requestMobilePhoneVerifyInBackground(String mobilePhone, String validateToken) {
+<span class="nc bnc" id="L1075" title="All 4 branches missed.">    if (StringUtil.isEmpty(mobilePhone) || !LCSMS.checkMobilePhoneNumber(mobilePhone)) {</span>
+<span class="nc" id="L1076">      return Observable.error(new IllegalArgumentException(&quot;mobile phone number is empty or invalid&quot;));</span>
+    }
+<span class="nc" id="L1078">    return PaasClient.getStorageClient().requestMobilePhoneVerify(mobilePhone, validateToken);</span>
+  }
+
+  /**
+   * request sms code for login
+   * @param mobilePhone mobile phone number.
+   * @return observable instance
+   */
+  public static Observable&lt;LCNull&gt; requestLoginSmsCodeInBackground(String mobilePhone) {
+<span class="nc bnc" id="L1087" title="All 4 branches missed.">    if (StringUtil.isEmpty(mobilePhone) || !LCSMS.checkMobilePhoneNumber(mobilePhone)) {</span>
+<span class="nc" id="L1088">      return Observable.error(new IllegalArgumentException(&quot;mobile phone number is empty or invalid&quot;));</span>
+    }
+<span class="nc" id="L1090">    return requestLoginSmsCodeInBackground(mobilePhone, null);</span>
+  }
+
+  /**
+   * request sms code for login, collaborating with AVCaptcha
+   * @param mobilePhone mobile phone number
+   * @param validateToken validated token, retrieved after invoking AVCaptcha#verifyCaptchaCodeInBackground
+   * @return observable instance.
+   */
+  public static Observable&lt;LCNull&gt; requestLoginSmsCodeInBackground(String mobilePhone, String validateToken) {
+<span class="nc bnc" id="L1100" title="All 4 branches missed.">    if (StringUtil.isEmpty(mobilePhone) || !LCSMS.checkMobilePhoneNumber(mobilePhone)) {</span>
+<span class="nc" id="L1101">      return Observable.error(new IllegalArgumentException(&quot;mobile phone number is empty or invalid&quot;));</span>
+    }
+<span class="nc" id="L1103">    return PaasClient.getStorageClient().requestLoginSmsCode(mobilePhone, validateToken);</span>
+  }
+
+  /**
+   * verify sms code with current user's phone number.
+   * @param verifyCode sms code
+   * @return observable instance.
+   */
+  public static Observable&lt;LCNull&gt; verifyMobilePhoneInBackground(String verifyCode) {
+<span class="nc" id="L1112">    return PaasClient.getStorageClient().verifyMobilePhone(verifyCode);</span>
+  }
+
+  /**
+   * request sms code for updating phone number of current user.
+   * @param mobilePhone mobile phone number.
+   * @param option sms option
+   * @return observable instance
+   */
+  public static Observable&lt;LCNull&gt; requestSMSCodeForUpdatingPhoneNumberInBackground(String mobilePhone, LCSMSOption option) {
+<span class="fc" id="L1122">    return requestSMSCodeForUpdatingPhoneNumberInBackground(null, mobilePhone, option);</span>
+  }
+
+  /**
+   * request sms code for updating phone number of current user.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param mobilePhone mobile phone number.
+   * @param option sms option
+   * @return observable instance
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public static Observable&lt;LCNull&gt; requestSMSCodeForUpdatingPhoneNumberInBackground(LCUser asAuthenticatedUser,
+                                                                                    String mobilePhone, LCSMSOption option) {
+<span class="pc bpc" id="L1136" title="2 of 4 branches missed.">    if (StringUtil.isEmpty(mobilePhone) || !LCSMS.checkMobilePhoneNumber(mobilePhone)) {</span>
+<span class="nc" id="L1137">      return Observable.error(new IllegalArgumentException(&quot;mobile phone number is empty or invalid&quot;));</span>
+    }
+<span class="pc bpc" id="L1139" title="1 of 2 branches missed.">    Map&lt;String, Object&gt; param = (null == option)? new HashMap&lt;String, Object&gt;() : option.getOptionMap();</span>
+<span class="fc" id="L1140">    return PaasClient.getStorageClient().requestSMSCodeForUpdatingPhoneNumber(asAuthenticatedUser, mobilePhone, param);</span>
+  }
+
+  /**
+   * verify sms code for updating phone number of current user.
+   * @param code    sms code
+   * @param mobilePhone mobile phone number.
+   * @return observable instance
+   */
+  public static Observable&lt;LCNull&gt; verifySMSCodeForUpdatingPhoneNumberInBackground(String code, String mobilePhone) {
+<span class="fc" id="L1150">    return verifySMSCodeForUpdatingPhoneNumberInBackground(null, code, mobilePhone);</span>
+  }
+
+  /**
+   * verify sms code for updating phone number of current user.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param code    sms code
+   * @param mobilePhone mobile phone number.
+   * @return observable instance
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public static Observable&lt;LCNull&gt; verifySMSCodeForUpdatingPhoneNumberInBackground(LCUser asAuthenticatedUser,
+                                                                                   String code, String mobilePhone) {
+<span class="pc bpc" id="L1164" title="2 of 4 branches missed.">    if (StringUtil.isEmpty(code) || StringUtil.isEmpty(mobilePhone)) {</span>
+<span class="nc" id="L1165">      return Observable.error(new IllegalArgumentException(&quot;code or mobilePhone is empty&quot;));</span>
+    }
+<span class="fc" id="L1167">    return PaasClient.getStorageClient().verifySMSCodeForUpdatingPhoneNumber(asAuthenticatedUser, code, mobilePhone);</span>
+  }
+
+  private boolean checkUserAuthentication(final LCCallback callback) {
+<span class="pc bpc" id="L1171" title="1 of 4 branches missed.">    if (!this.isAuthenticated() || StringUtil.isEmpty(getObjectId())) {</span>
+<span class="pc bpc" id="L1172" title="1 of 2 branches missed.">      if (callback != null) {</span>
+<span class="nc" id="L1173">        callback.internalDone(ErrorUtils.propagateException(LCException.SESSION_MISSING,</span>
+                &quot;No valid session token, make sure signUp or login has been called.&quot;));
+      }
+<span class="fc" id="L1176">      return false;</span>
+    }
+<span class="fc" id="L1178">    return true;</span>
+  }
+
+  /**
+   * follow somebody in background.
+   * @param userObjectId  target user objectId.
+   * @return observable instance.
+   */
+  public Observable&lt;JSONObject&gt; followInBackground(String userObjectId) {
+<span class="fc" id="L1187">    return followInBackground(null, userObjectId);</span>
+  }
+
+  /**
+   * follow somebody in background.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param userObjectId target user objectId.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;JSONObject&gt; followInBackground(LCUser asAuthenticatedUser, String userObjectId) {
+<span class="fc" id="L1199">    return this.followInBackground(asAuthenticatedUser, userObjectId, new HashMap&lt;String, Object&gt;());</span>
+  }
+
+  /**
+   * follow somebody in background.
+   * @param userObjectId target user objectId.
+   * @param attributes friendship attributes.
+   * @return observable instance.
+   */
+  public Observable&lt;JSONObject&gt; followInBackground(String userObjectId, Map&lt;String, Object&gt; attributes) {
+<span class="nc" id="L1209">    return followInBackground(null, userObjectId, attributes);</span>
+  }
+
+  /**
+   * follow somebody in background.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param userObjectId target user objectId.
+   * @param attributes friendship attributes.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;JSONObject&gt; followInBackground(LCUser asAuthenticatedUser, String userObjectId, Map&lt;String, Object&gt; attributes) {
+<span class="fc bfc" id="L1222" title="All 2 branches covered.">    if (!checkUserAuthentication(null)) {</span>
+<span class="fc" id="L1223">      return Observable.error(ErrorUtils.propagateException(LCException.SESSION_MISSING,</span>
+              &quot;No valid session token, make sure signUp or login has been called.&quot;));
+    }
+<span class="fc" id="L1226">    return PaasClient.getStorageClient().followUser(asAuthenticatedUser, getObjectId(), userObjectId, attributes);</span>
+  }
+
+  /**
+   * unfollow somebody in background.
+   * @param userObjectId target user objectId.
+   * @return observable instance.
+   */
+  public Observable&lt;JSONObject&gt; unfollowInBackground(String userObjectId) {
+<span class="fc" id="L1235">    return unfollowInBackground(null, userObjectId);</span>
+  }
+
+  /**
+   * unfollow somebody in background.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param userObjectId target user objectId.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;JSONObject&gt; unfollowInBackground(LCUser asAuthenticatedUser, String userObjectId) {
+<span class="pc bpc" id="L1247" title="1 of 2 branches missed.">    if (!checkUserAuthentication(null)) {</span>
+<span class="nc" id="L1248">      return Observable.error(ErrorUtils.propagateException(LCException.SESSION_MISSING,</span>
+              &quot;No valid session token, make sure signUp or login has been called.&quot;));
+    }
+<span class="fc" id="L1251">    return PaasClient.getStorageClient().unfollowUser(asAuthenticatedUser, getObjectId(), userObjectId);</span>
+  }
+
+  /**
+   * get follower query.
+   * @return query instance.
+   */
+  public LCQuery&lt;LCObject&gt; followerQuery() {
+<span class="fc" id="L1259">    return LCUser.followerQuery(getObjectId(), LCObject.class);</span>
+  }
+
+  /**
+   * get followee query.
+   * @return query instance.
+   */
+  public LCQuery&lt;LCObject&gt; followeeQuery() {
+<span class="fc" id="L1267">    return LCUser.followeeQuery(getObjectId(), LCObject.class);</span>
+  }
+
+  /**
+   * get follower query.
+   * @param userObjectId user object id.
+   * @param clazz result class.
+   * @param &lt;T&gt; template type.
+   * @return query instance.
+   */
+  public static &lt;T extends LCObject&gt; LCQuery&lt;T&gt; followerQuery(final String userObjectId,
+                                                              Class&lt;T&gt; clazz) {
+<span class="pc bpc" id="L1279" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(userObjectId)) {</span>
+<span class="nc" id="L1280">      throw new IllegalArgumentException(&quot;Blank user objectId&quot;);</span>
+    }
+<span class="fc" id="L1282">    LCQuery&lt;T&gt; query = new LCQuery&lt;&gt;(&quot;_Follower&quot;, clazz);</span>
+<span class="fc" id="L1283">    query.whereEqualTo(&quot;user&quot;, LCUser.createWithoutData(CLASS_NAME, userObjectId));</span>
+<span class="fc" id="L1284">    query.include(&quot;follower&quot;);</span>
+<span class="fc" id="L1285">    return query;</span>
+  }
+
+  /**
+   * get followee query.
+   * @param userObjectId user object id.
+   * @param clazz result class.
+   * @param &lt;T&gt; template type.
+   * @return query instance.
+   */
+  public static &lt;T extends LCObject&gt; LCQuery&lt;T&gt; followeeQuery(final String userObjectId, Class&lt;T&gt; clazz) {
+<span class="pc bpc" id="L1296" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(userObjectId)) {</span>
+<span class="nc" id="L1297">      throw new IllegalArgumentException(&quot;Blank user objectId&quot;);</span>
+    }
+<span class="fc" id="L1299">    LCQuery&lt;T&gt; query = new LCQuery&lt;&gt;(&quot;_Followee&quot;, clazz);</span>
+<span class="fc" id="L1300">    query.whereEqualTo(&quot;user&quot;, LCUser.createWithoutData(CLASS_NAME, userObjectId));</span>
+<span class="fc" id="L1301">    query.include(&quot;followee&quot;);</span>
+<span class="fc" id="L1302">    return query;</span>
+  }
+
+  /**
+   * get friendship query of current user.
+   *
+   * @param isFollowerDirection query direction:
+   *                            true - query follower of current user(users which followed current user).
+   *                            false - query followee of current user(users which current user followed).
+   * @return query instance, null for non-authenticated user.
+   */
+  public LCQuery&lt;LCFriendship&gt; friendshipQuery(boolean isFollowerDirection) {
+<span class="nc" id="L1314">    String userObjectId = getObjectId();</span>
+<span class="nc bnc" id="L1315" title="All 2 branches missed.">    if (StringUtil.isEmpty(userObjectId)) {</span>
+<span class="nc" id="L1316">      logger.d(&quot;user object id is empty.&quot;);</span>
+<span class="nc" id="L1317">      return null;</span>
+    }
+<span class="nc" id="L1319">    LCQuery&lt;LCFriendship&gt; query = new LCQuery&lt;&gt;(LCFriendship.CLASS_NAME);</span>
+<span class="nc bnc" id="L1320" title="All 2 branches missed.">    if (isFollowerDirection) {</span>
+<span class="nc" id="L1321">      query.whereEqualTo(LCFriendship.ATTR_FOLLOWEE, LCUser.createWithoutData(CLASS_NAME, userObjectId));</span>
+<span class="nc" id="L1322">      query.include(LCFriendship.ATTR_USER);</span>
+    } else {
+<span class="nc" id="L1324">      query.whereEqualTo(LCFriendship.ATTR_USER, LCUser.createWithoutData(CLASS_NAME, userObjectId));</span>
+<span class="nc" id="L1325">      query.include(LCFriendship.ATTR_FOLLOWEE);</span>
+    }
+<span class="nc" id="L1327">    query.whereEqualTo(LCFriendship.ATTR_FRIEND_STATUS, true);</span>
+<span class="nc" id="L1328">    return query;</span>
+  }
+
+  /**
+   * query current user's friendship.
+   * @return Observable instance to monitor operation result.
+   */
+  public Observable&lt;List&lt;LCFriendship&gt;&gt; queryFriendship() {
+<span class="nc" id="L1336">    return this.queryFriendship(0, 0, null);</span>
+  }
+
+  /**
+   * query current user's friendship.
+   * @param offset result offset.
+   * @param limit result size limit.
+   * @return Observable instance to monitor operation result.
+   */
+  public Observable&lt;List&lt;LCFriendship&gt;&gt; queryFriendship(int offset, int limit, String orderBy) {
+<span class="fc" id="L1346">    QueryConditions conditions = new QueryConditions();</span>
+<span class="fc" id="L1347">    conditions.whereEqualTo(LCFriendship.ATTR_FRIEND_STATUS, true);</span>
+<span class="pc bpc" id="L1348" title="1 of 2 branches missed.">    if (offset &gt; 0) {</span>
+<span class="nc" id="L1349">      conditions.setSkip(offset);</span>
+    }
+<span class="pc bpc" id="L1351" title="1 of 2 branches missed.">    if (limit &gt; 0) {</span>
+<span class="nc" id="L1352">      conditions.setLimit(limit);</span>
+    }
+<span class="pc bpc" id="L1354" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(orderBy)) {</span>
+<span class="nc" id="L1355">      conditions.setOrder(orderBy);</span>
+    }
+<span class="fc" id="L1357">    return PaasClient.getStorageClient().queryFriendship(this, conditions.assembleParameters());</span>
+  }
+
+  /**
+   * apply new friendship to someone.
+   *
+   * @param friend target user.
+   * @param attributes additional attributes.
+   * @return Observable instance to monitor operation result.
+   */
+  public Observable&lt;LCFriendshipRequest&gt; applyFriendshipInBackground(LCUser friend, Map&lt;String, Object&gt; attributes) {
+<span class="fc" id="L1368">    return applyFriendshipInBackground(null, friend, attributes);</span>
+  }
+
+  /**
+   * apply new friendship to someone.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param friend target user.
+   * @param attributes additional attributes.
+   * @return Observable instance to monitor operation result.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;LCFriendshipRequest&gt; applyFriendshipInBackground(LCUser asAuthenticatedUser,
+                                                                     LCUser friend, Map&lt;String, Object&gt; attributes) {
+<span class="pc bpc" id="L1382" title="1 of 2 branches missed.">    if (!checkUserAuthentication(null)) {</span>
+<span class="nc" id="L1383">      logger.d(&quot;current user isn't authenticated.&quot;);</span>
+<span class="nc" id="L1384">      return Observable.error(ErrorUtils.propagateException(LCException.SESSION_MISSING,</span>
+              &quot;No valid session token, make sure signUp or login has been called.&quot;));
+    }
+<span class="pc bpc" id="L1387" title="2 of 4 branches missed.">    if (null == friend || StringUtil.isEmpty(friend.getObjectId())) {</span>
+<span class="nc" id="L1388">      return Observable.error(ErrorUtils.propagateException(LCException.INVALID_PARAMETER,</span>
+              &quot;friend user is invalid.&quot;));
+    }
+<span class="fc" id="L1391">    Map&lt;String, Object&gt; param = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L1392">    param.put(LCFriendshipRequest.ATTR_USER, Utils.getParsedObject(this));</span>
+<span class="fc" id="L1393">    param.put(LCFriendshipRequest.ATTR_FRIEND, Utils.getParsedObject(friend));</span>
+<span class="pc bpc" id="L1394" title="1 of 4 branches missed.">    if (null != attributes &amp;&amp; attributes.size() &gt; 0) {</span>
+<span class="fc" id="L1395">      param.put(PARAM_ATTR_FRIENDSHIP, attributes);</span>
+    }
+<span class="fc" id="L1397">    JSONObject jsonObject = JSONObject.Builder.create(param);</span>
+<span class="fc" id="L1398">    return PaasClient.getStorageClient().applyFriendshipRequest(asAuthenticatedUser, jsonObject);</span>
+  }
+
+  /**
+   * update friendship attributes.
+   *
+   * @param friendship friendship instance.
+   * @return observable instance.
+   */
+  public Observable&lt;LCFriendship&gt; updateFriendship(LCFriendship friendship) {
+<span class="nc" id="L1408">    return updateFriendship(null, friendship);</span>
+  }
+
+  /**
+   * update friendship attributes.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param friendship friendship instance.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;LCFriendship&gt; updateFriendship(LCUser asAuthenticatedUser, LCFriendship friendship) {
+<span class="nc bnc" id="L1420" title="All 2 branches missed.">    if (!checkUserAuthentication(null)) {</span>
+<span class="nc" id="L1421">      logger.d(&quot;current user isn't authenticated.&quot;);</span>
+<span class="nc" id="L1422">      return Observable.error(ErrorUtils.propagateException(LCException.SESSION_MISSING,</span>
+              &quot;No valid session token, make sure signUp or login has been called.&quot;));
+    }
+<span class="nc bnc" id="L1425" title="All 4 branches missed.">    if (null == friendship || StringUtil.isEmpty(friendship.getObjectId())) {</span>
+<span class="nc" id="L1426">      return Observable.error(ErrorUtils.propagateException(LCException.INVALID_PARAMETER,</span>
+              &quot;friendship request(objectId) is invalid.&quot;));
+    }
+<span class="nc bnc" id="L1429" title="All 4 branches missed.">    if (null == friendship.getFollowee() || StringUtil.isEmpty(friendship.getFollowee().getObjectId())) {</span>
+<span class="nc" id="L1430">      return Observable.error(ErrorUtils.propagateException(LCException.INVALID_PARAMETER,</span>
+              &quot;friendship request(followee) is invalid.&quot;));
+    }
+<span class="nc" id="L1433">    JSONObject changedParam = friendship.generateChangedParam();</span>
+<span class="nc bnc" id="L1434" title="All 4 branches missed.">    if (null == changedParam || changedParam.size() &lt; 1) {</span>
+<span class="nc" id="L1435">      logger.d(&quot;nothing is changed within friendship.&quot;);</span>
+<span class="nc" id="L1436">      return Observable.just(friendship);</span>
+    }
+<span class="nc" id="L1438">    HashMap&lt;String, Object&gt; param = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L1439">    param.put(PARAM_ATTR_FRIENDSHIP, changedParam);</span>
+<span class="nc" id="L1440">    return PaasClient.getStorageClient().updateFriendship(asAuthenticatedUser,</span>
+<span class="nc" id="L1441">            getObjectId(), friendship.getFollowee().getObjectId(), param);</span>
+  }
+
+  /**
+   * accept a friendship.
+   * @param request friendship request.
+   * @param attributes additional attributes.
+   * @return Observable instance to monitor operation result.
+   * notice: attributes is necessary as parameter bcz they are not properties of FriendshipRequest.
+   */
+  public Observable&lt;LCFriendshipRequest&gt; acceptFriendshipRequest(LCFriendshipRequest request,
+                                                                 Map&lt;String, Object&gt; attributes) {
+<span class="fc" id="L1453">    return acceptFriendshipRequest(null, request, attributes);</span>
+  }
+
+  /**
+   * accept a friendship.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param request friendship request.
+   * @param attributes additional attributes.
+   * @return Observable instance to monitor operation result.
+   * notice: attributes is necessary as parameter bcz they are not properties of FriendshipRequest.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;LCFriendshipRequest&gt; acceptFriendshipRequest(LCUser asAuthenticatedUser,
+                                                                 LCFriendshipRequest request,
+                                                                 Map&lt;String, Object&gt; attributes){
+<span class="pc bpc" id="L1469" title="1 of 2 branches missed.">    if (!checkUserAuthentication(null)) {</span>
+<span class="nc" id="L1470">      logger.d(&quot;current user isn't authenticated.&quot;);</span>
+<span class="nc" id="L1471">      return Observable.error(ErrorUtils.propagateException(LCException.SESSION_MISSING,</span>
+              &quot;No valid session token, make sure signUp or login has been called.&quot;));
+    }
+<span class="pc bpc" id="L1474" title="2 of 4 branches missed.">    if (null == request || StringUtil.isEmpty(request.getObjectId())) {</span>
+<span class="nc" id="L1475">      return Observable.error(ErrorUtils.propagateException(LCException.INVALID_PARAMETER,</span>
+              &quot;friendship request(objectId) is invalid.&quot;));
+    }
+
+<span class="fc" id="L1479">    HashMap&lt;String, Object&gt; param = new HashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L1480" title="3 of 4 branches missed.">    if (null != attributes &amp;&amp; attributes.size() &gt; 0) {</span>
+<span class="nc" id="L1481">      param.put(PARAM_ATTR_FRIENDSHIP, attributes);</span>
+    }
+<span class="fc" id="L1483">    JSONObject jsonObject = JSONObject.Builder.create(param);</span>
+<span class="fc" id="L1484">    return PaasClient.getStorageClient().acceptFriendshipRequest(asAuthenticatedUser, request, jsonObject);</span>
+  }
+
+  /**
+   * decline a friendship.
+   * @param request friendship request.
+   * @return Observable instance to monitor operation result.
+   */
+  public Observable&lt;LCFriendshipRequest&gt; declineFriendshipRequest(LCFriendshipRequest request) {
+<span class="fc" id="L1493">    return declineFriendshipRequest(null, request);</span>
+  }
+
+  /**
+   * decline a friendship.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param request friendship request.
+   * @return Observable instance to monitor operation result.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;LCFriendshipRequest&gt; declineFriendshipRequest(LCUser asAuthenticatedUser, LCFriendshipRequest request) {
+<span class="pc bpc" id="L1505" title="1 of 2 branches missed.">    if (!checkUserAuthentication(null)) {</span>
+<span class="nc" id="L1506">      logger.d(&quot;current user isn't authenticated.&quot;);</span>
+<span class="nc" id="L1507">      return Observable.error(ErrorUtils.propagateException(LCException.SESSION_MISSING,</span>
+              &quot;No valid session token, make sure signUp or login has been called.&quot;));
+    }
+<span class="pc bpc" id="L1510" title="2 of 4 branches missed.">    if (null == request || StringUtil.isEmpty(request.getObjectId())) {</span>
+<span class="nc" id="L1511">      return Observable.error(ErrorUtils.propagateException(LCException.INVALID_PARAMETER,</span>
+              &quot;friendship request(objectId) is invalid.&quot;));
+    }
+
+<span class="fc" id="L1515">    return PaasClient.getStorageClient().declineFriendshipRequest(asAuthenticatedUser, request);</span>
+  }
+
+  /**
+   * get query for AVFriendshipRequest.
+   *
+   * @param status request status. following value can be used individually or combined with `and` operator:
+   *               AVFriendshipRequest.STATUS_PENDING(0x01) - request is pending yet.
+   *               AVFriendshipRequest.STATUS_ACCEPTED(0x02) - request is accepted by user.
+   *               AVFriendshipRequest.STATUS_DECLINED(0x04) - request is declined by user.
+   *               AVFriendshipRequest.STATUS_ANY(0x07) - no matter status, all of requests are wanted by current query.
+   * @param includeTargetUser boolean flag, indicating that need to include target user pointer or not.
+   * @param requestToMe boolean flag, indicating all requests are sent to current user or not.
+   *                    true - someone others sent requests to current user.
+   *                    false - current user sent requests to others.
+   * @return AVFriendshipRequest query, null for current user isn't authenticated or status is invlaid.
+   */
+  public LCQuery&lt;LCFriendshipRequest&gt; friendshipRequestQuery(int status,
+                                                             boolean includeTargetUser, boolean requestToMe) {
+<span class="pc bpc" id="L1534" title="1 of 2 branches missed.">    if (!checkUserAuthentication(null)) {</span>
+<span class="nc" id="L1535">      logger.d(&quot;current user isn't authenticated.&quot;);</span>
+<span class="nc" id="L1536">      return null;</span>
+    }
+<span class="fc" id="L1538">    List&lt;String&gt; statusCondition = new ArrayList&lt;&gt;(1);</span>
+<span class="fc bfc" id="L1539" title="All 2 branches covered.">    if ((status &amp; LCFriendshipRequest.STATUS_PENDING) == LCFriendshipRequest.STATUS_PENDING) {</span>
+<span class="fc" id="L1540">      statusCondition.add(LCFriendshipRequest.RequestStatus.Pending.name().toLowerCase());</span>
+    }
+<span class="fc bfc" id="L1542" title="All 2 branches covered.">    if ((status &amp; LCFriendshipRequest.STATUS_ACCEPTED) == LCFriendshipRequest.STATUS_ACCEPTED) {</span>
+<span class="fc" id="L1543">      statusCondition.add(LCFriendshipRequest.RequestStatus.Accepted.name().toLowerCase());</span>
+    }
+<span class="fc bfc" id="L1545" title="All 2 branches covered.">    if ((status &amp; LCFriendshipRequest.STATUS_DECLINED) == LCFriendshipRequest.STATUS_DECLINED) {</span>
+<span class="fc" id="L1546">      statusCondition.add(LCFriendshipRequest.RequestStatus.Declined.name().toLowerCase());</span>
+    }
+<span class="pc bpc" id="L1548" title="1 of 2 branches missed.">    if (statusCondition.size() &lt; 1) {</span>
+<span class="nc" id="L1549">      logger.d(&quot;status parameter is invalid.&quot;);</span>
+<span class="nc" id="L1550">      return null;</span>
+    }
+
+<span class="fc" id="L1553">    LCQuery&lt;LCFriendshipRequest&gt; result = new LCQuery&lt;&gt;(LCFriendshipRequest.CLASS_NAME);</span>
+<span class="fc" id="L1554">    result.whereContainedIn(LCFriendshipRequest.ATTR_STATUS, statusCondition);</span>
+<span class="fc bfc" id="L1555" title="All 2 branches covered.">    if (requestToMe) {</span>
+<span class="fc" id="L1556">      result.whereEqualTo(LCFriendshipRequest.ATTR_FRIEND, this);</span>
+<span class="fc bfc" id="L1557" title="All 2 branches covered.">      if (includeTargetUser) {</span>
+<span class="fc" id="L1558">        result.include(LCFriendshipRequest.ATTR_USER);</span>
+      }
+    } else {
+<span class="fc" id="L1561">      result.whereEqualTo(LCFriendshipRequest.ATTR_USER, this);</span>
+<span class="pc bpc" id="L1562" title="1 of 2 branches missed.">      if (includeTargetUser) {</span>
+<span class="nc" id="L1563">        result.include(LCFriendshipRequest.ATTR_FRIEND);</span>
+      }
+    }
+<span class="fc" id="L1566">    result.addDescendingOrder(LCObject.KEY_UPDATED_AT);</span>
+<span class="fc" id="L1567">    return result;</span>
+  }
+
+  private void processResultList(List&lt;JSONObject&gt; results, List&lt;LCUser&gt; list, String tag) {
+<span class="fc bfc" id="L1571" title="All 2 branches covered.">    for (JSONObject item : results) {</span>
+<span class="pc bpc" id="L1572" title="1 of 2 branches missed.">      if (null != item) {</span>
+<span class="fc" id="L1573">        LCUser user = (LCUser) Utils.parseObjectFromMap((Map&lt;String, Object&gt;)item.get(tag));</span>
+<span class="fc" id="L1574">        list.add(user);</span>
+      }
+<span class="fc" id="L1576">    }</span>
+<span class="fc" id="L1577">  }</span>
+  private Map&lt;String, List&lt;LCUser&gt;&gt; parseFollowerAndFollowee(JSONObject jsonObject) {
+<span class="fc" id="L1579">    Map&lt;String, List&lt;LCUser&gt;&gt; map = new HashMap&lt;String, List&lt;LCUser&gt;&gt;();</span>
+<span class="pc bpc" id="L1580" title="1 of 2 branches missed.">    if (null != jsonObject) {</span>
+<span class="fc" id="L1581">      List&lt;JSONObject&gt; followers = LCUtils.getObjectListFromMapList((List&lt;Map&lt;String, Object&gt;&gt;)jsonObject.get(&quot;followers&quot;));</span>
+<span class="pc bpc" id="L1582" title="2 of 4 branches missed.">      if ( null != followers &amp;&amp; followers.size() &gt; 0) {</span>
+<span class="fc" id="L1583">        List&lt;LCUser&gt; followerUsers = new LinkedList&lt;LCUser&gt;();</span>
+<span class="fc" id="L1584">        processResultList(followers, followerUsers, FOLLOWER_TAG);</span>
+<span class="fc" id="L1585">        map.put(FOLLOWER_TAG, followerUsers);</span>
+      }
+<span class="fc" id="L1587">      List&lt;JSONObject&gt; followees = LCUtils.getObjectListFromMapList((List&lt;Map&lt;String, Object&gt;&gt;)jsonObject.get(&quot;followees&quot;));</span>
+<span class="pc bpc" id="L1588" title="2 of 4 branches missed.">      if (null != followees &amp;&amp; followees.size() &gt; 0) {</span>
+<span class="fc" id="L1589">        List&lt;LCUser&gt; followeeUsers = new LinkedList&lt;LCUser&gt;();</span>
+<span class="fc" id="L1590">        processResultList(followees, followeeUsers, FOLLOWEE_TAG);</span>
+<span class="fc" id="L1591">        map.put(FOLLOWEE_TAG, followeeUsers);</span>
+      }
+    }
+<span class="fc" id="L1594">    return map;</span>
+  }
+
+  /**
+   * get follower and followee in background.
+   * @param callback callback handler.
+   *
+   * request authentication with current user.
+   */
+  public void getFollowersAndFolloweesInBackground(final FollowersAndFolloweesCallback callback) {
+<span class="fc" id="L1604">    getFollowersAndFolloweesInBackground(null, callback);</span>
+<span class="fc" id="L1605">  }</span>
+
+  /**
+   * get follower and followee in background.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param callback callback handler.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public void getFollowersAndFolloweesInBackground(LCUser asAuthenticatedUser,
+                                                   final FollowersAndFolloweesCallback callback) {
+<span class="pc bpc" id="L1616" title="1 of 2 branches missed.">    if (null == callback) {</span>
+<span class="nc" id="L1617">      return;</span>
+    }
+<span class="pc bpc" id="L1619" title="1 of 2 branches missed.">    if (!checkUserAuthentication(callback)) {</span>
+<span class="nc" id="L1620">      return;</span>
+    }
+<span class="fc" id="L1622">    PaasClient.getStorageClient().getFollowersAndFollowees(asAuthenticatedUser, getObjectId())</span>
+<span class="fc" id="L1623">            .subscribe(new Observer&lt;JSONObject&gt;() {</span>
+      @Override
+      public void onSubscribe(Disposable disposable) {
+
+<span class="fc" id="L1627">      }</span>
+
+      @Override
+      public void onNext(JSONObject jsonObject) {
+<span class="pc bpc" id="L1631" title="1 of 2 branches missed.">        if (null == jsonObject) {</span>
+<span class="nc" id="L1632">          callback.done(null, null);</span>
+        } else {
+<span class="fc" id="L1634">          Map&lt;String, List&lt;LCUser&gt;&gt; result = parseFollowerAndFollowee(jsonObject);</span>
+<span class="fc" id="L1635">          callback.done(result, null);</span>
+        }
+<span class="fc" id="L1637">      }</span>
+
+      @Override
+      public void onError(Throwable throwable) {
+<span class="nc" id="L1641">        callback.done(null, new LCException(throwable));</span>
+<span class="nc" id="L1642">      }</span>
+
+      @Override
+      public void onComplete() {
+<span class="fc" id="L1646">      }</span>
+    });
+<span class="fc" id="L1648">  }</span>
+
+  /**
+   * 通过设置此方法，所有关联对象中的 AVUser 对象都会被强转成注册的 AVUser 子类对象
+   * @param clazz class name
+   */
+  public static void alwaysUseSubUserClass(Class&lt;? extends LCUser&gt; clazz) {
+<span class="fc" id="L1655">    LCUser.registerSubclass(clazz);</span>
+<span class="fc" id="L1656">    subClazz = clazz;</span>
+<span class="fc" id="L1657">  }</span>
+
+  private static Class internalUserClazz() {
+<span class="fc bfc" id="L1660" title="All 2 branches covered.">    return subClazz == null ? LCUser.class: subClazz;</span>
+  }
+
+  /**
+   * 通过这个方法可以将 AVUser 对象强转为其子类对象
+   *
+   * @param user  user object.
+   * @param clazz user class name.
+   * @param &lt;T&gt; template type.
+   * @return user subclass instance.
+   */
+  public static &lt;T extends LCUser&gt; T cast(LCUser user, Class&lt;T&gt; clazz) {
+    try {
+<span class="nc" id="L1673">      T newUser = LCObject.cast(user, clazz);</span>
+<span class="nc" id="L1674">      return newUser;</span>
+<span class="nc" id="L1675">    } catch (Exception e) {</span>
+
+    }
+<span class="nc" id="L1678">    return null;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

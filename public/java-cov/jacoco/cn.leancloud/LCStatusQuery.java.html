@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LCStatusQuery.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud</a> &gt; <span class="el_source">LCStatusQuery.java</span></div><h1>LCStatusQuery.java</h1><pre class="source lang-java linenums">package cn.leancloud;
+
+import cn.leancloud.core.PaasClient;
+import cn.leancloud.ops.Utils;
+import cn.leancloud.utils.ErrorUtils;
+import cn.leancloud.utils.StringUtil;
+import cn.leancloud.json.JSONObject;
+import io.reactivex.Observable;
+import io.reactivex.functions.Function;
+
+import java.util.List;
+import java.util.Map;
+
+public class LCStatusQuery extends LCQuery&lt;LCStatus&gt; {
+<span class="fc" id="L15">  public enum SourceType {</span>
+<span class="fc" id="L16">    INBOX,</span>
+<span class="fc" id="L17">    OWNED</span>
+  }
+
+<span class="fc" id="L20">  public enum PaginationDirection {</span>
+<span class="fc" id="L21">    NEW_TO_OLD(0),</span>
+<span class="fc" id="L22">    OLD_TO_NEW(1);</span>
+<span class="fc" id="L23">    PaginationDirection(int v) {</span>
+<span class="fc" id="L24">      value = v;</span>
+<span class="fc" id="L25">    }</span>
+    public int value() {
+<span class="nc" id="L27">      return this.value;</span>
+    }
+    int value;
+  }
+
+<span class="fc" id="L32">  private LCUser source = null;</span>
+<span class="fc" id="L33">  private LCUser owner = null;</span>
+<span class="fc" id="L34">  private String inboxType = null;</span>
+
+  private SourceType sourceType;
+  private StatusIterator iterator;
+
+  protected LCStatusQuery(SourceType type) {
+<span class="fc" id="L40">    super(LCStatus.CLASS_NAME, LCStatus.class);</span>
+<span class="fc" id="L41">    sourceType = type;</span>
+<span class="fc" id="L42">    iterator = new StatusIterator(type);</span>
+<span class="fc" id="L43">  }</span>
+
+  /**
+   * set since messageId.
+   *
+   * @param sinceId starter message id
+   */
+  public void setSinceId(long sinceId) {
+<span class="nc" id="L51">    this.iterator.setSinceId(sinceId);</span>
+<span class="nc" id="L52">  }</span>
+
+  /**
+   * get current since messageId.
+   * @return since messageId
+   */
+  public long getSinceId() {
+<span class="nc" id="L59">    return this.iterator.getSinceId();</span>
+  }
+
+  /**
+   * get current max messageId.
+   * @return max messageId
+   */
+  public long getMaxId() {
+<span class="nc" id="L67">    return this.iterator.getMaxId();</span>
+  }
+
+  /**
+   * set max messageId.
+   * @param maxId max messageId
+   */
+  public void setMaxId(long maxId) {
+<span class="nc" id="L75">    this.iterator.setMaxId(maxId);</span>
+<span class="nc" id="L76">  }</span>
+
+  /**
+   * get pagination size.
+   * @return pagination size.
+   */
+  public int getPageSize() {
+<span class="fc" id="L83">    return iterator.getPageSize();</span>
+  }
+
+  /**
+   * set pagination size.
+   * @param pageSize pagination size
+   */
+  public void setPageSize(int pageSize) {
+<span class="fc" id="L91">    iterator.setPageSize(pageSize);</span>
+<span class="fc" id="L92">  }</span>
+
+  /**
+   * set query direction.
+   * @param direct pagination direction.
+   */
+  public void setDirection(PaginationDirection direct) {
+<span class="fc" id="L99">    this.iterator.setDirection(direct);</span>
+<span class="fc" id="L100">  }</span>
+
+  void setSource(LCUser source) {
+<span class="fc" id="L103">    this.source = source;</span>
+<span class="fc" id="L104">  }</span>
+
+  void setOwner(LCUser owner) {
+<span class="fc" id="L107">    this.owner = owner;</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">    if (null != owner) {</span>
+<span class="fc" id="L109">      getInclude().add(LCStatus.ATTR_SOURCE);</span>
+    }
+<span class="fc" id="L111">  }</span>
+
+  void setInboxType(String type) {
+<span class="fc" id="L114">    this.inboxType = type;</span>
+<span class="fc" id="L115">  }</span>
+
+  /**
+   * assemble query parameters.
+   * @return parameter map.
+   */
+  @Override
+  public Map&lt;String, String&gt; assembleParameters() {
+<span class="fc" id="L123">    return assembleParameters(false);</span>
+  }
+
+  private Map&lt;String, String&gt; assembleParameters(boolean withIterator) {
+<span class="fc bfc" id="L127" title="All 2 branches covered.">    if (SourceType.OWNED == this.sourceType) {</span>
+      // for status query, need to add inboxType filter into where clause.
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">      if (!StringUtil.isEmpty(inboxType)) {</span>
+<span class="fc" id="L130">        whereEqualTo(LCStatus.ATTR_INBOX_TYPE, inboxType);</span>
+      }
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">      if (null != this.source) {</span>
+<span class="fc" id="L133">        whereEqualTo(LCStatus.ATTR_SOURCE, this.source);</span>
+      }
+<span class="fc bfc" id="L135" title="All 2 branches covered.">      if (withIterator) {</span>
+<span class="fc" id="L136">        iterator.fillConditions(this);</span>
+      } else {
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (PaginationDirection.NEW_TO_OLD == iterator.getDirection()) {</span>
+<span class="fc" id="L139">          addDescendingOrder(LCObject.KEY_CREATED_AT);</span>
+        } else {
+<span class="nc" id="L141">          addAscendingOrder(LCObject.KEY_CREATED_AT);</span>
+        }
+      }
+<span class="fc bfc" id="L144" title="All 2 branches covered.">    } else if (!withIterator) {</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">      if (PaginationDirection.NEW_TO_OLD == iterator.getDirection()) {</span>
+<span class="fc" id="L146">        addDescendingOrder(LCStatus.ATTR_MESSAGE_ID);</span>
+      } else {
+<span class="nc" id="L148">        addAscendingOrder(LCStatus.ATTR_MESSAGE_ID);</span>
+      }
+    }
+
+<span class="fc" id="L152">    Map&lt;String, String&gt; result = super.assembleParameters();</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">    if (null != this.owner) {</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">      if (withIterator) {</span>
+<span class="fc" id="L155">        iterator.fillConditions(result);</span>
+      }
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">      if (!StringUtil.isEmpty(inboxType)) {</span>
+        // for inbox query, need to add inboxType filter on the top of parameter, it's different from status query.
+        // maybe a bug?
+<span class="fc" id="L160">        result.put(LCStatus.ATTR_INBOX_TYPE, inboxType);</span>
+      }
+<span class="fc" id="L162">      String ownerString = JSONObject.Builder.create(Utils.mapFromAVObject(this.owner, false)).toJSONString();</span>
+<span class="fc" id="L163">      result.put(LCStatus.ATTR_OWNER, ownerString);</span>
+<span class="pc bpc" id="L164" title="3 of 4 branches missed.">    } else if (SourceType.OWNED != this.sourceType &amp;&amp; null != this.source) {</span>
+<span class="nc" id="L165">      String sourceString = JSONObject.Builder.create(Utils.mapFromAVObject(this.source, false)).toJSONString();</span>
+<span class="nc" id="L166">      result.put(LCStatus.ATTR_SOURCE, sourceString);</span>
+    }
+<span class="fc bfc" id="L168" title="All 2 branches covered.">    if (getPageSize() &gt; 0) {</span>
+<span class="fc" id="L169">      result.put(&quot;limit&quot;, String.valueOf(getPageSize()));</span>
+    }
+
+<span class="fc" id="L172">    return result;</span>
+  }
+
+  protected Observable&lt;List&lt;LCStatus&gt;&gt; findInBackground(int explicitLimit) {
+<span class="nc" id="L176">    return this.findInBackground(null, explicitLimit);</span>
+  }
+  protected Observable&lt;List&lt;LCStatus&gt;&gt; findInBackground(LCUser asAuthenticatedUser, int explicitLimit) {
+<span class="fc" id="L179">    return internalFindInBackground(asAuthenticatedUser, explicitLimit, false);</span>
+  }
+
+  private Observable&lt;List&lt;LCStatus&gt;&gt; internalFindInBackground(LCUser asAuthenticatedUser,
+                                                              int explicitLimit, boolean enableIterator) {
+<span class="pc bpc" id="L184" title="1 of 4 branches missed.">    if (null == this.owner &amp;&amp; null == this.source) {</span>
+<span class="nc" id="L185">      return Observable.error(ErrorUtils.illegalArgument(&quot;source or owner is null, please initialize correctly.&quot;));</span>
+    }
+<span class="fc bfc" id="L187" title="All 4 branches covered.">    if (null != this.owner &amp;&amp; !this.owner.isAuthenticated()) {</span>
+<span class="fc" id="L188">      return Observable.error(ErrorUtils.sessionMissingException());</span>
+    }
+    Map&lt;String, String&gt; query;
+<span class="fc bfc" id="L191" title="All 2 branches covered.">    if (enableIterator) {</span>
+<span class="fc" id="L192">      query = assembleParameters(true);</span>
+    } else {
+<span class="fc" id="L194">      query = assembleParameters();</span>
+    }
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">    if (explicitLimit &gt; 0) {</span>
+<span class="nc" id="L197">      query.put(&quot;limit&quot;, String.valueOf(explicitLimit));</span>
+    }
+
+<span class="fc bfc" id="L200" title="All 2 branches covered.">    if (null != this.owner) {</span>
+<span class="fc" id="L201">      return PaasClient.getStorageClient().queryInbox(asAuthenticatedUser, query).map(new Function&lt;List&lt;LCStatus&gt;, List&lt;LCStatus&gt;&gt;() {</span>
+        @Override
+        public List&lt;LCStatus&gt; apply(List&lt;LCStatus&gt; avStatuses) throws Exception {
+<span class="pc bpc" id="L204" title="1 of 4 branches missed.">          if (null == avStatuses || avStatuses.size() &lt; 1) {</span>
+<span class="fc" id="L205">            return avStatuses;</span>
+          }
+<span class="fc bfc" id="L207" title="All 2 branches covered.">          for (LCStatus status: avStatuses) {</span>
+<span class="fc" id="L208">            iterator.encounter(status);</span>
+<span class="fc" id="L209">          }</span>
+<span class="fc" id="L210">          return avStatuses;</span>
+        }
+      });
+    } else {
+<span class="fc" id="L214">      return PaasClient.getStorageClient().queryStatus(asAuthenticatedUser, query).map(new Function&lt;List&lt;LCStatus&gt;, List&lt;LCStatus&gt;&gt;() {</span>
+        @Override
+        public List&lt;LCStatus&gt; apply(List&lt;LCStatus&gt; avStatuses) throws Exception {
+<span class="pc bpc" id="L217" title="1 of 4 branches missed.">          if (null == avStatuses || avStatuses.size() &lt; 1) {</span>
+<span class="fc" id="L218">            return avStatuses;</span>
+          }
+<span class="fc bfc" id="L220" title="All 2 branches covered.">          for (LCStatus status: avStatuses) {</span>
+<span class="fc" id="L221">            iterator.encounter(status);</span>
+<span class="fc" id="L222">          }</span>
+<span class="fc" id="L223">          return avStatuses;</span>
+        }
+      });
+    }
+  }
+
+  /**
+   * get next pagination result.
+   * @return observable instance.
+   */
+  public Observable&lt;List&lt;LCStatus&gt;&gt; nextInBackground() {
+<span class="fc" id="L234">    return internalFindInBackground(null, 0, true);</span>
+  }
+
+  /**
+   * get status count.
+   * @return observable instance.
+   */
+  @Override
+  public Observable&lt;Integer&gt; countInBackground() {
+<span class="pc bpc" id="L243" title="1 of 4 branches missed.">    if (null == this.owner &amp;&amp; null == this.source) {</span>
+<span class="nc" id="L244">      return Observable.error(ErrorUtils.illegalArgument(&quot;source or owner is null, please initialize correctly.&quot;));</span>
+    }
+<span class="fc bfc" id="L246" title="All 2 branches covered.">    if (null != this.owner) {</span>
+<span class="fc" id="L247">      return Observable.error(ErrorUtils.invalidStateException(&quot;countInBackground doesn't work for inbox query,&quot; +</span>
+              &quot; please use unreadCountInBackground.&quot;));
+    }
+
+<span class="fc" id="L251">    Map&lt;String, String&gt; query = assembleParameters();</span>
+<span class="fc" id="L252">    query.put(&quot;count&quot;, &quot;1&quot;);</span>
+<span class="fc" id="L253">    query.put(&quot;limit&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L254">    return PaasClient.getStorageClient().queryCount(null, LCStatus.CLASS_NAME, query);</span>
+  }
+
+  /**
+   * get (read, unread) count.
+   *
+   * @return observable instance.
+   */
+  public Observable&lt;JSONObject&gt; unreadCountInBackground() {
+<span class="pc bpc" id="L263" title="1 of 4 branches missed.">    if (null == this.owner || !this.owner.isAuthenticated()) {</span>
+<span class="fc" id="L264">      return Observable.error(ErrorUtils.sessionMissingException());</span>
+    }
+<span class="fc" id="L266">    Map&lt;String, String&gt; query = assembleParameters();</span>
+<span class="fc" id="L267">    query.put(&quot;count&quot;, &quot;1&quot;);</span>
+<span class="fc" id="L268">    query.put(&quot;limit&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L269">    return PaasClient.getStorageClient().getInboxCount(this.owner, query);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

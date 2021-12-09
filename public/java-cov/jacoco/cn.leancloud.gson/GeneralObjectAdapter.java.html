@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GeneralObjectAdapter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.gson</a> &gt; <span class="el_source">GeneralObjectAdapter.java</span></div><h1>GeneralObjectAdapter.java</h1><pre class="source lang-java linenums">package cn.leancloud.gson;
+
+import com.google.gson.*;
+import com.google.gson.internal.ConstructorConstructor;
+import com.google.gson.internal.Excluder;
+import com.google.gson.internal.bind.JsonAdapterAnnotationTypeAdapterFactory;
+import com.google.gson.internal.bind.ReflectiveTypeAdapterFactory;
+import com.google.gson.reflect.TypeToken;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonWriter;
+
+import java.io.IOException;
+import java.lang.reflect.Type;
+import java.util.HashMap;
+
+public class GeneralObjectAdapter&lt;T&gt; extends TypeAdapter&lt;T&gt; {
+<span class="fc" id="L17">  private TypeAdapter&lt;T&gt; typeAdapter = null;</span>
+
+<span class="fc" id="L19">  public GeneralObjectAdapter(FieldNamingPolicy policy, TypeToken&lt;T&gt; typeToken) {</span>
+<span class="fc" id="L20">    ConstructorConstructor constructorConstructor = new ConstructorConstructor(new HashMap&lt;Type, InstanceCreator&lt;?&gt;&gt;());</span>
+<span class="fc" id="L21">    JsonAdapterAnnotationTypeAdapterFactory jsonAdapterFactory = new JsonAdapterAnnotationTypeAdapterFactory(constructorConstructor);</span>
+<span class="fc" id="L22">    Excluder excluder = Excluder.DEFAULT;</span>
+<span class="fc" id="L23">    ReflectiveTypeAdapterFactory reflectiveTypeAdapterFactory =</span>
+            new ReflectiveTypeAdapterFactory(constructorConstructor, policy, excluder, jsonAdapterFactory);
+<span class="fc" id="L25">    typeAdapter = reflectiveTypeAdapterFactory.create(new GsonBuilder().setLenient().create(), typeToken);</span>
+<span class="fc" id="L26">  }</span>
+
+  public void write(JsonWriter writer, T object) throws IOException {
+<span class="fc" id="L29">    this.typeAdapter.write(writer, object);</span>
+<span class="fc" id="L30">  }</span>
+
+  public T read(JsonReader reader) throws IOException {
+<span class="fc" id="L33">    return this.typeAdapter.read(reader);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

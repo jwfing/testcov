@@ -1,0 +1,349 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AppRouter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.core</a> &gt; <span class="el_source">AppRouter.java</span></div><h1>AppRouter.java</h1><pre class="source lang-java linenums">package cn.leancloud.core;
+
+import cn.leancloud.LCLogger;
+import cn.leancloud.cache.SystemSetting;
+
+import cn.leancloud.network.DNSDetoxicant;
+import cn.leancloud.service.AppAccessEndpoint;
+import cn.leancloud.service.AppRouterService;
+import cn.leancloud.service.RTMConnectionServerResponse;
+import cn.leancloud.utils.LogUtil;
+
+import cn.leancloud.utils.StringUtil;
+import cn.leancloud.json.JSON;
+import io.reactivex.Observable;
+
+import io.reactivex.functions.Function;
+import io.reactivex.schedulers.Schedulers;
+import okhttp3.OkHttpClient;
+import retrofit2.Retrofit;
+import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * app router 请求
+ * https://app-router.com/2/route?appId=EDR0rD8otnmzF7zNGgLasHzi-MdYXbMMI
+ */
+public class AppRouter {
+<span class="fc" id="L31">  private static final LCLogger LOGGER = LogUtil.getLogger(AppRouter.class);</span>
+  private static final String APP_ROUTER_HOST = &quot;https://app-router.com&quot;;
+<span class="fc" id="L33">  private static AppRouter INSTANCE = null;</span>
+
+  public static synchronized AppRouter getInstance() {
+<span class="fc bfc" id="L36" title="All 2 branches covered.">    if (null == INSTANCE) {</span>
+<span class="fc" id="L37">      INSTANCE = new AppRouter();</span>
+    }
+<span class="fc" id="L39">    return INSTANCE;</span>
+  }
+
+  private static final String DEFAULT_SERVER_HOST_FORMAT = &quot;https://%s.%s.%s&quot;;
+<span class="fc" id="L43">  private static final String DEFAULT_SERVER_API = LeanService.API.toString();</span>
+<span class="fc" id="L44">  private static final String DEFAULT_SERVER_STAT = LeanService.STATS.toString();</span>
+<span class="fc" id="L45">  private static final String DEFAULT_SERVER_ENGINE = LeanService.ENGINE.toString();</span>
+<span class="fc" id="L46">  private static final String DEFAULT_SERVER_PUSH = LeanService.PUSH.toString();</span>
+<span class="fc" id="L47">  private static final String DEFAULT_SERVER_RTM_ROUTER = LeanService.RTM.toString();</span>
+
+  private static final String DEFAULT_REGION_EAST_CHINA = &quot;lncldapi.com&quot;;
+  private static final String DEFAULT_REGION_NORTH_CHINA = &quot;lncld.net&quot;;
+  private static final String DEFAULT_REGION_NORTH_AMERICA = &quot;lncldglobal.com&quot;;
+
+<span class="fc" id="L53">  private static final Set&lt;String&gt; NorthAmericaSpecialApps = new HashSet&lt;&gt;();</span>
+  static {
+<span class="fc" id="L55">    NorthAmericaSpecialApps.add(&quot;143mgzglqmg4d0simqtn1zswggcro2ykugj76th8l38u3cm5&quot;);</span>
+<span class="fc" id="L56">    NorthAmericaSpecialApps.add(&quot;18ry1wsn1p7808tagf2ka7sy1omna3nihe45cet0ne4xhg46&quot;);</span>
+<span class="fc" id="L57">    NorthAmericaSpecialApps.add(&quot;7az5r9i0v95acx932a518ygz7mvr26uc7e3xxaq9s389sd2o&quot;);</span>
+<span class="fc" id="L58">    NorthAmericaSpecialApps.add(&quot;8FfQwpvihLHK4htqmtEvkNrv&quot;);</span>
+<span class="fc" id="L59">    NorthAmericaSpecialApps.add(&quot;AjQYwoIyObTeEkD16v1eCq55&quot;);</span>
+<span class="fc" id="L60">    NorthAmericaSpecialApps.add(&quot;E0mVu1VMWrwBodUFWBpWzLNV&quot;);</span>
+<span class="fc" id="L61">    NorthAmericaSpecialApps.add(&quot;J0Ev9alAhaS4IdnxBA95wKgn&quot;);</span>
+<span class="fc" id="L62">    NorthAmericaSpecialApps.add(&quot;Ol0Cw6zL1xP9IIqJpiSv9uYC&quot;);</span>
+<span class="fc" id="L63">    NorthAmericaSpecialApps.add(&quot;W9BCIPx2biwKiKfUvVJtc8kF&quot;);</span>
+<span class="fc" id="L64">    NorthAmericaSpecialApps.add(&quot;YHE5exCaW7UolMFJUtHvXTUY&quot;);</span>
+<span class="fc" id="L65">    NorthAmericaSpecialApps.add(&quot;glvame9g0qlj3a4o29j5xdzzrypxvvb30jt4vnvm66klph4r&quot;);</span>
+<span class="fc" id="L66">    NorthAmericaSpecialApps.add(&quot;iuuztdrr4mj683kbsmwoalt1roaypb5d25eu0f23lrfsthgn&quot;);</span>
+<span class="fc" id="L67">    NorthAmericaSpecialApps.add(&quot;kekxwm8uz1wtgxzvv5kitsgsammjcx4lcgm5b159qia5rqo5&quot;);</span>
+<span class="fc" id="L68">    NorthAmericaSpecialApps.add(&quot;msjqtclsfmfeznwvm29dqvuwddt3cqmziszf0rjddxho8eis&quot;);</span>
+<span class="fc" id="L69">    NorthAmericaSpecialApps.add(&quot;nHptjiXlt3g8mcraXYRDpYFT&quot;);</span>
+<span class="fc" id="L70">    NorthAmericaSpecialApps.add(&quot;nf3udjhnnsbe99qg04j7oslck4w1yp2geewcy1kp6wskbu5w&quot;);</span>
+<span class="fc" id="L71">    NorthAmericaSpecialApps.add(&quot;pFcwt2MaALYf70POa7bIqe0J&quot;);</span>
+<span class="fc" id="L72">    NorthAmericaSpecialApps.add(&quot;q3er6vs0dkawy15skjeuktf7l4eam438wn5jkts2j7fpf2y3&quot;);</span>
+<span class="fc" id="L73">    NorthAmericaSpecialApps.add(&quot;tsvezhhlefbdj1jbkohynipehgtpk353sfonvbtlyxaraqxy&quot;);</span>
+<span class="fc" id="L74">    NorthAmericaSpecialApps.add(&quot;wnDg0lPt0wcYGJSiHRwHBhD4&quot;);</span>
+<span class="fc" id="L75">  }</span>
+
+  public static LeanCloud.REGION getAppRegion(String applicationId) {
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">    if (LeanCloud.getRegion() != LeanCloud.REGION.NorthChina) {</span>
+<span class="nc" id="L79">      return LeanCloud.getRegion();</span>
+    }
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(applicationId)) {</span>
+<span class="nc" id="L82">      return LeanCloud.REGION.NorthChina;</span>
+    }
+<span class="pc bpc" id="L84" title="1 of 4 branches missed.">    if (applicationId.endsWith(&quot;-MdYXbMMI&quot;) || NorthAmericaSpecialApps.contains(applicationId)) {</span>
+<span class="fc" id="L85">      return LeanCloud.REGION.NorthAmerica;</span>
+    }
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">    if (applicationId.endsWith(&quot;-9Nh9j0Va&quot;)) {</span>
+<span class="nc" id="L88">      return LeanCloud.REGION.EastChina;</span>
+    }
+<span class="fc" id="L90">    return LeanCloud.REGION.NorthChina;</span>
+  }
+
+<span class="fc" id="L93">  private Retrofit retrofit = null;</span>
+<span class="fc" id="L94">  private AppAccessEndpoint defaultEndpoint = null;</span>
+<span class="fc" id="L95">  private AppAccessEndpoint customizedEndpoint = new AppAccessEndpoint();</span>
+
+<span class="fc" id="L97">  protected AppRouter() {</span>
+<span class="fc" id="L98">    OkHttpClient httpClient = new OkHttpClient.Builder()</span>
+<span class="fc" id="L99">            .connectTimeout(15, TimeUnit.SECONDS)</span>
+<span class="fc" id="L100">            .readTimeout(10, TimeUnit.SECONDS)</span>
+<span class="fc" id="L101">            .writeTimeout(10, TimeUnit.SECONDS)</span>
+<span class="fc" id="L102">            .addInterceptor(new LoggingInterceptor())</span>
+<span class="fc" id="L103">            .dns(new DNSDetoxicant())</span>
+<span class="fc" id="L104">            .build();</span>
+<span class="fc" id="L105">    retrofit = new Retrofit.Builder()</span>
+<span class="fc" id="L106">            .baseUrl(APP_ROUTER_HOST)</span>
+<span class="fc" id="L107">            .addConverterFactory(AppConfiguration.getRetrofitConverterFactory())</span>
+<span class="fc" id="L108">            .addCallAdapterFactory(RxJava2CallAdapterFactory.create())</span>
+<span class="fc" id="L109">            .client(httpClient)</span>
+<span class="fc" id="L110">            .build();</span>
+<span class="fc" id="L111">  }</span>
+
+  protected AppAccessEndpoint buildDefaultEndpoint(String appId) {
+<span class="pc bpc" id="L114" title="2 of 4 branches missed.">    if (null == appId || appId.length() &lt;= 8) {</span>
+<span class="nc" id="L115">      return null;</span>
+    }
+<span class="fc" id="L117">    AppAccessEndpoint result = new AppAccessEndpoint();</span>
+<span class="fc" id="L118">    String appIdPrefix = appId.substring(0, 8).toLowerCase();</span>
+<span class="fc" id="L119">    LeanCloud.REGION region = getAppRegion(appId);</span>
+<span class="fc" id="L120">    String lastHost = &quot;&quot;;</span>
+<span class="pc bpc" id="L121" title="3 of 4 branches missed.">    switch (region) {</span>
+      case NorthChina:
+<span class="fc" id="L123">        lastHost = DEFAULT_REGION_NORTH_CHINA;</span>
+<span class="fc" id="L124">        break;</span>
+      case EastChina:
+<span class="nc" id="L126">        lastHost = DEFAULT_REGION_EAST_CHINA;</span>
+<span class="nc" id="L127">        break;</span>
+      case NorthAmerica:
+<span class="nc" id="L129">        lastHost = DEFAULT_REGION_NORTH_AMERICA;</span>
+<span class="nc" id="L130">        break;</span>
+      default:
+<span class="nc" id="L132">        LOGGER.w(&quot;Invalid region&quot;);</span>
+        break;
+    }
+<span class="fc" id="L135">    result.setApiServer(String.format(DEFAULT_SERVER_HOST_FORMAT, appIdPrefix, DEFAULT_SERVER_API, lastHost));</span>
+<span class="fc" id="L136">    result.setEngineServer(String.format(DEFAULT_SERVER_HOST_FORMAT, appIdPrefix, DEFAULT_SERVER_ENGINE, lastHost));</span>
+<span class="fc" id="L137">    result.setPushServer(String.format(DEFAULT_SERVER_HOST_FORMAT, appIdPrefix, DEFAULT_SERVER_PUSH, lastHost));</span>
+<span class="fc" id="L138">    result.setRtmRouterServer(String.format(DEFAULT_SERVER_HOST_FORMAT, appIdPrefix, DEFAULT_SERVER_RTM_ROUTER, lastHost));</span>
+<span class="fc" id="L139">    result.setStatsServer(String.format(DEFAULT_SERVER_HOST_FORMAT, appIdPrefix, DEFAULT_SERVER_STAT, lastHost));</span>
+<span class="fc" id="L140">    result.setTtl(36000 + System.currentTimeMillis() / 1000);</span>
+<span class="fc" id="L141">    return result;</span>
+  }
+
+  private Observable&lt;String&gt; fetchServerFromRemote(final String appId, final LeanService service) {
+<span class="nc" id="L145">    return fetchServerHostsInBackground(appId).map(new Function&lt;AppAccessEndpoint, String&gt;() {</span>
+      @Override
+      public String apply(AppAccessEndpoint appAccessEndpoint) throws Exception {
+<span class="nc" id="L148">        String result = &quot;&quot;;</span>
+<span class="nc bnc" id="L149" title="All 6 branches missed.">        switch (service) {</span>
+          case API:
+<span class="nc" id="L151">            result = appAccessEndpoint.getApiServer();</span>
+<span class="nc" id="L152">            break;</span>
+          case ENGINE:
+<span class="nc" id="L154">            result = appAccessEndpoint.getEngineServer();</span>
+<span class="nc" id="L155">            break;</span>
+          case PUSH:
+<span class="nc" id="L157">            result = appAccessEndpoint.getPushServer();</span>
+<span class="nc" id="L158">            break;</span>
+          case RTM:
+<span class="nc" id="L160">            result = appAccessEndpoint.getRtmRouterServer();</span>
+<span class="nc" id="L161">            break;</span>
+          case STATS:
+<span class="nc" id="L163">            result = appAccessEndpoint.getStatsServer();</span>
+<span class="nc" id="L164">            break;</span>
+          default:
+            break;
+        }
+<span class="nc bnc" id="L168" title="All 4 branches missed.">        if (!StringUtil.isEmpty(result) &amp;&amp; !result.startsWith(&quot;http&quot;)) {</span>
+<span class="nc" id="L169">          result = &quot;https://&quot; + result;</span>
+        }
+<span class="nc" id="L171">        return result;</span>
+      }
+    });
+  }
+
+  public boolean hasFrozenEndpoint() {
+<span class="nc" id="L177">    return this.customizedEndpoint.hasSpecifiedEndpoint();</span>
+  }
+
+  public void freezeEndpoint(final LeanService service, String host) {
+<span class="fc" id="L181">    this.customizedEndpoint.freezeEndpoint(service, host);</span>
+<span class="fc" id="L182">  }</span>
+
+  protected void clearEndpoints() {
+<span class="fc" id="L185">    this.customizedEndpoint.reset();</span>
+<span class="fc" id="L186">  }</span>
+
+  public Observable&lt;String&gt; getEndpoint(final String appId, final LeanService service) {
+<span class="fc" id="L189">    return getEndpoint(appId, service, false);</span>
+  }
+
+  private Observable&lt;String&gt; getEndpoint(final String appId, final LeanService service, boolean forceUpdate) {
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(appId)) {</span>
+<span class="nc" id="L194">      LOGGER.e(&quot;application id is empty.&quot;);</span>
+<span class="nc" id="L195">      return Observable.just(&quot;&quot;);</span>
+    }
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">    if (appId.length() &lt;= 8) {</span>
+<span class="nc" id="L198">      LOGGER.e(&quot;application id is invalid(too short):&quot; + appId);</span>
+<span class="nc" id="L199">      return Observable.just(&quot;&quot;);</span>
+    }
+<span class="fc" id="L201">    String fixedHost = this.customizedEndpoint.getServerHost(service);</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">    if (!StringUtil.isEmpty(fixedHost)) {</span>
+<span class="fc" id="L203">      return Observable.just(fixedHost);</span>
+    }
+
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">    if (forceUpdate) {</span>
+      // force to update from server.
+<span class="nc" id="L208">      return fetchServerFromRemote(appId, service);</span>
+    }
+
+<span class="fc bfc" id="L211" title="All 2 branches covered.">    if (null == this.defaultEndpoint) {</span>
+<span class="fc" id="L212">      SystemSetting setting = AppConfiguration.getDefaultSetting();</span>
+<span class="fc" id="L213">      String cachedResult = null;</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">      if (null != setting) {</span>
+<span class="fc" id="L215">        cachedResult = setting.getString(getPersistenceKeyZone(appId, true), appId, &quot;&quot;);</span>
+      }
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">      if (!StringUtil.isEmpty(cachedResult)) {</span>
+<span class="nc" id="L218">        defaultEndpoint = JSON.parseObject(cachedResult, AppAccessEndpoint.class);</span>
+<span class="nc" id="L219">        long currentSeconds = System.currentTimeMillis() / 1000;</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        if (currentSeconds &gt; defaultEndpoint.getTtl()) {</span>
+<span class="nc" id="L221">          defaultEndpoint = null;</span>
+        }
+      }
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">      if (null == defaultEndpoint) {</span>
+<span class="fc" id="L225">        defaultEndpoint = buildDefaultEndpoint(appId);</span>
+      }
+    }
+
+<span class="fc" id="L229">    String result = &quot;&quot;;</span>
+<span class="pc bpc" id="L230" title="4 of 6 branches missed.">    switch (service) {</span>
+      case API:
+<span class="nc" id="L232">        result = this.defaultEndpoint.getApiServer();</span>
+<span class="nc" id="L233">        break;</span>
+      case ENGINE:
+<span class="nc" id="L235">        result = this.defaultEndpoint.getEngineServer();</span>
+<span class="nc" id="L236">        break;</span>
+      case PUSH:
+<span class="fc" id="L238">        result = this.defaultEndpoint.getPushServer();</span>
+<span class="fc" id="L239">        break;</span>
+      case RTM:
+<span class="fc" id="L241">        result = this.defaultEndpoint.getRtmRouterServer();</span>
+<span class="fc" id="L242">        break;</span>
+      case STATS:
+<span class="nc" id="L244">        result = this.defaultEndpoint.getStatsServer();</span>
+<span class="nc" id="L245">        break;</span>
+      default:
+        break;
+    }
+<span class="pc bpc" id="L249" title="2 of 4 branches missed.">    if (!StringUtil.isEmpty(result) &amp;&amp; !result.startsWith(&quot;http&quot;)) {</span>
+<span class="nc" id="L250">      result = &quot;https://&quot; + result;</span>
+    }
+<span class="fc" id="L252">    return Observable.just(result);</span>
+  }
+
+  public Observable&lt;AppAccessEndpoint&gt; fetchServerHostsInBackground(final String appId) {
+<span class="nc" id="L256">    AppRouterService service = retrofit.create(AppRouterService.class);</span>
+<span class="nc" id="L257">    Observable&lt;AppAccessEndpoint&gt; result = service.getRouter(appId);</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">    if (AppConfiguration.isAsynchronized()) {</span>
+<span class="nc" id="L259">      result = result.subscribeOn(Schedulers.io());</span>
+    }
+<span class="nc" id="L261">    AppConfiguration.SchedulerCreator creator = AppConfiguration.getDefaultScheduler();</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">    if (null != creator) {</span>
+<span class="nc" id="L263">      result = result.observeOn(creator.create());</span>
+    }
+<span class="nc" id="L265">    return result.map(new Function&lt;AppAccessEndpoint, AppAccessEndpoint&gt;() {</span>
+      @Override
+      public AppAccessEndpoint apply(AppAccessEndpoint appAccessEndpoint) throws Exception {
+        // save result to local cache.
+<span class="nc" id="L269">        LOGGER.d(appAccessEndpoint.toString());</span>
+<span class="nc" id="L270">        AppRouter.this.defaultEndpoint = appAccessEndpoint;</span>
+<span class="nc" id="L271">        AppRouter.this.defaultEndpoint.setTtl(appAccessEndpoint.getTtl() + System.currentTimeMillis() / 1000);</span>
+<span class="nc" id="L272">        SystemSetting setting = AppConfiguration.getDefaultSetting();</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">        if (null != setting) {</span>
+<span class="nc" id="L274">          String endPoints = JSON.toJSONString(AppRouter.this.defaultEndpoint);</span>
+<span class="nc" id="L275">          setting.saveString(getPersistenceKeyZone(appId, true), appId, endPoints);</span>
+        }
+<span class="nc" id="L277">        return AppRouter.this.defaultEndpoint;</span>
+      }
+    });
+  }
+
+  private Observable&lt;RTMConnectionServerResponse&gt; fetchRTMServerFromRemote(final String routerHost, final String appId,
+                                                                           final String installationId, int secure) {
+<span class="fc" id="L284">    LOGGER.d(&quot;fetchRTMServerFromRemote. router=&quot; + routerHost + &quot;, appId=&quot; + appId</span>
+            + &quot;, installationId=&quot; + installationId);
+<span class="fc" id="L286">    Retrofit tmpRetrofit = retrofit.newBuilder().baseUrl(routerHost).build();</span>
+<span class="fc" id="L287">    AppRouterService tmpService = tmpRetrofit.create(AppRouterService.class);</span>
+<span class="fc" id="L288">    Observable&lt;RTMConnectionServerResponse&gt; result = tmpService.getRTMConnectionServer(appId, installationId, secure);</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">    if (AppConfiguration.isAsynchronized()) {</span>
+<span class="nc" id="L290">      result = result.subscribeOn(Schedulers.io());</span>
+    }
+<span class="fc" id="L292">    AppConfiguration.SchedulerCreator creator = AppConfiguration.getDefaultScheduler();</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">    if (null != creator) {</span>
+<span class="nc" id="L294">      result = result.observeOn(creator.create());</span>
+    }
+<span class="fc" id="L296">    return result.map(new Function&lt;RTMConnectionServerResponse, RTMConnectionServerResponse&gt;() {</span>
+      @Override
+      public RTMConnectionServerResponse apply(RTMConnectionServerResponse rtmConnectionServerResponse) throws Exception {
+<span class="fc" id="L299">        SystemSetting setting = AppConfiguration.getDefaultSetting();</span>
+<span class="pc bpc" id="L300" title="2 of 4 branches missed.">        if (null != rtmConnectionServerResponse &amp;&amp; null != setting) {</span>
+<span class="fc" id="L301">          rtmConnectionServerResponse.setTtl(rtmConnectionServerResponse.getTtl() + System.currentTimeMillis() / 1000);</span>
+<span class="fc" id="L302">          String cacheResult = JSON.toJSONString(rtmConnectionServerResponse);</span>
+<span class="fc" id="L303">          setting.saveString(getPersistenceKeyZone(appId, false), routerHost, cacheResult);</span>
+        }
+<span class="fc" id="L305">        return rtmConnectionServerResponse;</span>
+      }
+    });
+  }
+
+  public Observable&lt;RTMConnectionServerResponse&gt; fetchRTMConnectionServer(final String routerHost, final String appId,
+                                                                          final String installationId, int secure,
+                                                                          boolean forceUpdate) {
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">    if (!forceUpdate) {</span>
+<span class="fc" id="L314">      RTMConnectionServerResponse cachedResponse = null;</span>
+<span class="fc" id="L315">      SystemSetting setting = AppConfiguration.getDefaultSetting();</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">      if (null != setting) {</span>
+<span class="fc" id="L317">        String cacheServer = setting.getString(getPersistenceKeyZone(appId, false), routerHost, &quot;&quot;);</span>
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">        if (!StringUtil.isEmpty(cacheServer)) {</span>
+          try {
+<span class="nc" id="L320">            cachedResponse = JSON.parseObject(cacheServer, RTMConnectionServerResponse.class);</span>
+<span class="nc" id="L321">            long currentSeconds = System.currentTimeMillis()/1000;</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">            if (currentSeconds &gt; cachedResponse.getTtl()) {</span>
+              // cache is out of date.
+<span class="nc" id="L324">              setting.removeKey(getPersistenceKeyZone(appId, false), routerHost);</span>
+<span class="nc" id="L325">              cachedResponse = null;</span>
+            }
+<span class="nc bnc" id="L327" title="All 2 branches missed.">            if (null != cachedResponse) {</span>
+<span class="nc" id="L328">              return Observable.just(cachedResponse);</span>
+            }
+<span class="nc" id="L330">          } catch (Exception ex) {</span>
+<span class="nc" id="L331">            cachedResponse = null;</span>
+<span class="nc" id="L332">            setting.removeKey(getPersistenceKeyZone(appId, false), routerHost);</span>
+<span class="nc" id="L333">          }</span>
+        }
+      }
+    }
+<span class="fc" id="L337">    return fetchRTMServerFromRemote(routerHost, appId, installationId, secure);</span>
+  }
+
+  protected String getPersistenceKeyZone(String appId, boolean forAPIEndpoints) {
+<span class="fc bfc" id="L341" title="All 2 branches covered.">    if (forAPIEndpoints) {</span>
+<span class="fc" id="L342">      return &quot;com.avos.avoscloud.approuter.&quot; + appId;</span>
+    } else {
+<span class="fc" id="L344">      return &quot;com.avos.push.router.server.cache&quot; + appId;</span>
+    }
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

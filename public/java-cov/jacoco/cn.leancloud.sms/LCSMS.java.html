@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LCSMS.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.sms</a> &gt; <span class="el_source">LCSMS.java</span></div><h1>LCSMS.java</h1><pre class="source lang-java linenums">package cn.leancloud.sms;
+
+import cn.leancloud.core.PaasClient;
+import cn.leancloud.types.LCNull;
+import cn.leancloud.utils.StringUtil;
+import io.reactivex.Observable;
+
+import java.util.Map;
+import java.util.regex.Pattern;
+
+<span class="nc" id="L11">public class LCSMS {</span>
+<span class="fc" id="L12">  static Pattern phoneNumPattern = Pattern.compile(&quot;^[1+]\\d+$&quot;);</span>
+
+<span class="fc" id="L14">  public enum TYPE {</span>
+<span class="fc" id="L15">    VOICE_SMS(&quot;voice&quot;), TEXT_SMS(&quot;sms&quot;);</span>
+
+    private String name;
+
+<span class="fc" id="L19">    TYPE(String name) {</span>
+<span class="fc" id="L20">      this.name = name;</span>
+<span class="fc" id="L21">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L25">      return this.name;</span>
+    }
+  }
+
+  public static boolean checkMobilePhoneNumber(String phoneNumber) {
+<span class="fc" id="L30">    return phoneNumPattern.matcher(phoneNumber).find();</span>
+  }
+
+  public static Observable&lt;LCNull&gt; requestSMSCodeInBackground(String mobilePhone, LCSMSOption option) {
+<span class="pc bpc" id="L34" title="1 of 4 branches missed.">    if (StringUtil.isEmpty(mobilePhone) || !checkMobilePhoneNumber(mobilePhone)) {</span>
+<span class="fc" id="L35">      return Observable.error(new IllegalArgumentException(&quot;mobile phone number is empty or invalid&quot;));</span>
+    }
+<span class="fc bfc" id="L37" title="All 2 branches covered.">    if (null == option) {</span>
+<span class="fc" id="L38">      return Observable.error(new IllegalArgumentException(&quot;smsOption is null&quot;));</span>
+    }
+<span class="fc" id="L40">    Map&lt;String, Object&gt; param = option.getOptionMap();</span>
+<span class="fc" id="L41">    return PaasClient.getStorageClient().requestSMSCode(mobilePhone, param);</span>
+  }
+
+  public static Observable&lt;LCNull&gt; verifySMSCodeInBackground(String code, String mobilePhone) {
+<span class="nc bnc" id="L45" title="All 4 branches missed.">    if (StringUtil.isEmpty(code) || StringUtil.isEmpty(mobilePhone)) {</span>
+<span class="nc" id="L46">      return Observable.error(new IllegalArgumentException(&quot;code or mobilePhone is empty&quot;));</span>
+    }
+<span class="nc" id="L48">    return PaasClient.getStorageClient().verifySMSCode(code, mobilePhone);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

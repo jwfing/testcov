@@ -1,0 +1,591 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LCPush.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud</a> &gt; <span class="el_source">LCPush.java</span></div><h1>LCPush.java</h1><pre class="source lang-java linenums">package cn.leancloud;
+
+import cn.leancloud.callback.SendCallback;
+import cn.leancloud.core.PaasClient;
+import cn.leancloud.utils.LCUtils;
+import cn.leancloud.utils.LogUtil;
+import cn.leancloud.utils.StringUtil;
+import cn.leancloud.json.JSON;
+import cn.leancloud.json.JSONObject;
+import io.reactivex.Observable;
+import io.reactivex.Observer;
+import io.reactivex.disposables.Disposable;
+
+import java.util.*;
+
+public class LCPush {
+<span class="fc" id="L17">  private static final LCLogger LOGGER = LogUtil.getLogger(LCPush.class);</span>
+
+  private static final String deviceTypeTag = &quot;deviceType&quot;;
+<span class="fc" id="L20">  private static final Set&lt;String&gt; DEVICE_TYPES = new HashSet&lt;String&gt;();</span>
+
+  private static final String FlowControlTag = &quot;flow_control&quot;;
+  private static final String APNsTeamIdTag = &quot;apns_team_id&quot;;
+  private static final String APNsTopicTag = &quot;topic&quot;;
+  private static final String iOSEnvironmentTag = &quot;prod&quot;;
+  private static final String NotificationIdTag = &quot;notification_id&quot;;
+  private static final String RequestIdTag = &quot;req_id&quot;;
+  public static final String iOSEnvironmentDev = &quot;dev&quot;;
+  public static final String iOSEnvironmentProd = &quot;prod&quot;;
+  private static final int FlowControlMinValue = 1000;
+
+  static {
+<span class="fc" id="L33">    DEVICE_TYPES.add(&quot;android&quot;);</span>
+<span class="fc" id="L34">    DEVICE_TYPES.add(&quot;ios&quot;);</span>
+<span class="fc" id="L35">  }</span>
+
+  private final Set&lt;String&gt; channelSet;
+  private LCQuery&lt;? extends LCInstallation&gt; pushQuery;
+  private String cql;
+  private long expirationTime;
+  private long expirationTimeInterval;
+  private final Set&lt;String&gt; pushTarget;
+  private final Map&lt;String, Object&gt; pushData;
+  private LCObject notification;
+<span class="fc" id="L45">  private Date pushDate = null;</span>
+<span class="fc" id="L46">  private int flowControl = 0;          // add since v6.1.2</span>
+
+<span class="fc" id="L48">  private String iOSEnvironment = null; // add since v6.5.2</span>
+<span class="fc" id="L49">  private String APNsTopic = null;      // add since v6.5.2</span>
+<span class="fc" id="L50">  private String APNsTeamId = null;     // add since v6.5.2</span>
+<span class="fc" id="L51">  private String notificationId = null; // add since v6.5.2</span>
+<span class="fc" id="L52">  private String requestId = null;      // add since v6.5.2</span>
+
+  /**
+   * Creates a new push notification. The default channel is the empty string, also known as the
+   * global broadcast channel, but this value can be overridden using AVPush.setChannel(String),
+   * AVPush.setChannels(Collection) or AVPush.setQuery(AVQuery). Before sending the push
+   * notification you must call either AVPush.setMessage(String) or AVPush.setData(JSONObject).
+   */
+<span class="fc" id="L60">  public LCPush() {</span>
+<span class="fc" id="L61">    channelSet = new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L62">    pushData = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L63">    pushTarget = new HashSet&lt;String&gt;(DEVICE_TYPES);</span>
+<span class="fc" id="L64">    pushQuery = LCInstallation.getQuery();</span>
+<span class="fc" id="L65">  }</span>
+
+  /**
+   * Return channel set.
+   * @return channel set.
+   */
+  public Set&lt;String&gt; getChannelSet() {
+<span class="nc" id="L72">    return channelSet;</span>
+  }
+
+  /**
+   * Return the instance of _Notification。
+   *
+   * @return notification instance.
+   */
+  public LCObject getNotification() {
+<span class="nc" id="L81">    return notification;</span>
+  }
+
+  /**
+   * Return push query instance.
+   * @return push query instance.
+   */
+  public LCQuery&lt;? extends LCInstallation&gt; getPushQuery() {
+<span class="nc" id="L89">    return pushQuery;</span>
+  }
+
+  /**
+   * Get push date.
+   * @return push date
+   */
+  public Date getPushDate() {
+<span class="nc" id="L97">    return pushDate;</span>
+  }
+
+  /**
+   * Get expiration time.
+   * @return expiration time
+   */
+  public long getExpirationTime() {
+<span class="nc" id="L105">    return expirationTime;</span>
+  }
+
+  /**
+   * Get expiration time interval.
+   * @return expiration time interval
+   */
+  public long getExpirationTimeInterval() {
+<span class="nc" id="L113">    return expirationTimeInterval;</span>
+  }
+
+  /**
+   * Get push target.
+   * @return push target
+   */
+  public Set&lt;String&gt; getPushTarget() {
+<span class="nc" id="L121">    return pushTarget;</span>
+  }
+
+  /**
+   * Get push data.
+   * @return push data
+   */
+  public Map&lt;String, Object&gt; getPushData() {
+<span class="nc" id="L129">    return pushData;</span>
+  }
+
+  /**
+   * Get push flow control value.
+   * @return flow control value.
+   */
+  public int getFlowControl() {
+<span class="fc" id="L137">    return flowControl;</span>
+  }
+
+  /**
+   * set flow control for send speed.
+   * flow control value indicates how many devices will be pushed per second.
+   * the min value is 1000, if flowControl less than 1000, it will be replaced with 1000.
+   *
+   * @since 6.1.2
+   * @param flowControl flow control value which stands how many devices will be pushed per second.
+   */
+  public void setFlowControl(int flowControl) {
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">    if (flowControl &lt; FlowControlMinValue) {</span>
+<span class="fc" id="L150">      flowControl = FlowControlMinValue;</span>
+    }
+<span class="fc" id="L152">    this.flowControl = flowControl;</span>
+<span class="fc" id="L153">  }</span>
+
+  /**
+   * set iOS Environment(optinal, default is production environment).
+   * When using Token Authentication, this parameter determines which of environment(dev or prod)
+   * will become the push target.
+   * @param iOSEnvironment iOS environment, allowed values as following:
+   *                       AVPush.iOSEnvironmentDev(&quot;dev&quot;) - development environment
+   *                       AVPush.iOSEnvironmentProd(&quot;prod&quot;) - production environment
+   * @since 6.5.2
+   */
+  public void setiOSEnvironment(String iOSEnvironment) {
+<span class="fc" id="L165">    this.iOSEnvironment = iOSEnvironment;</span>
+<span class="fc" id="L166">  }</span>
+
+  /**
+   * set APNs Topic(optinal, only used by Token Authentication)
+   * @param APNsTopic apns topic
+   * @since 6.5.2
+   */
+  public void setAPNsTopic(String APNsTopic) {
+<span class="nc" id="L174">    this.APNsTopic = APNsTopic;</span>
+<span class="nc" id="L175">  }</span>
+
+  /**
+   * set APNs Team Id(optinal, only used by Token Authentication)
+   * @param APNsTeamId apns team id.
+   * @since 6.5.2
+   */
+  public void setAPNsTeamId(String APNsTeamId) {
+<span class="nc" id="L183">    this.APNsTeamId = APNsTeamId;</span>
+<span class="nc" id="L184">  }</span>
+
+  /**
+   * set notification id(optional).
+   * at now, notification id's max length is 16 characters, only letter and number is valid.
+   *
+   * @param notificationId customized notification id.
+   */
+  public void setNotificationId(String notificationId) {
+<span class="nc" id="L193">    this.notificationId = notificationId;</span>
+<span class="nc" id="L194">  }</span>
+
+  /**
+   * set customized request id(optional).
+   * at now, request id's max length is 16 characters, only letter and number is valid.
+   * when many requests with the same request id within 5 minutes, only one request works.
+   * @param requestId customized request id.
+   */
+  public void setRequestId(String requestId) {
+<span class="nc" id="L203">    this.requestId = requestId;</span>
+<span class="nc" id="L204">  }</span>
+
+  /**
+   * Sets the channel on which this push notification will be sent. The channel name must start with
+   * a letter and contain only letters, numbers, dashes, and underscores. A push can either have
+   * channels or a query. Setting this will unset the query.
+   * @param channel  channel string.
+   */
+  public void setChannel(String channel) {
+<span class="fc" id="L213">    channelSet.clear();</span>
+<span class="fc" id="L214">    channelSet.add(channel);</span>
+<span class="fc" id="L215">  }</span>
+
+  /**
+   * Sets the collection of channels on which this push notification will be sent. Each channel name
+   * must start with a letter and contain only letters, numbers, dashes, and underscores. A push can
+   * either have channels or a query. Setting this will unset the query.
+   *
+   * @param channels channel collection.
+   */
+  public void setChannels(Collection&lt;String&gt; channels) {
+<span class="nc" id="L225">    channelSet.clear();</span>
+<span class="nc" id="L226">    channelSet.addAll(channels);</span>
+<span class="nc" id="L227">  }</span>
+
+  /**
+   * Sets the entire data of the push message. See the push guide for more details on the data
+   * format. This will overwrite any data specified in AVPush.setMessage(String).
+   *
+   * @param data push data.
+   * @since 1.4.4
+   */
+  public void setData(Map&lt;String, Object&gt; data) {
+<span class="fc" id="L237">    this.pushData.put(&quot;data&quot;, data);</span>
+<span class="fc" id="L238">  }</span>
+
+  /**
+   * Sets the entire data of the push message. See the push guide for more details on the data
+   * format. This will overwrite any data specified in AVPush.setMessage(String).
+   * @param data push data.
+   */
+  public void setData(JSONObject data) {
+    try {
+<span class="nc" id="L247">      Map&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L248">      Iterator&lt;Map.Entry&lt;String, Object&gt;&gt; iter = data.entrySet().iterator();</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">      while (iter.hasNext()) {</span>
+<span class="nc" id="L250">        Map.Entry&lt;String, Object&gt; entry = iter.next();</span>
+<span class="nc" id="L251">        map.put(entry.getKey(), entry.getValue());</span>
+<span class="nc" id="L252">      }</span>
+<span class="nc" id="L253">      this.pushData.put(&quot;data&quot;, map);</span>
+<span class="nc" id="L254">    } catch (Exception exception) {</span>
+<span class="nc" id="L255">      LOGGER.w(exception);</span>
+<span class="nc" id="L256">    }</span>
+<span class="nc" id="L257">  }</span>
+
+  private Date expirationDateTime() {
+<span class="nc" id="L260">    return new Date(expirationTime);</span>
+  }
+
+  /**
+   * Set the push date at which the push will be sent.
+   *
+   * @param date The push date.
+   */
+  public void setPushDate(Date date) {
+<span class="nc" id="L269">    this.pushDate = date;</span>
+<span class="nc" id="L270">  }</span>
+
+  /**
+   * Sets a UNIX epoch timestamp at which this notification should expire, in seconds (UTC). This
+   * notification will be sent to devices which are either online at the time the notification is
+   * sent, or which come online before the expiration time is reached. Because device clocks are not
+   * guaranteed to be accurate, most applications should instead use
+   * AVPush.setExpirationTimeInterval(long).
+   * @param time timestamp.
+   */
+  public void setExpirationTime(long time) {
+<span class="nc" id="L281">    this.expirationTime = time;</span>
+<span class="nc" id="L282">  }</span>
+
+  /**
+   * Sets the time interval after which this notification should expire, in seconds. This
+   * notification will be sent to devices which are either online at the time the notification is
+   * sent, or which come online within the given number of seconds of the notification being
+   * received by AVOSCloud's server. An interval which is less than or equal to zero indicates that
+   * the message should only be sent to devices which are currently online.
+   * @param timeInterval time interval.
+   */
+  public void setExpirationTimeInterval(long timeInterval) {
+<span class="nc" id="L293">    this.expirationTimeInterval = timeInterval;</span>
+<span class="nc" id="L294">  }</span>
+
+  /**
+   * Sets the message that will be shown in the notification. This will overwrite any data specified
+   * in AVPush.setData(JSONObject).
+   * @param message push message.
+   */
+  public void setMessage(String message) {
+<span class="fc" id="L302">    pushData.clear();</span>
+<span class="fc" id="L303">    Map&lt;String, Object&gt; map = LCUtils.createStringObjectMap(&quot;alert&quot;, message);</span>
+<span class="fc" id="L304">    pushData.put(&quot;data&quot;, map);</span>
+<span class="fc" id="L305">  }</span>
+
+  /**
+   * set push target only android device.
+   * @param pushToAndroid flag to push to android or not.
+   */
+  public void setPushToAndroid(boolean pushToAndroid) {
+<span class="fc bfc" id="L312" title="All 2 branches covered.">    if (pushToAndroid) {</span>
+<span class="fc" id="L313">      this.pushTarget.add(&quot;android&quot;);</span>
+    } else {
+<span class="fc" id="L315">      this.pushTarget.remove(&quot;android&quot;);</span>
+    }
+<span class="fc" id="L317">  }</span>
+
+  /**
+   * set push target only ios device.
+   * @param pushToIOS flag to push to iOS or not.
+   */
+  public void setPushToIOS(boolean pushToIOS) {
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">    if (pushToIOS) {</span>
+<span class="fc" id="L325">      this.pushTarget.add(&quot;ios&quot;);</span>
+    } else {
+<span class="nc" id="L327">      this.pushTarget.remove(&quot;ios&quot;);</span>
+    }
+<span class="fc" id="L329">  }</span>
+
+  /**
+   * set push target only windows phone device.
+   * @param pushToWP flag to push to Windows Phone or not.
+   */
+  public void setPushToWindowsPhone(boolean pushToWP) {
+<span class="nc bnc" id="L336" title="All 2 branches missed.">    if (pushToWP) {</span>
+<span class="nc" id="L337">      this.pushTarget.add(&quot;wp&quot;);</span>
+    } else {
+<span class="nc" id="L339">      this.pushTarget.remove(&quot;wp&quot;);</span>
+    }
+<span class="nc" id="L341">  }</span>
+
+  /**
+   * Sets the query for this push for which this push notification will be sent. This query will be
+   * executed in the AVOSCloud cloud; this push notification will be sent to Installations which
+   * this query yields. A push can either have channels or a query. Setting this will unset the
+   * channels.
+   *
+   * @param query A query to which this push should target. This must be a AVInstallation query.
+   */
+  public void setQuery(LCQuery&lt;? extends LCInstallation&gt; query) {
+<span class="nc" id="L352">    this.pushQuery = query;</span>
+<span class="nc" id="L353">  }</span>
+
+  /**
+   * 可以通过 cql来针对push进行筛选
+   *
+   * 请注意cql 的主体应该是_Installation表
+   *
+   * 请在设置cql的同时，不要设置pushTarget(ios,android,wp)
+   *
+   * @param cql query cql.
+   * @since 2.6.7
+   */
+  public void setCloudQuery(String cql) {
+<span class="nc" id="L366">    this.cql = cql;</span>
+<span class="nc" id="L367">  }</span>
+
+  /**
+   * Clears both expiration values, indicating that the notification should never expire.
+   */
+  public void clearExpiration() {
+<span class="nc" id="L373">    expirationTime = 0L;</span>
+<span class="nc" id="L374">    expirationTimeInterval = 0L;</span>
+<span class="nc" id="L375">  }</span>
+
+  /**
+   * Sends this push notification while blocking this thread until the push notification has
+   * successfully reached the AVOSCloud servers. Typically, you should use AVPush.sendInBackground()
+   * instead of this, unless you are managing your own threading.
+   */
+  public void send() {
+<span class="fc" id="L383">    sendInBackground().blockingFirst();</span>
+<span class="fc" id="L384">  }</span>
+
+  /**
+   * Sends this push notification in a background thread. This is preferable to using send(), unless
+   * your code is already running from a background thread.
+   * @return observable instance.
+   */
+  public Observable&lt;JSONObject&gt; sendInBackground() {
+    try {
+<span class="fc" id="L393">      Map&lt;String, Object&gt; map = postDataMap();</span>
+<span class="fc" id="L394">      return PaasClient.getPushClient().sendPushRequest(map);</span>
+<span class="nc" id="L395">    } catch (Exception ex) {</span>
+<span class="nc" id="L396">      return Observable.error(ex);</span>
+    }
+  }
+
+  private Map&lt;String, Object&gt; pushChannelsData() {
+<span class="fc" id="L401">    return LCUtils.createStringObjectMap(&quot;channels&quot;, channelSet);</span>
+  }
+
+  private Map&lt;String, Object&gt; postDataMap() throws LCException {
+<span class="fc" id="L405">    Map&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();</span>
+
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">    if (pushQuery != null) {</span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">      if (pushTarget.size() == 0) {</span>
+<span class="nc" id="L409">        pushQuery.whereNotContainedIn(deviceTypeTag, DEVICE_TYPES);</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">      } else if (pushTarget.size() == 1) {</span>
+<span class="fc" id="L411">        pushQuery.whereEqualTo(deviceTypeTag, pushTarget.toArray()[0]);</span>
+      }
+<span class="fc" id="L413">      Map&lt;String, String&gt; pushParameters = pushQuery.assembleParameters();</span>
+<span class="pc bpc" id="L414" title="1 of 4 branches missed.">      if (pushParameters.keySet().size() &gt; 0 &amp;&amp; !StringUtil.isEmpty(cql)) {</span>
+<span class="nc" id="L415">        throw new IllegalStateException(&quot;You can't use AVQuery and Cloud query at the same time.&quot;);</span>
+      }
+<span class="fc bfc" id="L417" title="All 2 branches covered.">      for (Map.Entry&lt;String, String&gt; entry: pushParameters.entrySet()) {</span>
+<span class="fc" id="L418">        map.put(entry.getKey(), JSON.parse(entry.getValue()));</span>
+<span class="fc" id="L419">      }</span>
+    }
+
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(cql)) {</span>
+<span class="nc" id="L423">      map.put(&quot;cql&quot;, cql);</span>
+    }
+
+<span class="fc bfc" id="L426" title="All 2 branches covered.">    if (channelSet.size() &gt; 0) {</span>
+<span class="fc" id="L427">      map.putAll(pushChannelsData());</span>
+    }
+
+<span class="pc bpc" id="L430" title="1 of 2 branches missed.">    if (this.expirationTime &gt; 0) {</span>
+<span class="nc" id="L431">      map.put(&quot;expiration_time&quot;, this.expirationDateTime());</span>
+    }
+
+<span class="pc bpc" id="L434" title="1 of 2 branches missed.">    if (this.expirationTimeInterval &gt; 0) {</span>
+<span class="nc" id="L435">      map.put(&quot;push_time&quot;, StringUtil.stringFromDate(new Date()));</span>
+<span class="nc" id="L436">      map.put(&quot;expiration_interval&quot;, Long.valueOf(this.expirationTimeInterval));</span>
+    }
+
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">    if (this.pushDate != null) {</span>
+<span class="nc" id="L440">      map.put(&quot;push_time&quot;, StringUtil.stringFromDate(pushDate));</span>
+    }
+
+<span class="fc bfc" id="L443" title="All 2 branches covered.">    if (this.flowControl &gt; 0) {</span>
+<span class="fc" id="L444">      map.put(FlowControlTag, this.flowControl);</span>
+    }
+
+<span class="fc bfc" id="L447" title="All 2 branches covered.">    if (!StringUtil.isEmpty(this.iOSEnvironment)) {</span>
+<span class="fc" id="L448">      map.put(iOSEnvironmentTag, this.iOSEnvironment);</span>
+    }
+
+<span class="pc bpc" id="L451" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(this.APNsTopic)) {</span>
+<span class="nc" id="L452">      map.put(APNsTopicTag, this.APNsTopic);</span>
+    }
+
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(this.APNsTeamId)) {</span>
+<span class="nc" id="L456">      map.put(APNsTeamIdTag, this.APNsTeamId);</span>
+    }
+
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(this.notificationId)) {</span>
+<span class="nc" id="L460">      map.put(NotificationIdTag, this.notificationId);</span>
+    }
+
+<span class="fc" id="L463">    map.putAll(pushData);</span>
+<span class="fc" id="L464">    return map;</span>
+  }
+
+  /**
+   * Sends this push notification in a background thread. This is preferable to using send(), unless
+   * your code is already running from a background thread.
+   *
+   * @param callback callback.done(e) is called when the send completes.
+   */
+  public void sendInBackground(final SendCallback callback) {
+<span class="nc" id="L474">    sendInBackground().subscribe(new Observer&lt;JSONObject&gt;() {</span>
+      @Override
+      public void onSubscribe(Disposable disposable) {
+
+<span class="nc" id="L478">      }</span>
+
+      @Override
+      public void onNext(JSONObject jsonObject) {
+<span class="nc" id="L482">        notification = new LCObject(&quot;_Notification&quot;);</span>
+<span class="nc" id="L483">        notification.resetServerData(jsonObject.getInnerMap());</span>
+<span class="nc bnc" id="L484" title="All 2 branches missed.">        if (null != callback) {</span>
+<span class="nc" id="L485">          callback.internalDone(null);</span>
+        }
+<span class="nc" id="L487">      }</span>
+
+      @Override
+      public void onError(Throwable throwable) {
+<span class="nc bnc" id="L491" title="All 2 branches missed.">        if (null != callback) {</span>
+<span class="nc" id="L492">          callback.internalDone(new LCException(throwable));</span>
+        }
+<span class="nc" id="L494">      }</span>
+
+      @Override
+      public void onComplete() {
+
+<span class="nc" id="L499">      }</span>
+    });
+<span class="nc" id="L501">  }</span>
+
+  /**
+   * A helper method to concisely send a push to a query. This method is equivalent to
+   *
+   * &lt;pre&gt;
+   * AVPush push = new AVPush();
+   * push.setData(data);
+   * push.setQuery(query);
+   * push.sendInBackground(callback);
+   * &lt;/pre&gt;
+   *
+   * @param data The entire data of the push message. See the push guide for more details on the
+   *          data format.
+   * @param query A AVInstallation query which specifies the recipients of a push.
+   * @param callback callback.done(e) is called when the send completes.
+   */
+  public static void sendDataInBackground(JSONObject data, LCQuery&lt;? extends LCInstallation&gt; query,
+                                          final SendCallback callback) {
+<span class="nc" id="L520">    LCPush push = new LCPush();</span>
+<span class="nc" id="L521">    push.setData(data);</span>
+<span class="nc" id="L522">    push.setQuery(query);</span>
+<span class="nc" id="L523">    push.sendInBackground(callback);</span>
+<span class="nc" id="L524">  }</span>
+
+  /**
+   * A helper method to concisely send a push to a query. This method is equivalent to
+   *
+   * &lt;pre&gt;
+   * AVPush push = new AVPush();
+   * push.setData(data);
+   * push.setQuery(query);
+   * push.sendInBackground(callback);
+   * &lt;/pre&gt;
+   *
+   * @param data The entire data of the push message. See the push guide for more details on the
+   *          data format.
+   * @param query A AVInstallation query which specifies the recipients of a push.
+   * @return observable instance.
+   */
+  public static Observable&lt;JSONObject&gt; sendDataInBackground(JSONObject data, LCQuery&lt;? extends LCInstallation&gt; query) {
+<span class="nc" id="L542">    LCPush push = new LCPush();</span>
+<span class="nc" id="L543">    push.setData(data);</span>
+<span class="nc" id="L544">    push.setQuery(query);</span>
+<span class="nc" id="L545">    return push.sendInBackground();</span>
+  }
+
+  /**
+   * A helper method to concisely send a push message to a query. This method is equivalent to
+   *
+   * &lt;pre&gt;
+   * AVPush push = new AVPush();
+   * push.setMessage(message);
+   * push.setQuery(query);
+   * push.sendInBackground();
+   * &lt;/pre&gt;
+   *
+   * @param message The message that will be shown in the notification.
+   * @param query A AVInstallation query which specifies the recipients of a push.
+   * @return observable instance.
+   */
+  public static Observable&lt;JSONObject&gt; sendMessageInBackground(String message, LCQuery&lt;? extends LCInstallation&gt; query) {
+<span class="nc" id="L563">    LCPush push = new LCPush();</span>
+<span class="nc" id="L564">    push.setMessage(message);</span>
+<span class="nc" id="L565">    push.setQuery(query);</span>
+<span class="nc" id="L566">    return push.sendInBackground();</span>
+  }
+
+  /**
+   * A helper method to concisely send a push message to a query. This method is equivalent to
+   *
+   * &lt;pre&gt;
+   * AVPush push = new AVPush();
+   * push.setMessage(message);
+   * push.setQuery(query);
+   * push.sendInBackground(callback);
+   * &lt;/pre&gt;
+   *
+   * @param message The message that will be shown in the notification.
+   * @param query A AVInstallation query which specifies the recipients of a push.
+   * @param callback callback.done(e) is called when the send completes.
+   */
+  public static void sendMessageInBackground(String message,
+                                             LCQuery&lt;? extends LCInstallation&gt; query, final SendCallback callback) {
+<span class="nc" id="L585">    LCPush push = new LCPush();</span>
+<span class="nc" id="L586">    push.setMessage(message);</span>
+<span class="nc" id="L587">    push.setQuery(query);</span>
+<span class="nc" id="L588">    push.sendInBackground(callback);</span>
+<span class="nc" id="L589">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

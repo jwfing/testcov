@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>QiniuSlicingUploader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.upload</a> &gt; <span class="el_source">QiniuSlicingUploader.java</span></div><h1>QiniuSlicingUploader.java</h1><pre class="source lang-java linenums">package cn.leancloud.upload;
+
+import cn.leancloud.LCException;
+import cn.leancloud.LCLogger;
+import cn.leancloud.callback.ProgressCallback;
+import cn.leancloud.LCFile;
+import cn.leancloud.utils.LogUtil;
+
+import java.io.InputStream;
+
+import java.util.List;
+import java.util.ArrayList;
+
+/**
+ * Use one thread to upload file to qiniu, slicing with 4MB chunk.
+ *
+ * Created by fengjunwen on 2017/8/14.
+ */
+
+class QiniuSlicingUploader extends HttpClientUploader {
+<span class="fc" id="L21">  private static LCLogger LOGGER = LogUtil.getLogger(QiniuSlicingUploader.class);</span>
+
+  private final String token;
+  private FileUploader.ProgressCalculator progressCalculator;
+<span class="fc" id="L25">  private int uploadChunkSize = QiniuAccessor.WIFI_CHUNK_SIZE;</span>
+<span class="fc" id="L26">  private String fileKey = null;</span>
+  private QiniuAccessor qiniuAccessor;
+
+  QiniuSlicingUploader(LCFile avFile, String token, String uploadUrl, ProgressCallback progressCallback) {
+<span class="fc" id="L30">    super(avFile, progressCallback);</span>
+<span class="fc" id="L31">    this.token = token;</span>
+<span class="fc" id="L32">    this.fileKey = avFile.getKey();</span>
+<span class="fc" id="L33">    this.qiniuAccessor = new QiniuAccessor(getOKHttpClient(), this.token, this.fileKey, uploadUrl);</span>
+<span class="fc" id="L34">    LOGGER.d(&quot;Constructor with token=&quot; + token + &quot;, key=&quot; + fileKey + &quot;, accessor=&quot; + qiniuAccessor);</span>
+<span class="fc" id="L35">  }</span>
+
+  public LCException execute() {
+<span class="fc" id="L38">    boolean isWifi = true;</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">    if (!isWifi) {</span>
+      // 从七牛的接口来看block size为4M不可变，但是chunkSize是可以调整的
+<span class="nc" id="L41">      uploadChunkSize = QiniuAccessor.NONWIFI_CHUNK_SIZE;</span>
+    }
+<span class="fc" id="L43">    InputStream is = null;</span>
+<span class="fc" id="L44">    byte buf[] = new byte[uploadChunkSize];</span>
+<span class="fc" id="L45">    int fileSize = this.avFile.getSize();</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">    int blockCount = (fileSize / QiniuAccessor.BLOCK_SIZE) + (fileSize % QiniuAccessor.BLOCK_SIZE &gt; 0 ? 1 : 0);</span>
+<span class="fc" id="L47">    List&lt;String&gt; uploadFileCtxs = new ArrayList&lt;String&gt;(blockCount);</span>
+
+<span class="fc" id="L49">    progressCalculator = new FileUploader.ProgressCalculator(blockCount, new FileUploader.FileUploadProgressCallback() {</span>
+      public void onProgress(int progress) {
+<span class="fc" id="L51">        publishProgress(progress);</span>
+<span class="fc" id="L52">      }</span>
+    });
+
+    try {
+<span class="fc" id="L56">      is = this.avFile.getDataStream();</span>
+<span class="fc" id="L57">      LOGGER.d(&quot;begin to upload qiniu. chunkSize=&quot; + uploadChunkSize + &quot;, blockCount=&quot; + blockCount + &quot;, is=&quot; + is);</span>
+      // loop for read, upload block to qiniu.
+<span class="fc bfc" id="L59" title="All 2 branches covered.">      for (int i = 0; i&lt; blockCount; i++) {</span>
+<span class="fc" id="L60">        int currentBlockSize = QiniuAccessor.BLOCK_SIZE;</span>
+<span class="fc" id="L61">        int currentBlockOffset = i * QiniuAccessor.BLOCK_SIZE;</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (i == blockCount - 1) {</span>
+          // last block.
+<span class="fc" id="L64">          currentBlockSize = fileSize - currentBlockOffset;</span>
+        }
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        int chunkCount = currentBlockSize / uploadChunkSize + (currentBlockSize % uploadChunkSize &gt; 0? 1 : 0);</span>
+<span class="fc" id="L67">        QiniuAccessor.QiniuBlockResponseData lastResponse = null;</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (int j = 0; j &lt; chunkCount; j++) {</span>
+<span class="fc" id="L69">          int currentChunkOffset = j * uploadChunkSize;</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">          int currentChunkSize = (j == chunkCount -1)? (currentBlockSize - currentChunkOffset): uploadChunkSize;</span>
+
+          // read BLOCK_SIZE content to buf until reach out block size or end-of-file.
+<span class="fc" id="L73">          int totalReadCnt = 0;</span>
+<span class="fc" id="L74">          int curReadCnt = is.read(buf, totalReadCnt, currentChunkSize - totalReadCnt);</span>
+<span class="fc" id="L75">          totalReadCnt += curReadCnt;</span>
+<span class="pc bpc" id="L76" title="2 of 4 branches missed.">          while (curReadCnt &gt; 0 &amp;&amp; totalReadCnt &lt; currentChunkSize) {</span>
+<span class="nc" id="L77">            curReadCnt = is.read(buf, totalReadCnt, currentChunkSize - totalReadCnt);</span>
+<span class="nc" id="L78">            totalReadCnt += curReadCnt;</span>
+          }
+
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">          if (j == 0) {</span>
+            // 1.创建一个block,并且会上传第一个block的第一个chunk的数据
+<span class="fc" id="L83">            lastResponse = this.qiniuAccessor.createBlockInQiniu(currentBlockSize, currentChunkSize, buf, DEFAULT_RETRY_TIMES);</span>
+<span class="fc" id="L84">            LOGGER.d(&quot;createBlockInQiniu(curBlockSize=&quot; + currentBlockSize + &quot;, curChunkSize=&quot; + currentChunkSize + &quot;) result=&quot; + lastResponse);</span>
+          } else {
+            // 2.分片上传
+<span class="nc" id="L87">            QiniuAccessor.QiniuBlockResponseData tmpResponse = lastResponse;</span>
+<span class="nc" id="L88">            lastResponse = this.qiniuAccessor.putFileBlocksToQiniu(lastResponse, currentBlockOffset, buf, currentChunkSize, DEFAULT_RETRY_TIMES);</span>
+<span class="nc" id="L89">            LOGGER.d(&quot;putFileBlocksToQiniu(lastRes=&quot; + tmpResponse + &quot;, curBlockOffset=&quot; + currentBlockOffset + &quot;, curChunkSize=&quot; + currentChunkSize</span>
+              + &quot;) result=&quot; + lastResponse);
+          }
+        }
+
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (null != lastResponse){</span>
+<span class="fc" id="L95">          uploadFileCtxs.add(lastResponse.getCtx());</span>
+<span class="fc" id="L96">          progressCalculator.publishProgress(i, 100);</span>
+<span class="fc" id="L97">          LOGGER.d(&quot;finished to upload block(&quot; + i + &quot;), ctx=&quot; + lastResponse.getCtx());</span>
+        } else {
+          // error.
+<span class="nc" id="L100">          return new LCException(LCException.FILE_UPLOAD_FAILURE, &quot;failed to upload file to qiniu.&quot;);</span>
+        }
+      }
+<span class="fc" id="L103">      QiniuAccessor.QiniuMKFileResponseData finalResponse = this.qiniuAccessor.makeFile(fileSize, uploadFileCtxs, DEFAULT_RETRY_TIMES);</span>
+<span class="fc" id="L104">      LOGGER.d(&quot;makeFile(fileSize=&quot; + fileSize + &quot;) result=&quot; + finalResponse);</span>
+<span class="pc bpc" id="L105" title="2 of 4 branches missed.">      if (finalResponse == null || !finalResponse.key.equals(fileKey)) {</span>
+<span class="nc" id="L106">        return new LCException(LCException.OTHER_CAUSE, &quot;upload file failure&quot;);</span>
+      }
+<span class="nc" id="L108">    } catch (Exception ex) {</span>
+<span class="nc" id="L109">      return new LCException(ex);</span>
+    } finally {
+      try {
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (null != is) {</span>
+<span class="fc" id="L113">          is.close();</span>
+        }
+<span class="nc" id="L115">      } catch (Exception e) {</span>
+        ;
+<span class="fc" id="L117">      }</span>
+    }
+
+<span class="fc" id="L120">    return null;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

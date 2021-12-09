@@ -1,0 +1,396 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LCSearchQuery.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.search</a> &gt; <span class="el_source">LCSearchQuery.java</span></div><h1>LCSearchQuery.java</h1><pre class="source lang-java linenums">package cn.leancloud.search;
+
+import cn.leancloud.*;
+import cn.leancloud.LCUser;
+import cn.leancloud.LCObject;
+import cn.leancloud.core.PaasClient;
+import cn.leancloud.utils.LCUtils;
+import cn.leancloud.utils.LogUtil;
+import cn.leancloud.utils.StringUtil;
+import io.reactivex.Observable;
+import io.reactivex.functions.Function;
+
+import java.util.*;
+
+public class LCSearchQuery&lt;T extends LCObject&gt; {
+<span class="fc" id="L16">  private static final LCLogger LOGGER = LogUtil.getLogger(LCSearchQuery.class);</span>
+
+  public static final String AVSEARCH_HIGHTLIGHT = &quot;highlight_avoscloud_&quot;;
+  public static final String AVSEARCH_APP_URL = &quot;app_url_avoscloud_&quot;;
+  public static final String AVSEARCH_DEEP_LINK = &quot;deep_link_avoscloud_&quot;;
+  public static final String DATA_EXTRA_SEARCH_KEY = &quot;com.avos.avoscloud.search.key&quot;;
+
+  private String sid;
+<span class="fc" id="L24">  private int limit = 100;</span>
+<span class="fc" id="L25">  private int skip = 0;</span>
+<span class="fc" id="L26">  private String hightlights = null;</span>
+  private static final String URL = &quot;search/select&quot;;
+  private List&lt;String&gt; fields;
+  private String queryString;
+  private String titleAttribute;
+  private String className;
+  private int hits;
+  private String order;
+  private LCSearchSortBuilder sortBuilder;
+  private List&lt;String&gt; include;
+  Class&lt;T&gt; clazz;
+
+  /**
+   * 获取当前的AVSearchSortBuilder对象
+   *
+   * @return sort builder.
+   */
+  public LCSearchSortBuilder getSortBuilder() {
+<span class="nc" id="L44">    return sortBuilder;</span>
+  }
+
+  /**
+   * 设置查询的AVSearchSortBuilder，使用更丰富的排序选项。
+   *
+   * @param sortBuilder sort builder.
+   */
+  public void setSortBuilder(LCSearchSortBuilder sortBuilder) {
+<span class="nc" id="L53">    this.sortBuilder = sortBuilder;</span>
+<span class="nc" id="L54">  }</span>
+
+  public LCSearchQuery() {
+<span class="nc" id="L57">    this(null);</span>
+<span class="nc" id="L58">  }</span>
+
+  public LCSearchQuery(String queryString) {
+<span class="fc" id="L61">    this(queryString, null);</span>
+<span class="fc" id="L62">  }</span>
+
+<span class="fc" id="L64">  public LCSearchQuery(String queryString, Class&lt;T&gt; clazz) {</span>
+<span class="fc" id="L65">    this.queryString = queryString;</span>
+<span class="fc" id="L66">    this.clazz = clazz;</span>
+<span class="fc" id="L67">    this.include = new LinkedList&lt;String&gt;();</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">    if (clazz == null) {</span>
+<span class="fc" id="L69">      this.className = Transformer.getSubClassName(LCObject.class);</span>
+    } else {
+<span class="nc" id="L71">      this.className = Transformer.getSubClassName(clazz);</span>
+    }
+<span class="fc" id="L73">  }</span>
+
+  /**
+   * 获取查询的className，默认为null，即包括所有启用了应用内搜索的class
+   *
+   * @return class name.
+   */
+  public String getClassName() {
+<span class="nc" id="L81">    return className;</span>
+  }
+
+
+  /**
+   * 设置查询字段列表，以逗号隔开的字符串，例如&quot;a,b,c&quot;，表示按照a,b,c三个字段的顺序排序，如果字段前面有负号，表示倒序，例如&quot;a,-b&quot;
+   *
+   * @param order order string.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCSearchQuery order(String order) {
+<span class="nc" id="L92">    this.order = order;</span>
+<span class="nc" id="L93">    return this;</span>
+  }
+
+  /**
+   * 根据提供的key进行升序排序
+   *
+   * @param key 需要排序的key
+   * @return  Returns the query, so you can chain this call.
+   */
+  public LCSearchQuery orderByAscending(String key) {
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(order)) {</span>
+<span class="fc" id="L104">      order = String.format(&quot;%s&quot;, key);</span>
+    } else {
+<span class="nc" id="L106">      order = String.format(&quot;%s,%s&quot;, order, key);</span>
+    }
+<span class="fc" id="L108">    return this;</span>
+  }
+
+  /**
+   * 根据提供的key进行降序排序
+   *
+   * @param key The key to order by.
+   * @return Returns the query, so you can chain this call.
+   */
+  public LCSearchQuery orderByDescending(String key) {
+<span class="nc bnc" id="L118" title="All 2 branches missed.">    if (StringUtil.isEmpty(order)) {</span>
+<span class="nc" id="L119">      order = String.format(&quot;-%s&quot;, key);</span>
+    } else {
+<span class="nc" id="L121">      order = String.format(&quot;%s,-%s&quot;, order, key);</span>
+    }
+<span class="nc" id="L123">    return this;</span>
+  }
+
+  /**
+   * Also sorts the results in ascending order by the given key. The previous sort keys have
+   * precedence over this key.
+   *
+   * @param key The key to order by
+   * @return Returns the query so you can chain this call.
+   */
+  public LCSearchQuery addAscendingOrder(String key) {
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(order)) {</span>
+<span class="fc" id="L135">      return this.orderByAscending(key);</span>
+    }
+
+<span class="nc" id="L138">    order = String.format(&quot;%s,%s&quot;, order, key);</span>
+<span class="nc" id="L139">    return this;</span>
+  }
+
+  /**
+   * Also sorts the results in descending order by the given key. The previous sort keys have
+   * precedence over this key.
+   *
+   * @param key The key to order by
+   * @return Returns the query so you can chain this call.
+   */
+  public LCSearchQuery addDescendingOrder(String key) {
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(order)) {</span>
+<span class="nc" id="L151">      return orderByDescending(key);</span>
+    }
+
+<span class="fc" id="L154">    order = String.format(&quot;%s,-%s&quot;, order, key);</span>
+<span class="fc" id="L155">    return this;</span>
+  }
+
+
+  /**
+   * 设置查询的className，否则将包括所有启用了应用内搜索的class
+   *
+   * @param className class name
+   */
+  public void setClassName(String className) {
+<span class="fc" id="L165">    this.className = className;</span>
+<span class="fc" id="L166">  }</span>
+
+  /**
+   * 设置搜索的结果单页大小限制,默认值为100，最大为1000
+   *
+   * @param limit pagination limit.
+   */
+  public void setLimit(int limit) {
+<span class="fc" id="L174">    this.limit = limit;</span>
+<span class="fc" id="L175">  }</span>
+
+  /**
+   * 获得搜索结果的单页大小限制
+   *
+   * @return pagination limit.
+   */
+  public int getLimit() {
+<span class="fc" id="L183">    return this.limit;</span>
+  }
+
+  /**
+   * 返回当前返回集合的其实位置
+   *
+   * @return current skip.
+   */
+  public int getSkip() {
+<span class="fc" id="L192">    return skip;</span>
+  }
+
+  /**
+   * 设置返回集合的起始位置，一般用于分页
+   *
+   * @param skip skip value.
+   */
+  public void setSkip(int skip) {
+<span class="fc" id="L201">    this.skip = skip;</span>
+<span class="fc" id="L202">  }</span>
+
+  /**
+   * 设置返回的高亮语法，默认为&quot;*&quot;
+   * 语法规则可以参考　　http://www.elasticsearch.org/guide/en/elasticsearch/reference/current
+   * /search-request-highlighting.html#highlighting-settings
+   *
+   * @param hightlights highlight setting.
+   */
+  public void setHightLights(String hightlights) {
+<span class="nc" id="L212">    this.hightlights = hightlights;</span>
+<span class="nc" id="L213">  }</span>
+
+  /**
+   * 获取当前设定的语法高亮
+   *
+   * @return highlight setting.
+   */
+
+  public String getHightLights() {
+<span class="fc" id="L222">    return this.hightlights;</span>
+  }
+
+  public void setFields(List&lt;String&gt; fields) {
+<span class="fc" id="L226">    this.fields = fields;</span>
+<span class="fc" id="L227">  }</span>
+
+  public List&lt;String&gt; getFields() {
+<span class="nc" id="L230">    return this.fields;</span>
+  }
+
+  /**
+   * 设置查询id，通常您都不需要调用这个方法来设置，只要不停调用find就可以实现分页。
+   * 不过如果需要将查询分页传递到其他Activity，则可能需要通过传递sid来实现。
+   *
+   * @param sid search session id.
+   */
+  public void setSid(String sid) {
+<span class="nc" id="L240">    this.sid = sid;</span>
+<span class="nc" id="L241">  }</span>
+
+  /**
+   * 获取本次查询的id，注意，它不是返回结果中对象的objectId，而是表示本次AVSearchQuery查询的id
+   *
+   * @return search session id.
+   */
+  public String getSid() {
+<span class="nc" id="L249">    return this.sid;</span>
+  }
+
+  /**
+   * 此选项为AVOSCloud SearchActivity使用 指定Title所对应的Field
+   *
+   * @param titleAttribute title setting.
+   */
+  public void setTitleAttribute(String titleAttribute) {
+<span class="nc" id="L258">    this.titleAttribute = titleAttribute;</span>
+<span class="nc" id="L259">  }</span>
+
+  /**
+   * 获取当前指定的title 对应的Field
+   *
+   * @return title setting.
+   */
+  public String getTitleAttribute() {
+<span class="nc" id="L267">    return titleAttribute;</span>
+  }
+
+  /**
+   * 设置搜索的查询语句。
+   * 详细语法可以参考http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/query-dsl
+   * -query-string-query.html#query-string-syntax
+   *
+   * @param query query string.
+   */
+  public void setQueryString(String query) {
+<span class="nc bnc" id="L278" title="All 6 branches missed.">    if (!((this.queryString == null &amp;&amp; query == null) || (this.queryString != null &amp;&amp; this.queryString</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">            .equals(query)))) {</span>
+<span class="nc" id="L280">      this.sid = null;</span>
+    }
+<span class="nc" id="L282">    this.queryString = query;</span>
+
+<span class="nc" id="L284">  }</span>
+
+  public String getQueryString() {
+<span class="fc" id="L287">    return queryString;</span>
+  }
+
+  public int getHits() {
+<span class="nc" id="L291">    return this.hits;</span>
+  }
+
+  public void include(String key) {
+<span class="nc" id="L295">    this.include.add(key);</span>
+<span class="nc" id="L296">  }</span>
+
+  private Map&lt;String, String&gt; getParameters(String query) {
+<span class="fc" id="L299">    Map&lt;String, String&gt; params = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L300">    params.put(&quot;q&quot;, query);</span>
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(sid)) {</span>
+<span class="nc" id="L302">      params.put(&quot;sid&quot;, sid);</span>
+    }
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(hightlights)) {</span>
+<span class="nc" id="L305">      params.put(&quot;highlights&quot;, hightlights);</span>
+    } else {
+<span class="fc" id="L307">      params.put(&quot;highlights&quot;, &quot;*&quot;);</span>
+    }
+<span class="pc bpc" id="L309" title="2 of 4 branches missed.">    if (fields != null &amp;&amp; fields.size() &gt; 0) {</span>
+<span class="fc" id="L310">      params.put(&quot;fields&quot;, StringUtil.join(&quot;,&quot;, fields));</span>
+    }
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">    if (limit &gt; 0) {</span>
+<span class="fc" id="L313">      params.put(&quot;limit&quot;, String.valueOf(limit));</span>
+    }
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">    if (skip &gt; 0) {</span>
+<span class="nc" id="L316">      params.put(&quot;skip&quot;, String.valueOf(skip));</span>
+    }
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(order)) {</span>
+<span class="fc" id="L319">      params.put(&quot;order&quot;, order);</span>
+    }
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">    if (sortBuilder != null) {</span>
+<span class="nc" id="L322">      params.put(&quot;sort&quot;, LCUtils.jsonStringFromObjectWithNull(sortBuilder.getSortFields()));</span>
+    }
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">    if (!include.isEmpty()) {</span>
+<span class="nc" id="L325">      String value = StringUtil.join(&quot;,&quot;, include);</span>
+<span class="nc" id="L326">      params.put(&quot;include&quot;, value);</span>
+    }
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(className)) {</span>
+<span class="fc" id="L329">      params.put(&quot;clazz&quot;, className);</span>
+    }
+<span class="fc" id="L331">    return params;</span>
+  }
+
+  /**
+   * execute query in background.
+   * @return observable instance.
+   */
+  public Observable&lt;List&lt;T&gt;&gt; findInBackground() {
+<span class="fc" id="L339">    return this.findInBackground(null);</span>
+  }
+
+  /**
+   * execute query in background.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;List&lt;T&gt;&gt; findInBackground(LCUser asAuthenticatedUser) {
+<span class="fc" id="L350">    return getSearchResult(asAuthenticatedUser, getParameters(queryString));</span>
+  }
+
+  protected Observable&lt;List&lt;T&gt;&gt; getSearchResult(LCUser asAuthenticatedUser, Map&lt;String, String&gt; params) {
+<span class="fc" id="L354">    return PaasClient.getStorageClient().search(asAuthenticatedUser, params).map(new Function&lt;LCSearchResponse, List&lt;T&gt;&gt;() {</span>
+      @Override
+      public List&lt;T&gt; apply(LCSearchResponse result) throws Exception {
+<span class="fc" id="L357">        return processContent(result);</span>
+      }
+    });
+  }
+
+  private List&lt;T&gt; processContent(LCSearchResponse resp) throws Exception {
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">    if (null == resp) {</span>
+<span class="nc" id="L364">      return Collections.emptyList();</span>
+    }
+<span class="fc" id="L366">    this.sid = resp.sid;</span>
+<span class="fc" id="L367">    this.hits = resp.hits;</span>
+<span class="fc" id="L368">    List&lt;T&gt; result = new LinkedList&lt;T&gt;();</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">    for (Map item : resp.results) {</span>
+<span class="pc bpc" id="L370" title="2 of 4 branches missed.">      if (item != null &amp;&amp; !item.isEmpty()) {</span>
+        LCObject object;
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">        if (clazz == null) {</span>
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">          object = new LCObject(StringUtil.isEmpty(className) ? (String) item.get(&quot;className&quot;) : className);</span>
+        } else {
+<span class="nc" id="L375">          object = clazz.newInstance();</span>
+        }
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">        if(item.containsKey(&quot;_highlight&quot;)) {</span>
+<span class="fc" id="L378">          item.put(AVSEARCH_HIGHTLIGHT, item.get(&quot;_highlight&quot;));</span>
+<span class="fc" id="L379">          item.remove(&quot;_highlight&quot;);</span>
+        }
+<span class="pc bpc" id="L381" title="1 of 2 branches missed.">        if(item.containsKey(&quot;_app_url&quot;)) {</span>
+<span class="fc" id="L382">          item.put(AVSEARCH_APP_URL, item.get(&quot;_app_url&quot;));</span>
+<span class="fc" id="L383">          item.remove(&quot;_app_url&quot;);</span>
+        }
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">        if(item.containsKey(&quot;_deeplink&quot;)) {</span>
+<span class="fc" id="L386">          item.put(AVSEARCH_DEEP_LINK, item.get(&quot;_deeplink&quot;));</span>
+<span class="fc" id="L387">          item.remove(&quot;_deeplink&quot;);</span>
+        }
+<span class="fc" id="L389">        object.resetServerData(item);</span>
+<span class="fc" id="L390">        result.add((T) object);</span>
+      }
+    }
+<span class="fc" id="L393">    return result;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

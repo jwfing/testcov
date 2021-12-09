@@ -1,0 +1,1827 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LCObject.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud</a> &gt; <span class="el_source">LCObject.java</span></div><h1>LCObject.java</h1><pre class="source lang-java linenums">package cn.leancloud;
+
+import cn.leancloud.core.AppConfiguration;
+import cn.leancloud.network.NetworkingDetector;
+import cn.leancloud.ops.*;
+import cn.leancloud.types.LCDate;
+import cn.leancloud.types.LCGeoPoint;
+import cn.leancloud.core.PaasClient;
+import cn.leancloud.types.LCNull;
+import cn.leancloud.utils.LCUtils;
+import cn.leancloud.utils.LogUtil;
+import cn.leancloud.utils.StringUtil;
+import cn.leancloud.json.JSON;
+import cn.leancloud.json.JSONObject;
+import cn.leancloud.json.JSONArray;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.regex.Pattern;
+
+import io.reactivex.Observable;
+import io.reactivex.ObservableSource;
+import io.reactivex.Observer;
+import io.reactivex.disposables.Disposable;
+import io.reactivex.functions.Function;
+import io.reactivex.schedulers.Schedulers;
+
+public class LCObject {
+  public static final String KEY_CREATED_AT = &quot;createdAt&quot;;
+  public static final String KEY_UPDATED_AT = &quot;updatedAt&quot;;
+  public static final String KEY_OBJECT_ID = &quot;objectId&quot;;
+  public static final String KEY_ACL = &quot;ACL&quot;;
+
+  public static final String KEY_CLASSNAME = &quot;className&quot;;
+
+  public static final String KEY_IGNORE_HOOKS = &quot;__ignore_hooks&quot;;
+
+  private static final String INTERNAL_PATTERN = &quot;^[\\da-z][\\d-a-z]*$&quot;;
+<span class="fc" id="L40">  private static final Set&lt;String&gt; RESERVED_ATTRS = new HashSet&lt;String&gt;(</span>
+<span class="fc" id="L41">          Arrays.asList(KEY_CREATED_AT, KEY_UPDATED_AT, KEY_OBJECT_ID, KEY_ACL, KEY_CLASSNAME));</span>
+
+<span class="fc" id="L43">  protected static final LCLogger logger = LogUtil.getLogger(LCObject.class);</span>
+<span class="fc" id="L44">  protected static final int UUID_LEN = UUID.randomUUID().toString().length();</span>
+
+  protected String className;
+<span class="fc" id="L47">  protected transient String endpointClassName = null;</span>
+
+<span class="fc" id="L49">  protected transient String objectId = &quot;&quot;;</span>
+<span class="fc" id="L50">  protected ConcurrentMap&lt;String, Object&gt; serverData = new ConcurrentHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L51">  protected transient ConcurrentMap&lt;String, ObjectFieldOperation&gt; operations = new ConcurrentHashMap&lt;String, ObjectFieldOperation&gt;();</span>
+<span class="fc" id="L52">  protected transient LCACL acl = null;</span>
+<span class="fc" id="L53">  private transient String uuid = null;</span>
+
+<span class="fc" id="L55">  private volatile boolean fetchWhenSave = false;</span>
+<span class="fc" id="L56">  protected volatile boolean totallyOverwrite = false;</span>
+
+<span class="fc" id="L58">  public enum Hook {</span>
+<span class="fc" id="L59">    beforeSave, afterSave, beforeUpdate, afterUpdate, beforeDelete, afterDelete,</span>
+  }
+
+<span class="fc" id="L62">  private transient Set&lt;Hook&gt; ignoreHooks = new TreeSet&lt;Hook&gt;();</span>
+
+  /**
+   * Default constructor.
+   */
+<span class="fc" id="L67">  public LCObject() {</span>
+<span class="fc" id="L68">    this.className = Transformer.getSubClassName(this.getClass());</span>
+<span class="fc" id="L69">  }</span>
+
+  /**
+   * Constructor with class name.
+   * @param className class name.
+   */
+<span class="fc" id="L75">  public LCObject(String className) {</span>
+<span class="fc" id="L76">    Transformer.checkClassName(className);</span>
+<span class="fc" id="L77">    this.className = className;</span>
+<span class="fc" id="L78">  }</span>
+
+  /**
+   * Copy constructor.
+   * @param other other instance.
+   */
+<span class="fc" id="L84">  public LCObject(LCObject other) {</span>
+<span class="fc" id="L85">    this.className = other.className;</span>
+<span class="fc" id="L86">    this.objectId = other.objectId;</span>
+<span class="fc" id="L87">    this.serverData.putAll(other.serverData);</span>
+<span class="fc" id="L88">    this.operations.putAll(other.operations);</span>
+<span class="fc" id="L89">    this.acl = other.acl;</span>
+<span class="fc" id="L90">    this.endpointClassName = other.endpointClassName;</span>
+<span class="fc" id="L91">  }</span>
+
+  /**
+   * Get class name.
+   * @return class name.
+   */
+  public String getClassName() {
+<span class="fc" id="L98">    return this.className;</span>
+  }
+
+  /**
+   * Get internal class name.
+   * @return internal class name.
+   */
+  public String internalClassName() {
+<span class="fc" id="L106">    return this.getClassName();</span>
+  }
+
+  /**
+   * Set class name.
+   * @param name class name.
+   */
+  public void setClassName(String name) {
+<span class="fc" id="L114">    Transformer.checkClassName(name);</span>
+<span class="fc" id="L115">    this.className = name;</span>
+<span class="fc" id="L116">  }</span>
+
+  /**
+   * Get createdAt date.
+   * @return createdAt date.
+   */
+  public Date getCreatedAt() {
+<span class="fc" id="L123">    String value = getCreatedAtString();</span>
+<span class="fc" id="L124">    return StringUtil.dateFromString(value);</span>
+  }
+
+  /**
+   * Get createdAt string.
+   * @return createdAt string.
+   */
+  public String getCreatedAtString() {
+<span class="fc" id="L132">    return (String) this.serverData.get(KEY_CREATED_AT);</span>
+  }
+
+  /**
+   * Get updatedAt date.
+   * @return updatedAt date.
+   */
+  public Date getUpdatedAt() {
+<span class="fc" id="L140">    String value = getUpdatedAtString();</span>
+<span class="fc" id="L141">    return StringUtil.dateFromString(value);</span>
+  }
+
+  /**
+   * Get updatedAt string.
+   * @return updatedAt string.
+   */
+  public String getUpdatedAtString() {
+<span class="fc" id="L149">    return (String) this.serverData.get(KEY_UPDATED_AT);</span>
+  }
+
+  /**
+   * Get objectId.
+   * @return objectId.
+   */
+  public String getObjectId() {
+<span class="fc bfc" id="L157" title="All 2 branches covered.">    if (this.serverData.containsKey(KEY_OBJECT_ID)) {</span>
+<span class="fc" id="L158">      return (String) this.serverData.get(KEY_OBJECT_ID);</span>
+    } else {
+<span class="fc" id="L160">      return this.objectId;</span>
+    }
+  }
+
+  /**
+   * Set objectId.
+   * @param objectId object id.
+   */
+  public void setObjectId(String objectId) {
+<span class="fc" id="L169">    this.objectId = objectId;</span>
+<span class="pc bpc" id="L170" title="2 of 4 branches missed.">    if (null != this.serverData &amp;&amp; !StringUtil.isEmpty(objectId)) {</span>
+<span class="fc" id="L171">      this.serverData.put(KEY_OBJECT_ID, objectId);</span>
+    }
+<span class="fc" id="L173">  }</span>
+
+  /**
+   * Flag to fetchWhenSave.
+   * @return flag for fetchWhenSave.
+   */
+  public boolean isFetchWhenSave() {
+<span class="fc" id="L180">    return fetchWhenSave;</span>
+  }
+
+  /**
+   * Set fetchWhenSave flag.
+   * @param fetchWhenSave flag.
+   */
+  public void setFetchWhenSave(boolean fetchWhenSave) {
+<span class="fc" id="L188">    this.fetchWhenSave = fetchWhenSave;</span>
+<span class="fc" id="L189">  }</span>
+
+  /**
+   * Get UUID.
+   * @return UUID.
+   * Caution: public this method just for compatibility.
+   */
+  public String getUuid() {
+<span class="fc bfc" id="L197" title="All 2 branches covered.">    if (StringUtil.isEmpty(this.uuid)) {</span>
+<span class="fc" id="L198">      this.uuid = UUID.randomUUID().toString().toLowerCase();</span>
+    }
+<span class="fc" id="L200">    return this.uuid;</span>
+  }
+
+  void setUuid(String uuid) {
+<span class="fc" id="L204">    this.uuid = uuid;</span>
+<span class="fc" id="L205">  }</span>
+
+  protected static boolean verifyInternalId(String internalId) {
+<span class="fc" id="L208">    return Pattern.matches(INTERNAL_PATTERN, internalId);</span>
+  }
+
+  protected String internalId() {
+<span class="fc bfc" id="L212" title="All 2 branches covered.">    return StringUtil.isEmpty(getObjectId()) ? getUuid() : getObjectId();</span>
+  }
+
+  /**
+   * Contain specified key.
+   * @param key key
+   * @return flag to indicate current object contains the specified key or not.
+   */
+  public boolean containsKey(String key) {
+<span class="nc" id="L221">    return serverData.containsKey(key);</span>
+  }
+
+  /**
+   * Contain specified key.
+   * @param key key
+   * @return flag to indicate current object contains the specified key or not.
+   */
+  public boolean has(String key) {
+<span class="fc bfc" id="L230" title="All 2 branches covered.">    return (this.get(key) != null);</span>
+  }
+
+  /**
+   * Get value of specified key.
+   * @param key specified key.
+   * @return the value associated with specified key.
+   */
+  public Object get(String key) {
+<span class="fc" id="L239">    return internalGet(key);</span>
+  }
+
+  protected Object internalGet(String key) {
+<span class="fc" id="L243">    Object value = serverData.get(key);</span>
+<span class="fc" id="L244">    ObjectFieldOperation op = operations.get(key);</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">    if (null != op) {</span>
+<span class="fc" id="L246">      value = op.apply(value);</span>
+    }
+<span class="fc" id="L248">    return value;</span>
+  }
+
+  /**
+   * Get boolean value of specified key.
+   * @param key specified key.
+   * @return the boolean value associated with specified key.
+   */
+  public boolean getBoolean(String key) {
+<span class="nc" id="L257">    Boolean b = (Boolean) get(key);</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">    return b == null ? false : b;</span>
+  }
+
+  /**
+   * Get bytes value of specified key.
+   * @param key specified key.
+   * @return the bytes value associated with specified key.
+   */
+  public byte[] getBytes(String key) {
+<span class="fc" id="L267">    return (byte[]) (get(key));</span>
+  }
+
+  /**
+   * Get Date value of specified key.
+   * @param key specified key.
+   * @return the Date value associated with specified key.
+   */
+  public Date getDate(String key) {
+<span class="fc" id="L276">    Object res = get(key);</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">    if (res instanceof Date) {</span>
+<span class="fc" id="L278">      return (Date)res;</span>
+    }
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">    if (res instanceof Long) {</span>
+<span class="nc" id="L281">      return new Date((Long) res);</span>
+    }
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">    if (res instanceof String) {</span>
+<span class="nc" id="L284">      return StringUtil.dateFromString((String) res);</span>
+    }
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">    if (res instanceof JSONObject) {</span>
+<span class="nc" id="L287">      return new LCDate((JSONObject) res).getDate();</span>
+    }
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">    if (res instanceof Map) {</span>
+<span class="nc" id="L290">      JSONObject json = JSONObject.Builder.create((Map) res);</span>
+<span class="nc" id="L291">      return new LCDate(json).getDate();</span>
+    }
+<span class="fc" id="L293">    return null;</span>
+  }
+
+  /**
+   * Get string value of specified key.
+   * @param key specified key.
+   * @return the string value associated with specified key.
+   */
+  public String getString(String key) {
+<span class="fc" id="L302">    Object obj = get(key);</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">    if (obj instanceof String)</span>
+<span class="fc" id="L304">      return (String) obj;</span>
+    else
+<span class="nc" id="L306">      return null;</span>
+  }
+
+  /**
+   * Get int value of specified key.
+   * @param key specified key.
+   * @return the int value associated with specified key.
+   */
+  public int getInt(String key) {
+<span class="fc" id="L315">    Number v = (Number) get(key);</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">    if (v != null) return v.intValue();</span>
+<span class="nc" id="L317">    return 0;</span>
+  }
+
+  /**
+   * Get long value of specified key.
+   * @param key specified key.
+   * @return the long value associated with specified key.
+   */
+  public long getLong(String key) {
+<span class="fc" id="L326">    Number v = (Number) get(key);</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">    if (v != null) return v.longValue();</span>
+<span class="fc" id="L328">    return 0l;</span>
+  }
+
+  /**
+   * Get double value of specified key.
+   * @param key specified key.
+   * @return the double value associated with specified key.
+   */
+  public double getDouble(String key) {
+<span class="nc" id="L337">    Number number = (Number) get(key);</span>
+<span class="nc bnc" id="L338" title="All 2 branches missed.">    if (number != null) return number.doubleValue();</span>
+<span class="nc" id="L339">    return 0f;</span>
+  }
+
+  /**
+   * Get numeric value of specified key.
+   * @param key specified key.
+   * @return the numeric value associated with specified key.
+   */
+  public Number getNumber(String key) {
+<span class="nc" id="L348">    return (Number) get(key);</span>
+  }
+
+  /**
+   * Get list value of specified key.
+   * @param key specified key.
+   * @return the list value associated with specified key.
+   */
+  public List getList(String key) {
+<span class="fc" id="L357">    return (List) get(key);</span>
+  }
+
+  /**
+   * Get jsonarray value of specified key.
+   * @param key specified key.
+   * @return the jsonarray value associated with specified key.
+   */
+  public JSONArray getJSONArray(String key) {
+<span class="nc" id="L366">    Object list = get(key);</span>
+<span class="nc bnc" id="L367" title="All 2 branches missed.">    if (list == null) {</span>
+<span class="nc" id="L368">      return null;</span>
+    }
+<span class="nc bnc" id="L370" title="All 2 branches missed.">    if (list instanceof JSONArray) {</span>
+<span class="nc" id="L371">      return (JSONArray) list;</span>
+    }
+<span class="nc bnc" id="L373" title="All 2 branches missed.">    if (list instanceof List&lt;?&gt;) {</span>
+<span class="nc" id="L374">      return JSONArray.Builder.create((List&lt;Object&gt;) list);</span>
+    }
+<span class="nc bnc" id="L376" title="All 2 branches missed.">    if (list instanceof Object[]) {</span>
+<span class="nc" id="L377">      JSONArray array = JSONArray.Builder.create(null);</span>
+<span class="nc bnc" id="L378" title="All 2 branches missed.">      for (Object obj : (Object[]) list) {</span>
+<span class="nc" id="L379">        array.add(obj);</span>
+      }
+<span class="nc" id="L381">      return array;</span>
+    }
+<span class="nc" id="L383">    return null;</span>
+  }
+
+  /**
+   * Get jsonobject value of specified key.
+   * @param key specified key.
+   * @return the jsonobject value associated with specified key.
+   */
+  public JSONObject getJSONObject(String key) {
+<span class="fc" id="L392">    Object object = get(key);</span>
+<span class="pc bpc" id="L393" title="1 of 2 branches missed.">    if (object instanceof JSONObject) {</span>
+<span class="nc" id="L394">      return (JSONObject) object;</span>
+    }
+<span class="fc" id="L396">    String jsonString = JSON.toJSONString(object);</span>
+<span class="fc" id="L397">    JSONObject jsonObject = null;</span>
+    try {
+<span class="fc" id="L399">      jsonObject = JSON.parseObject(jsonString);</span>
+<span class="nc" id="L400">    } catch (Exception exception) {</span>
+<span class="nc" id="L401">      throw new IllegalStateException(&quot;Invalid json string&quot;, exception);</span>
+<span class="fc" id="L402">    }</span>
+<span class="fc" id="L403">    return jsonObject;</span>
+  }
+
+  /**
+   * Get AVGeoPoint value of specified key.
+   * @param key specified key.
+   * @return the AVGeoPoint value associated with specified key.
+   */
+  public LCGeoPoint getLCGeoPoint(String key) {
+<span class="fc" id="L412">    return (LCGeoPoint) get(key);</span>
+  }
+
+  /**
+   * Get AVFile value of specified key.
+   * @param key specified key.
+   * @return the AVFile value associated with specified key.
+   */
+  public LCFile getLCFile(String key) {
+<span class="fc" id="L421">    return (LCFile) get(key);</span>
+  }
+
+  /**
+   * Get AVObject value of specified key.
+   * @param key specified key.
+   * @param &lt;T&gt; template type
+   * @return the AVObject value associated with specified key.
+   */
+  public &lt;T extends LCObject&gt; T getLCObject(String key) {
+    try {
+<span class="fc" id="L432">      return (T) get(key);</span>
+<span class="nc" id="L433">    } catch (Exception ex) {</span>
+<span class="nc" id="L434">      logger.w(&quot;failed to convert Object.&quot;, ex);</span>
+<span class="nc" id="L435">      return null;</span>
+    }
+  }
+
+  /**
+   * Get AVRelation value of specified key.
+   * @param key specified key.
+   * @param &lt;T&gt; template type
+   * @return the AVRelation value associated with specified key.
+   */
+  public &lt;T extends LCObject&gt; LCRelation&lt;T&gt; getRelation(String key) {
+<span class="fc" id="L446">    validFieldName(key);</span>
+<span class="fc" id="L447">    Object object = get(key);</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">    if (object instanceof LCRelation) {</span>
+<span class="fc" id="L449">      ((LCRelation)object).setParent(this);</span>
+<span class="fc" id="L450">      ((LCRelation)object).setKey(key);</span>
+<span class="fc" id="L451">      return (LCRelation)object;</span>
+    } else {
+<span class="nc" id="L453">      return new LCRelation&lt;&gt;(this, key);</span>
+    }
+  }
+
+  /**
+   * Add Relation.
+   * @param object target object.
+   * @param key specified key.
+   */
+  void addRelation(final LCObject object, final String key) {
+<span class="fc" id="L463">    validFieldName(key);</span>
+<span class="fc" id="L464">    ObjectFieldOperation op = OperationBuilder.gBuilder.create(OperationBuilder.OperationType.AddRelation, key, object);</span>
+<span class="fc" id="L465">    addNewOperation(op);</span>
+<span class="fc" id="L466">  }</span>
+
+  /**
+   * Remove Relation.
+   * @param object target object.
+   * @param key specified key.
+   */
+  void removeRelation(final LCObject object, final String key) {
+<span class="nc" id="L474">    validFieldName(key);</span>
+<span class="nc" id="L475">    ObjectFieldOperation op = OperationBuilder.gBuilder.create(OperationBuilder.OperationType.RemoveRelation, key, object);</span>
+<span class="nc" id="L476">    addNewOperation(op);</span>
+<span class="nc" id="L477">  }</span>
+
+  /**
+   * Get server data.
+   * @return map of server data.
+   */
+  public ConcurrentMap&lt;String, Object&gt; getServerData() {
+<span class="fc" id="L484">    return this.serverData;</span>
+  }
+
+  protected void validFieldName(String key) {
+<span class="pc bpc" id="L488" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(key)) {</span>
+<span class="nc" id="L489">      throw new IllegalArgumentException(&quot;Blank key&quot;);</span>
+    }
+<span class="pc bpc" id="L491" title="1 of 2 branches missed.">    if (key.startsWith(&quot;_&quot;)) {</span>
+<span class="nc" id="L492">      throw new IllegalArgumentException(&quot;key should not start with '_'&quot;);</span>
+    }
+<span class="pc bpc" id="L494" title="1 of 2 branches missed.">    if (RESERVED_ATTRS.contains(key)) {</span>
+<span class="nc" id="L495">      throw new IllegalArgumentException(&quot;key(&quot; + key + &quot;) is reserved by LeanCloud&quot;);</span>
+    }
+<span class="fc" id="L497">  }</span>
+
+  /**
+   * Flag to indicate data is available or not.
+   * @return available flag.
+   */
+  public boolean isDataAvailable() {
+<span class="nc bnc" id="L504" title="All 4 branches missed.">    return !StringUtil.isEmpty(this.objectId) &amp;&amp; !this.serverData.isEmpty();</span>
+  }
+
+  /******************************
+   * changable operations.
+   ******************************/
+
+  /**
+   * Add attribute.
+   * @param key target key.
+   * @param value value object.
+   */
+  public void add(String key, Object value) {
+<span class="fc" id="L517">    validFieldName(key);</span>
+<span class="fc" id="L518">    ObjectFieldOperation op = OperationBuilder.gBuilder.create(OperationBuilder.OperationType.Add, key, value);</span>
+<span class="fc" id="L519">    addNewOperation(op);</span>
+<span class="fc" id="L520">  }</span>
+
+  /**
+   * Add collection attribute.
+   * @param key target key.
+   * @param values values collection.
+   */
+  public void addAll(String key, Collection&lt;?&gt; values) {
+<span class="fc" id="L528">    validFieldName(key);</span>
+<span class="fc" id="L529">    ObjectFieldOperation op = OperationBuilder.gBuilder.create(OperationBuilder.OperationType.Add, key, values);</span>
+<span class="fc" id="L530">    addNewOperation(op);</span>
+<span class="fc" id="L531">  }</span>
+
+  /**
+   * Add unique attribute.
+   * @param key target key.
+   * @param value value object.
+   */
+  public void addUnique(String key, Object value) {
+<span class="fc" id="L539">    validFieldName(key);</span>
+<span class="fc" id="L540">    ObjectFieldOperation op = OperationBuilder.gBuilder.create(OperationBuilder.OperationType.AddUnique, key, value);</span>
+<span class="fc" id="L541">    addNewOperation(op);</span>
+<span class="fc" id="L542">  }</span>
+
+  /**
+   * Add unique collection attribute.
+   * @param key target key.
+   * @param values value collection.
+   */
+  public void addAllUnique(String key, Collection&lt;?&gt; values) {
+<span class="fc" id="L550">    validFieldName(key);</span>
+<span class="fc" id="L551">    ObjectFieldOperation op = OperationBuilder.gBuilder.create(OperationBuilder.OperationType.AddUnique, key, values);</span>
+<span class="fc" id="L552">    addNewOperation(op);</span>
+<span class="fc" id="L553">  }</span>
+
+  /**
+   * Set attribute.
+   * @param key target key.
+   * @param value value object.
+   */
+  public void put(String key, Object value) {
+<span class="fc" id="L561">    validFieldName(key);</span>
+<span class="fc bfc" id="L562" title="All 2 branches covered.">    if (null == value) {</span>
+<span class="fc" id="L563">      return;</span>
+    }
+<span class="fc" id="L565">    internalPut(key, value);</span>
+<span class="fc" id="L566">  }</span>
+
+  protected void internalPut(String key, Object value) {
+<span class="fc" id="L569">    ObjectFieldOperation op = OperationBuilder.gBuilder.create(OperationBuilder.OperationType.Set, key, value);</span>
+<span class="fc" id="L570">    addNewOperation(op);</span>
+<span class="fc" id="L571">  }</span>
+
+  /**
+   * Remove attribute.
+   * @param key target key.
+   */
+  public void remove(String key) {
+<span class="fc" id="L578">    validFieldName(key);</span>
+<span class="fc" id="L579">    ObjectFieldOperation op = OperationBuilder.gBuilder.create(OperationBuilder.OperationType.Delete, key, null);</span>
+<span class="fc" id="L580">    addNewOperation(op);</span>
+<span class="fc" id="L581">  }</span>
+
+  /**
+   * Remove all collection.
+   * @param key target keys.
+   * @param values value collection.
+   */
+  public void removeAll(String key, Collection&lt;?&gt; values) {
+<span class="fc" id="L589">    validFieldName(key);</span>
+<span class="fc" id="L590">    ObjectFieldOperation op = OperationBuilder.gBuilder.create(OperationBuilder.OperationType.Remove, key, values);</span>
+<span class="fc" id="L591">    addNewOperation(op);</span>
+<span class="fc" id="L592">  }</span>
+
+  /**
+   * Increment one attribute.
+   * @param key target key.
+   */
+  public void increment(String key) {
+<span class="fc" id="L599">    this.increment(key, 1);</span>
+<span class="fc" id="L600">  }</span>
+
+  /**
+   * Increment one attribute.
+   * @param key target key.
+   * @param value value object.
+   */
+  public void increment(String key, Number value) {
+<span class="fc" id="L608">    validFieldName(key);</span>
+<span class="fc" id="L609">    ObjectFieldOperation op = OperationBuilder.gBuilder.create(OperationBuilder.OperationType.Increment, key, value);</span>
+<span class="fc" id="L610">    addNewOperation(op);</span>
+<span class="fc" id="L611">  }</span>
+
+  /**
+   * Decrement one attribute.
+   * @param key target key.
+   */
+  public void decrement(String key) {
+<span class="fc" id="L618">    decrement(key, 1);</span>
+<span class="fc" id="L619">  }</span>
+
+  /**
+   * Decrement one attribute.
+   * @param key target key.
+   * @param value value object.
+   */
+  public void decrement(String key, Number value) {
+<span class="fc" id="L627">    validFieldName(key);</span>
+<span class="fc" id="L628">    ObjectFieldOperation op = OperationBuilder.gBuilder.create(OperationBuilder.OperationType.Decrement, key, value);</span>
+<span class="fc" id="L629">    addNewOperation(op);</span>
+<span class="fc" id="L630">  }</span>
+
+  /**
+   * Modify integer attribute.
+   * @param key target key.
+   * @param value value object.
+   */
+  public void bitAnd(String key, long value) {
+<span class="fc" id="L638">    validFieldName(key);</span>
+<span class="fc" id="L639">    ObjectFieldOperation op = OperationBuilder.gBuilder.create(OperationBuilder.OperationType.BitAnd, key, value);</span>
+<span class="fc" id="L640">    addNewOperation(op);</span>
+<span class="fc" id="L641">  }</span>
+
+  /**
+   * Modify integer attribute.
+   * @param key target key.
+   * @param value value object.
+   */
+  public void bitOr(String key, long value) {
+<span class="fc" id="L649">    validFieldName(key);</span>
+<span class="fc" id="L650">    ObjectFieldOperation op = OperationBuilder.gBuilder.create(OperationBuilder.OperationType.BitOr, key, value);</span>
+<span class="fc" id="L651">    addNewOperation(op);</span>
+<span class="fc" id="L652">  }</span>
+
+  /**
+   * Modify integer attribute.
+   * @param key target key.
+   * @param value value object.
+   */
+  public void bitXor(String key, long value) {
+<span class="fc" id="L660">    validFieldName(key);</span>
+<span class="fc" id="L661">    ObjectFieldOperation op = OperationBuilder.gBuilder.create(OperationBuilder.OperationType.BitXor, key, value);</span>
+<span class="fc" id="L662">    addNewOperation(op);</span>
+<span class="fc" id="L663">  }</span>
+
+  /**
+   * abort all modify operations.
+   * Notice: this method doesn't work for AVInstallation.
+   */
+  public void abortOperations() {
+<span class="pc bpc" id="L670" title="1 of 2 branches missed.">    if (totallyOverwrite) {</span>
+<span class="nc" id="L671">      logger.w(&quot;Can't abort modify operations under TotalOverWrite mode.&quot;);</span>
+    }
+<span class="fc" id="L673">    this.operations.clear();</span>
+<span class="fc" id="L674">  }</span>
+
+  protected void removeOperationForKey(String key) {
+<span class="fc" id="L677">    this.operations.remove(key);</span>
+<span class="fc" id="L678">  }</span>
+
+  protected void addNewOperation(ObjectFieldOperation op) {
+<span class="pc bpc" id="L681" title="1 of 2 branches missed.">    if (null == op) {</span>
+<span class="nc" id="L682">      return;</span>
+    }
+<span class="fc bfc" id="L684" title="All 2 branches covered.">    if (totallyOverwrite) {</span>
+<span class="fc bfc" id="L685" title="All 2 branches covered.">      if (&quot;Delete&quot;.equalsIgnoreCase(op.getOperation())) {</span>
+<span class="fc" id="L686">        this.serverData.remove(op.getField());</span>
+      } else {
+<span class="fc" id="L688">        Object oldValue = this.serverData.get(op.getField());</span>
+<span class="fc" id="L689">        Object newValue = op.apply(oldValue);</span>
+<span class="pc bpc" id="L690" title="1 of 2 branches missed.">        if (null == newValue) {</span>
+<span class="nc" id="L691">          this.serverData.remove(op.getField());</span>
+        } else {
+<span class="fc" id="L693">          this.serverData.put(op.getField(), newValue);</span>
+        }
+<span class="fc" id="L695">      }</span>
+    } else {
+<span class="fc" id="L697">      ObjectFieldOperation previous = null;</span>
+<span class="fc bfc" id="L698" title="All 2 branches covered.">      if (this.operations.containsKey(op.getField())) {</span>
+<span class="fc" id="L699">        previous = this.operations.get(op.getField());</span>
+      }
+<span class="fc" id="L701">      this.operations.put(op.getField(), op.merge(previous));</span>
+    }
+<span class="fc" id="L703">  }</span>
+
+  private boolean needBatchMode() {
+<span class="fc bfc" id="L706" title="All 2 branches covered.">    for (ObjectFieldOperation op : this.operations.values()) {</span>
+<span class="fc bfc" id="L707" title="All 2 branches covered.">      if (op instanceof CompoundOperation) {</span>
+<span class="fc" id="L708">        return true;</span>
+      }
+<span class="fc" id="L710">    }</span>
+<span class="fc" id="L711">    return false;</span>
+  }
+
+  /**
+   * save/update with server.
+   * @return json object.
+   */
+  protected JSONObject generateChangedParam() {
+<span class="fc bfc" id="L719" title="All 2 branches covered.">    if (totallyOverwrite) {</span>
+<span class="fc" id="L720">      HashMap&lt;String, Object&gt; tmp = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L721" title="All 2 branches covered.">      for (Map.Entry&lt;String, Object&gt; entry : this.serverData.entrySet()) {</span>
+<span class="fc" id="L722">        String key = entry.getKey();</span>
+<span class="fc" id="L723">        Object val = entry.getValue();</span>
+<span class="fc" id="L724">        tmp.put(key, BaseOperation.encodeObject(val));</span>
+<span class="fc" id="L725">      }</span>
+
+      // createdAt, updatedAt, objectId is immutable.
+<span class="fc" id="L728">      tmp.remove(KEY_CREATED_AT);</span>
+<span class="fc" id="L729">      tmp.remove(KEY_UPDATED_AT);</span>
+<span class="fc" id="L730">      tmp.remove(KEY_OBJECT_ID);</span>
+
+<span class="pc bpc" id="L732" title="1 of 2 branches missed.">      if (ignoreHooks.size() &gt; 0) {</span>
+<span class="nc" id="L733">        tmp.put(KEY_IGNORE_HOOKS, ignoreHooks);</span>
+      }
+ 
+<span class="fc" id="L736">      return JSONObject.Builder.create(tmp);</span>
+    }
+
+<span class="fc" id="L739">    Map&lt;String, Object&gt; params = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L740">    Set&lt;Map.Entry&lt;String, ObjectFieldOperation&gt;&gt; entries = operations.entrySet();</span>
+<span class="fc bfc" id="L741" title="All 2 branches covered.">    for (Map.Entry&lt;String, ObjectFieldOperation&gt; entry: entries) {</span>
+      //{&quot;attr&quot;:{&quot;__op&quot;:&quot;Add&quot;, &quot;objects&quot;:[obj1, obj2]}}
+<span class="fc" id="L743">      Map&lt;String, Object&gt; oneOp = entry.getValue().encode();</span>
+<span class="fc" id="L744">      params.putAll(oneOp);</span>
+<span class="fc" id="L745">    }</span>
+
+<span class="fc bfc" id="L747" title="All 2 branches covered.">    if (null != this.acl) {</span>
+<span class="fc" id="L748">      LCACL serverACL = generateACLFromServerData();</span>
+<span class="fc bfc" id="L749" title="All 2 branches covered.">      if (!this.acl.equals(serverACL)) {</span>
+        // only append acl request when modified.
+<span class="fc" id="L751">        ObjectFieldOperation op = OperationBuilder.gBuilder.create(OperationBuilder.OperationType.Set, KEY_ACL, acl);</span>
+<span class="fc" id="L752">        params.putAll(op.encode());</span>
+      }
+    }
+
+<span class="fc bfc" id="L756" title="All 2 branches covered.">    if (ignoreHooks.size() &gt; 0) {</span>
+<span class="fc" id="L757">      params.put(KEY_IGNORE_HOOKS, ignoreHooks);</span>
+    }
+
+<span class="fc bfc" id="L760" title="All 2 branches covered.">    if (!needBatchMode()) {</span>
+<span class="fc" id="L761">      return JSONObject.Builder.create(params);</span>
+    }
+
+<span class="fc" id="L764">    List&lt;Map&lt;String, Object&gt;&gt; finalParams = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc" id="L765">    Map&lt;String, Object&gt; topParams = Utils.makeCompletedRequest(getObjectId(), getRequestRawEndpoint(), getRequestMethod(), params);</span>
+<span class="pc bpc" id="L766" title="1 of 2 branches missed.">    if (null != topParams) {</span>
+<span class="fc" id="L767">      finalParams.add(topParams);</span>
+    }
+
+<span class="fc bfc" id="L770" title="All 2 branches covered.">    for (ObjectFieldOperation ops : this.operations.values()) {</span>
+<span class="fc bfc" id="L771" title="All 2 branches covered.">      if (ops instanceof CompoundOperation) {</span>
+<span class="fc" id="L772">        List&lt;Map&lt;String, Object&gt;&gt; restParams = ((CompoundOperation)ops).encodeRestOp(this);</span>
+<span class="pc bpc" id="L773" title="2 of 4 branches missed.">        if (null != restParams &amp;&amp; !restParams.isEmpty()) {</span>
+<span class="fc" id="L774">          finalParams.addAll(restParams);</span>
+        }
+      }
+<span class="fc" id="L777">    }</span>
+<span class="fc" id="L778">    Map&lt;String, Object&gt; finalResult = new HashMap&lt;String, Object&gt;(1);</span>
+<span class="fc" id="L779">    finalResult.put(&quot;requests&quot;, finalParams);</span>
+
+<span class="fc" id="L781">    return JSONObject.Builder.create(finalResult);</span>
+  }
+
+  protected List&lt;LCObject&gt; extractCascadingObjects(Object o) {
+<span class="fc" id="L785">    List&lt;LCObject&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L786" title="All 4 branches covered.">    if (o instanceof LCObject &amp;&amp; StringUtil.isEmpty(((LCObject)o).getObjectId())) {</span>
+<span class="fc" id="L787">      result.add((LCObject) o);</span>
+<span class="fc bfc" id="L788" title="All 2 branches covered.">    } else if (o instanceof Collection) {</span>
+<span class="fc bfc" id="L789" title="All 2 branches covered.">      for (Object secondO: ((Collection)o).toArray()) {</span>
+<span class="fc" id="L790">        List&lt;LCObject&gt; tmp = extractCascadingObjects(secondO);</span>
+<span class="pc bpc" id="L791" title="2 of 4 branches missed.">        if (null != tmp &amp;&amp; !tmp.isEmpty()) {</span>
+<span class="nc" id="L792">          result.addAll(tmp);</span>
+        }
+      }
+    }
+<span class="fc" id="L796">    return result;</span>
+  }
+
+  protected Observable&lt;List&lt;LCObject&gt;&gt; generateCascadingSaveObjects() {
+<span class="fc" id="L800">    List&lt;LCObject&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L801" title="All 2 branches covered.">    for (ObjectFieldOperation ofo: operations.values()) {</span>
+<span class="fc" id="L802">      List&lt;LCObject&gt; operationValues = extractCascadingObjects(ofo.getValue());</span>
+<span class="pc bpc" id="L803" title="1 of 4 branches missed.">      if (null != operationValues &amp;&amp; !operationValues.isEmpty()) {</span>
+<span class="fc" id="L804">        result.addAll(operationValues);</span>
+      }
+<span class="fc" id="L806">    }</span>
+<span class="fc" id="L807">    return Observable.just(result).subscribeOn(Schedulers.io());</span>
+  }
+
+  protected List&lt;LCFile&gt; extractUnsavedFiles(Object o) {
+<span class="fc" id="L811">    List&lt;LCFile&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L812" title="1 of 4 branches missed.">    if (o instanceof LCFile &amp;&amp; StringUtil.isEmpty(((LCFile) o).getObjectId())) {</span>
+<span class="fc" id="L813">      result.add((LCFile) o);</span>
+<span class="fc bfc" id="L814" title="All 2 branches covered.">    } else if (o instanceof Collection) {</span>
+<span class="fc bfc" id="L815" title="All 2 branches covered.">      for (Object secondTmp: ((Collection)o).toArray()) {</span>
+<span class="fc" id="L816">        List&lt;LCFile&gt; tmp = extractUnsavedFiles(secondTmp);</span>
+<span class="pc bpc" id="L817" title="1 of 4 branches missed.">        if (null != tmp &amp;&amp; !tmp.isEmpty()) {</span>
+<span class="fc" id="L818">          result.addAll(tmp);</span>
+        }
+      }
+    }
+<span class="fc" id="L822">    return result;</span>
+  }
+
+  protected List&lt;LCFile&gt; getUnsavedFiles() {
+<span class="fc" id="L826">    List&lt;LCFile&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L827" title="All 2 branches covered.">    for (ObjectFieldOperation ofo: operations.values()) {</span>
+<span class="fc" id="L828">      List&lt;LCFile&gt; unsavedFiles = extractUnsavedFiles(ofo.getValue());</span>
+<span class="pc bpc" id="L829" title="1 of 4 branches missed.">      if (null != unsavedFiles &amp;&amp; !unsavedFiles.isEmpty()) {</span>
+<span class="fc" id="L830">        result.addAll(unsavedFiles);</span>
+      }
+<span class="fc" id="L832">    }</span>
+<span class="fc" id="L833">    return result;</span>
+  }
+
+  protected void onSaveSuccess() {
+<span class="fc" id="L837">    this.operations.clear();</span>
+<span class="fc" id="L838">  }</span>
+
+  protected void onSaveFailure() {
+<span class="nc" id="L841">  }</span>
+
+  protected void onDataSynchronized() {
+<span class="fc" id="L844">  }</span>
+
+  private Observable&lt;? extends LCObject&gt; saveSelfOperations(LCUser asAuthenticatedUser, LCSaveOption option) {
+<span class="fc bfc" id="L847" title="All 2 branches covered.">    final boolean needFetch = (null != option) ? option.fetchWhenSave : isFetchWhenSave();</span>
+
+<span class="fc bfc" id="L849" title="All 4 branches covered.">    if (null != option &amp;&amp; null != option.matchQuery) {</span>
+<span class="fc" id="L850">      String currentClass = getClassName();</span>
+<span class="pc bpc" id="L851" title="2 of 4 branches missed.">      if (!StringUtil.isEmpty(currentClass) &amp;&amp; !currentClass.equals(option.matchQuery.getClassName())) {</span>
+<span class="nc" id="L852">        return Observable.error(new LCException(0, &quot;AVObject class inconsistant with AVQuery in AVSaveOption&quot;));</span>
+      }
+    }
+
+<span class="fc" id="L856">    final JSONObject paramData = generateChangedParam();</span>
+<span class="fc" id="L857">    logger.d(&quot;saveObject param: &quot; + paramData.toJSONString());</span>
+
+<span class="fc" id="L859">    final String currentObjectId = getObjectId();</span>
+
+<span class="fc bfc" id="L861" title="All 2 branches covered.">    if (needBatchMode()) {</span>
+<span class="fc" id="L862">      logger.w(&quot;Caution: batch mode will ignore fetchWhenSave flag and matchQuery.&quot;);</span>
+<span class="fc bfc" id="L863" title="All 2 branches covered.">      if (StringUtil.isEmpty(currentObjectId)) {</span>
+<span class="fc" id="L864">        logger.d(&quot;request payload: &quot; + paramData.toJSONString());</span>
+<span class="fc" id="L865">        return PaasClient.getStorageClient().batchSave(asAuthenticatedUser, paramData).map(new Function&lt;List&lt;Map&lt;String, Object&gt;&gt;, LCObject&gt;() {</span>
+          public LCObject apply(List&lt;Map&lt;String, Object&gt;&gt; object) throws Exception {
+<span class="pc bpc" id="L867" title="2 of 4 branches missed.">            if (null != object &amp;&amp; !object.isEmpty()) {</span>
+<span class="fc" id="L868">              logger.d(&quot;batchSave result: &quot; + object.toString());</span>
+
+<span class="fc" id="L870">              Map&lt;String, Object&gt; lastResult = object.get(object.size() - 1);</span>
+<span class="pc bpc" id="L871" title="1 of 2 branches missed.">              if (null != lastResult) {</span>
+<span class="fc" id="L872">                LCUtils.mergeConcurrentMap(serverData, lastResult);</span>
+<span class="fc" id="L873">                LCObject.this.onSaveSuccess();</span>
+              }
+            }
+<span class="fc" id="L876">            return LCObject.this;</span>
+          }
+        });
+      } else {
+<span class="fc" id="L880">        return PaasClient.getStorageClient().batchUpdate(asAuthenticatedUser, paramData).map(new Function&lt;JSONObject, LCObject&gt;() {</span>
+          public LCObject apply(JSONObject object) throws Exception {
+<span class="pc bpc" id="L882" title="1 of 2 branches missed.">            if (null != object) {</span>
+<span class="fc" id="L883">              logger.d(&quot;batchUpdate result: &quot; + object.toJSONString());</span>
+<span class="fc" id="L884">              Map&lt;String, Object&gt; lastResult = object.getObject(currentObjectId, Map.class);</span>
+<span class="pc bpc" id="L885" title="1 of 2 branches missed.">              if (null != lastResult) {</span>
+<span class="fc" id="L886">                LCUtils.mergeConcurrentMap(serverData, lastResult);</span>
+<span class="fc" id="L887">                LCObject.this.onSaveSuccess();</span>
+              }
+            }
+<span class="fc" id="L890">            return LCObject.this;</span>
+          }
+        });
+      }
+    } else {
+<span class="fc" id="L895">      JSONObject whereCondition = null;</span>
+<span class="fc bfc" id="L896" title="All 4 branches covered.">      if (null != option &amp;&amp; null != option.matchQuery) {</span>
+<span class="fc" id="L897">        Map&lt;String, Object&gt; whereConditionMap = option.matchQuery.conditions.compileWhereOperationMap();</span>
+<span class="fc" id="L898">        whereCondition = JSONObject.Builder.create(whereConditionMap);</span>
+      }
+<span class="fc bfc" id="L900" title="All 2 branches covered.">      if (totallyOverwrite) {</span>
+<span class="fc" id="L901">        return PaasClient.getStorageClient().saveWholeObject(asAuthenticatedUser,</span>
+<span class="fc" id="L902">                this.getClass(), endpointClassName, currentObjectId,</span>
+                paramData, needFetch, whereCondition)
+<span class="fc" id="L904">                .map(new Function&lt;LCObject, LCObject&gt;() {</span>
+          @Override
+          public LCObject apply(LCObject LCObject) throws Exception {
+<span class="fc" id="L907">            LCObject.this.mergeRawData(LCObject, needFetch);</span>
+<span class="fc" id="L908">            LCObject.this.onSaveSuccess();</span>
+<span class="fc" id="L909">            return LCObject.this;</span>
+          }
+        });
+<span class="fc bfc" id="L912" title="All 2 branches covered.">      } else if (StringUtil.isEmpty(currentObjectId)) {</span>
+<span class="fc" id="L913">        return PaasClient.getStorageClient().createObject(asAuthenticatedUser,</span>
+                this.className, paramData, needFetch, whereCondition)
+<span class="fc" id="L915">                .map(new Function&lt;LCObject, LCObject&gt;() {</span>
+                  @Override
+                  public LCObject apply(LCObject LCObject) throws Exception {
+<span class="fc" id="L918">                    LCObject.this.mergeRawData(LCObject, needFetch);</span>
+<span class="fc" id="L919">                    LCObject.this.onSaveSuccess();</span>
+<span class="fc" id="L920">                    return LCObject.this;</span>
+                  }
+                });
+      } else {
+<span class="fc" id="L924">        return PaasClient.getStorageClient().saveObject(asAuthenticatedUser,</span>
+<span class="fc" id="L925">                this.className, getObjectId(), paramData, needFetch, whereCondition)</span>
+<span class="fc" id="L926">                .map(new Function&lt;LCObject, LCObject&gt;() {</span>
+                  @Override
+                  public LCObject apply(LCObject LCObject) throws Exception {
+<span class="fc" id="L929">                    LCObject.this.mergeRawData(LCObject, needFetch);</span>
+<span class="fc" id="L930">                    LCObject.this.onSaveSuccess();</span>
+<span class="fc" id="L931">                    return LCObject.this;</span>
+                  }
+                });
+      }
+    }
+  }
+
+  /**
+   * Save object in background.
+   * @return observable instance.
+   */
+  public Observable&lt;? extends LCObject&gt; saveInBackground() {
+<span class="fc" id="L943">    LCUser targetUser = null;</span>
+<span class="fc" id="L944">    return saveInBackground(targetUser);</span>
+  }
+
+  /**
+   * Save object in background.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;? extends LCObject&gt; saveInBackground(LCUser asAuthenticatedUser) {
+<span class="fc" id="L955">    LCSaveOption option = null;</span>
+<span class="fc bfc" id="L956" title="All 2 branches covered.">    if (totallyOverwrite) {</span>
+<span class="fc" id="L957">      option = new LCSaveOption();</span>
+<span class="fc" id="L958">      option.setFetchWhenSave(true);</span>
+    }
+<span class="fc" id="L960">    return saveInBackground(asAuthenticatedUser, option);</span>
+  }
+
+  /**
+   * Save object in background.
+   * @param option save option.
+   * @return observable instance.
+   */
+  public Observable&lt;? extends LCObject&gt; saveInBackground(final LCSaveOption option) {
+<span class="fc" id="L969">    return saveInBackground(null, option);</span>
+  }
+
+  /**
+   * Save object in background.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param option save option.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;? extends LCObject&gt; saveInBackground(final LCUser asAuthenticatedUser, final LCSaveOption option) {
+<span class="fc" id="L981">    Map&lt;LCObject, Boolean&gt; markMap = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L982" title="All 2 branches covered.">    if (hasCircleReference(markMap)) {</span>
+<span class="fc" id="L983">      return Observable.error(new LCException(LCException.CIRCLE_REFERENCE, &quot;Found a circular dependency when saving.&quot;));</span>
+    }
+
+<span class="fc" id="L986">    Observable&lt;List&lt;LCObject&gt;&gt; needSaveFirstly = generateCascadingSaveObjects();</span>
+<span class="fc" id="L987">    return needSaveFirstly.flatMap(new Function&lt;List&lt;LCObject&gt;, Observable&lt;? extends LCObject&gt;&gt;() {</span>
+      @Override
+      public Observable&lt;? extends LCObject&gt; apply(List&lt;LCObject&gt; objects) throws Exception {
+<span class="fc" id="L990">        logger.d(&quot;First, try to execute save operations in thread: &quot; + Thread.currentThread());</span>
+<span class="fc bfc" id="L991" title="All 2 branches covered.">        for (LCObject o: objects) {</span>
+<span class="fc" id="L992">          o.save(asAuthenticatedUser);</span>
+<span class="fc" id="L993">        }</span>
+<span class="fc" id="L994">        logger.d(&quot;Second, save object itself...&quot;);</span>
+<span class="fc" id="L995">        return saveSelfOperations(asAuthenticatedUser, option);</span>
+      }
+    });
+  }
+
+  /**
+   * judge operations' value include circle reference or not.
+   *
+   * notice: internal used, pls not invoke it.
+   *
+   * @param markMap markup map.
+   * @return flag to indicate there is circle reference or not.
+   */
+  public boolean hasCircleReference(Map&lt;LCObject, Boolean&gt; markMap) {
+<span class="pc bpc" id="L1009" title="1 of 2 branches missed.">    if (null == markMap) {</span>
+<span class="nc" id="L1010">      return false;</span>
+    }
+<span class="fc" id="L1012">    markMap.put(this, true);</span>
+<span class="fc" id="L1013">    boolean rst = false;</span>
+<span class="fc bfc" id="L1014" title="All 2 branches covered.">    for (ObjectFieldOperation op: operations.values()) {</span>
+<span class="pc bpc" id="L1015" title="1 of 4 branches missed.">      rst = rst || op.checkCircleReference(markMap);</span>
+<span class="fc" id="L1016">    }</span>
+<span class="fc" id="L1017">    return rst;</span>
+  }
+
+  /**
+   * Save in blocking mode.
+   */
+  public void save() {
+<span class="fc" id="L1024">    save(null);</span>
+<span class="fc" id="L1025">  }</span>
+
+  /**
+   * Save in blocking mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public void save(LCUser asAuthenticatedUser) {
+<span class="fc" id="L1034">    saveInBackground(asAuthenticatedUser).blockingSubscribe();</span>
+<span class="fc" id="L1035">  }</span>
+
+  /**
+   * Save All objects in blocking mode.
+   * @param objects object collection.
+   * @throws LCException error happened.
+   */
+  public static void saveAll(Collection&lt;? extends LCObject&gt; objects) throws LCException {
+<span class="fc" id="L1043">    saveAll(null, objects);</span>
+<span class="fc" id="L1044">  }</span>
+
+  /**
+   * Save All objects in blocking mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param objects object collection.
+   * @throws LCException error happened.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public static void saveAll(LCUser asAuthenticatedUser, Collection&lt;? extends LCObject&gt; objects) throws LCException {
+<span class="fc" id="L1055">    saveAllInBackground(asAuthenticatedUser, objects).blockingSubscribe();</span>
+<span class="fc" id="L1056">  }</span>
+
+  private static Observable&lt;List&lt;LCFile&gt;&gt; extractSaveAheadFiles(Collection&lt;? extends LCObject&gt; objects) {
+<span class="fc" id="L1059">    List&lt;LCFile&gt; needSaveAheadFiles = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L1060" title="All 2 branches covered.">    for (LCObject o: objects) {</span>
+<span class="fc" id="L1061">      List&lt;LCFile&gt; cascadingSaveFiles = o.getUnsavedFiles();</span>
+<span class="pc bpc" id="L1062" title="1 of 4 branches missed.">      if (null != cascadingSaveFiles &amp;&amp; !cascadingSaveFiles.isEmpty()) {</span>
+<span class="fc" id="L1063">        needSaveAheadFiles.addAll(cascadingSaveFiles);</span>
+      }
+<span class="fc" id="L1065">    }</span>
+<span class="fc" id="L1066">    return Observable.just(needSaveAheadFiles).subscribeOn(Schedulers.io());</span>
+  }
+
+  /**
+   * Save all objects in async mode.
+   * @param objects object collection.
+   * @return observable instance.
+   */
+  public static Observable&lt;JSONArray&gt; saveAllInBackground(final Collection&lt;? extends LCObject&gt; objects) {
+<span class="nc" id="L1075">    return saveAllInBackground(null, objects);</span>
+  }
+
+  /**
+   * Save all objects in async mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param objects object collection.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public static Observable&lt;JSONArray&gt; saveAllInBackground(final LCUser asAuthenticatedUser,
+                                                          final Collection&lt;? extends LCObject&gt; objects) {
+<span class="pc bpc" id="L1088" title="2 of 4 branches missed.">    if (null == objects || objects.isEmpty()) {</span>
+<span class="nc" id="L1089">      JSONArray emptyResult = JSONArray.Builder.create(null);</span>
+<span class="nc" id="L1090">      return Observable.just(emptyResult);</span>
+    }
+<span class="fc bfc" id="L1092" title="All 2 branches covered.">    for (LCObject o: objects) {</span>
+<span class="fc" id="L1093">      Map&lt;LCObject, Boolean&gt; markMap = new HashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L1094" title="1 of 2 branches missed.">      if (o.hasCircleReference(markMap)) {</span>
+<span class="nc" id="L1095">        return Observable.error(new LCException(LCException.CIRCLE_REFERENCE, &quot;Found a circular dependency when saving.&quot;));</span>
+      }
+<span class="fc" id="L1097">    }</span>
+<span class="fc" id="L1098">    Observable&lt;List&lt;LCFile&gt;&gt; aHeadStage = extractSaveAheadFiles(objects);</span>
+<span class="fc" id="L1099">    return aHeadStage.flatMap(new Function&lt;List&lt;LCFile&gt;, ObservableSource&lt;JSONArray&gt;&gt;() {</span>
+      @Override
+      public ObservableSource&lt;JSONArray&gt; apply(List&lt;LCFile&gt; avFiles) throws Exception {
+<span class="fc" id="L1102">        logger.d(&quot;begin to save objects with batch mode...&quot;);</span>
+<span class="pc bpc" id="L1103" title="1 of 4 branches missed.">        if (null != avFiles &amp;&amp; !avFiles.isEmpty()) {</span>
+<span class="fc bfc" id="L1104" title="All 2 branches covered.">          for (LCFile file : avFiles) {</span>
+<span class="fc" id="L1105">            file.save(asAuthenticatedUser);</span>
+<span class="fc" id="L1106">          }</span>
+        }
+<span class="fc" id="L1108">        JSONArray requests = JSONArray.Builder.create(null);</span>
+<span class="fc bfc" id="L1109" title="All 2 branches covered.">        for (LCObject o : objects) {</span>
+<span class="fc" id="L1110">          JSONObject requestBody = o.generateChangedParam();</span>
+<span class="fc" id="L1111">          JSONObject objectRequest = JSONObject.Builder.create(null);</span>
+<span class="fc" id="L1112">          objectRequest.put(&quot;method&quot;, o.getRequestMethod());</span>
+<span class="fc" id="L1113">          objectRequest.put(&quot;path&quot;, o.getRequestRawEndpoint());</span>
+<span class="fc" id="L1114">          objectRequest.put(&quot;body&quot;, requestBody);</span>
+<span class="fc" id="L1115">          requests.add(objectRequest);</span>
+<span class="fc" id="L1116">        }</span>
+
+<span class="fc" id="L1118">        JSONObject requestTotal = JSONObject.Builder.create(null);</span>
+<span class="fc" id="L1119">        requestTotal.put(&quot;requests&quot;, requests);</span>
+<span class="fc" id="L1120">        return PaasClient.getStorageClient().batchSave(asAuthenticatedUser, requestTotal).map(new Function&lt;List&lt;Map&lt;String, Object&gt;&gt;, JSONArray&gt;() {</span>
+          public JSONArray apply(List&lt;Map&lt;String, Object&gt;&gt; batchResults) throws Exception {
+
+<span class="fc" id="L1123">            JSONArray result = JSONArray.Builder.create(null);</span>
+<span class="pc bpc" id="L1124" title="2 of 4 branches missed.">            if (null != batchResults &amp;&amp; (objects.size() == batchResults.size())) {</span>
+<span class="fc" id="L1125">              logger.d(&quot;batchSave result: &quot; + batchResults.toString());</span>
+<span class="fc" id="L1126">              Iterator it = objects.iterator();</span>
+
+<span class="pc bpc" id="L1128" title="1 of 4 branches missed.">              for (int i = 0; i &lt; batchResults.size() &amp;&amp; it.hasNext(); i++) {</span>
+<span class="fc" id="L1129">                JSONObject oneResult = JSONObject.Builder.create(batchResults.get(i));</span>
+<span class="fc" id="L1130">                LCObject originObject = (LCObject) it.next();</span>
+<span class="pc bpc" id="L1131" title="1 of 2 branches missed.">                if (oneResult.containsKey(&quot;success&quot;)) {</span>
+<span class="fc" id="L1132">                  LCUtils.mergeConcurrentMap(originObject.serverData, oneResult.getJSONObject(&quot;success&quot;).getInnerMap());</span>
+<span class="fc" id="L1133">                  originObject.onSaveSuccess();</span>
+<span class="nc bnc" id="L1134" title="All 2 branches missed.">                } else if (oneResult.containsKey(&quot;error&quot;)) {</span>
+<span class="nc" id="L1135">                  originObject.onSaveFailure();</span>
+                }
+<span class="fc" id="L1137">                result.add(oneResult);</span>
+              }
+            }
+<span class="fc" id="L1140">            return result;</span>
+          }
+        });
+      }
+    });
+  }
+
+  /**
+   * Save eventually.
+   * @throws LCException error happened.
+   */
+  public void saveEventually() throws LCException {
+<span class="fc" id="L1152">    saveEventually(null);</span>
+<span class="fc" id="L1153">  }</span>
+
+  /**
+   * Save eventually.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @throws LCException error happened.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public void saveEventually(final LCUser asAuthenticatedUser) throws LCException {
+<span class="fc bfc" id="L1163" title="All 2 branches covered.">    if (operations.isEmpty()) {</span>
+<span class="fc" id="L1164">      return;</span>
+    }
+<span class="fc" id="L1166">    Map&lt;LCObject, Boolean&gt; markMap = new HashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L1167" title="1 of 2 branches missed.">    if (hasCircleReference(markMap)) {</span>
+<span class="nc" id="L1168">      throw new LCException(LCException.CIRCLE_REFERENCE, &quot;Found a circular dependency when saving.&quot;);</span>
+    }
+
+<span class="fc" id="L1171">    NetworkingDetector detector = AppConfiguration.getGlobalNetworkingDetector();</span>
+<span class="pc bpc" id="L1172" title="2 of 4 branches missed.">    if (null != detector &amp;&amp; detector.isConnected()) {</span>
+      // network is fine, try to save object;
+<span class="fc" id="L1174">      this.saveInBackground(asAuthenticatedUser).subscribe(new Observer&lt;LCObject&gt;() {</span>
+        @Override
+        public void onSubscribe(Disposable disposable) {
+
+<span class="fc" id="L1178">        }</span>
+
+        @Override
+        public void onNext(LCObject LCObject) {
+<span class="fc" id="L1182">          logger.d(&quot;succeed to save directly&quot;);</span>
+<span class="fc" id="L1183">        }</span>
+
+        @Override
+        public void onError(Throwable throwable) {
+          // failed, save data to local file first;
+<span class="nc" id="L1188">          add2ArchivedRequest(false);</span>
+<span class="nc" id="L1189">        }</span>
+
+        @Override
+        public void onComplete() {
+
+<span class="fc" id="L1194">        }</span>
+      });
+    } else {
+      // network down, save data to local file first;
+<span class="nc" id="L1198">      add2ArchivedRequest(false);</span>
+    }
+<span class="fc" id="L1200">  }</span>
+
+  private void add2ArchivedRequest(boolean isDelete) {
+<span class="nc" id="L1203">    ArchivedRequests requests = ArchivedRequests.getInstance();</span>
+<span class="nc bnc" id="L1204" title="All 2 branches missed.">    if (isDelete) {</span>
+<span class="nc" id="L1205">      requests.deleteEventually(this);</span>
+    } else {
+<span class="nc" id="L1207">      requests.saveEventually(this);</span>
+    }
+<span class="nc" id="L1209">  }</span>
+
+  /**
+   * Delete current object eventually.
+   */
+  public void deleteEventually() {
+<span class="fc" id="L1215">    deleteEventually(null);</span>
+<span class="fc" id="L1216">  }</span>
+
+  /**
+   * Delete current object eventually.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public void deleteEventually(final LCUser asAuthenticatedUser) {
+<span class="fc" id="L1225">    String objectId  = getObjectId();</span>
+<span class="fc bfc" id="L1226" title="All 2 branches covered.">    if (StringUtil.isEmpty(objectId)) {</span>
+<span class="fc" id="L1227">      logger.w(&quot;objectId is empty, you couldn't delete a persistent object.&quot;);</span>
+<span class="fc" id="L1228">      return;</span>
+    }
+<span class="fc" id="L1230">    NetworkingDetector detector = AppConfiguration.getGlobalNetworkingDetector();</span>
+<span class="pc bpc" id="L1231" title="2 of 4 branches missed.">    if (null != detector &amp;&amp; detector.isConnected()) {</span>
+<span class="fc" id="L1232">      this.deleteInBackground(asAuthenticatedUser).subscribe(new Observer&lt;LCNull&gt;() {</span>
+        @Override
+        public void onSubscribe(Disposable disposable) {
+
+<span class="fc" id="L1236">        }</span>
+
+        @Override
+        public void onNext(LCNull LCNull) {
+<span class="fc" id="L1240">          logger.d(&quot;succeed to delete directly.&quot;);</span>
+<span class="fc" id="L1241">        }</span>
+
+        @Override
+        public void onError(Throwable throwable) {
+<span class="nc bnc" id="L1245" title="All 2 branches missed.">          boolean notFound = throwable.getMessage().indexOf(&quot;not find object by id&quot;) &gt; 0;</span>
+<span class="nc bnc" id="L1246" title="All 2 branches missed.">          if (notFound) {</span>
+<span class="nc" id="L1247">            logger.d(&quot;not found object, equals that operation succeed.&quot;);</span>
+          } else {
+<span class="nc" id="L1249">            add2ArchivedRequest(true);</span>
+          }
+<span class="nc" id="L1251">        }</span>
+
+        @Override
+        public void onComplete() {
+
+<span class="fc" id="L1256">        }</span>
+      });
+    } else {
+<span class="nc" id="L1259">      add2ArchivedRequest(true);</span>
+    }
+<span class="fc" id="L1261">  }</span>
+
+  /**
+   * Delete current object in async mode.
+   * @return observable instance.
+   */
+  public Observable&lt;LCNull&gt; deleteInBackground() {
+<span class="fc" id="L1268">    return deleteInBackground(null);</span>
+  }
+
+  /**
+   * Delete current object in async mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;LCNull&gt; deleteInBackground(final LCUser asAuthenticatedUser) {
+<span class="fc" id="L1279">    Map&lt;String, Object&gt; ignoreParam = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L1280" title="All 2 branches covered.">    if (ignoreHooks.size() &gt; 0) {</span>
+<span class="fc" id="L1281">      ignoreParam.put(KEY_IGNORE_HOOKS, ignoreHooks);</span>
+    }
+<span class="pc bpc" id="L1283" title="1 of 2 branches missed.">    if (totallyOverwrite) {</span>
+<span class="nc" id="L1284">      return PaasClient.getStorageClient().deleteWholeObject(asAuthenticatedUser,</span>
+<span class="nc" id="L1285">              this.endpointClassName, getObjectId(), ignoreParam);</span>
+    }
+<span class="fc" id="L1287">    return PaasClient.getStorageClient().deleteObject(asAuthenticatedUser, this.className, getObjectId(), ignoreParam);</span>
+  }
+
+  /**
+   * Delete current object in blocking mode.
+   */
+  public void delete() {
+<span class="fc" id="L1294">    delete(null);</span>
+<span class="fc" id="L1295">  }</span>
+
+  /**
+   * Delete current object in blocking mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public void delete(final LCUser asAuthenticatedUser) {
+<span class="fc" id="L1304">    deleteInBackground(asAuthenticatedUser).blockingSubscribe();</span>
+<span class="fc" id="L1305">  }</span>
+
+  /**
+   * Delete all objects in blocking mode.
+   * @param objects object collection.
+   * @throws LCException error happened.
+   */
+  public static void deleteAll(Collection&lt;? extends LCObject&gt; objects) throws LCException {
+<span class="fc" id="L1313">    deleteAll(null, objects);</span>
+<span class="fc" id="L1314">  }</span>
+
+  /**
+   * Delete all objects in blocking mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param objects object collection.
+   * @throws LCException error happened.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public static void deleteAll(final LCUser asAuthenticatedUser, Collection&lt;? extends LCObject&gt; objects) throws LCException {
+<span class="fc" id="L1325">    deleteAllInBackground(asAuthenticatedUser, objects).blockingSubscribe();</span>
+<span class="fc" id="L1326">  }</span>
+
+  /**
+   * Delete all objects in async mode.
+   * @param objects object collection.
+   * @return observable instance.
+   */
+  public static Observable&lt;LCNull&gt; deleteAllInBackground(Collection&lt;? extends LCObject&gt; objects) {
+<span class="fc" id="L1334">    return deleteAllInBackground(null, objects);</span>
+  }
+
+  /**
+   * Delete all objects in async mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param objects object collection.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public static Observable&lt;LCNull&gt; deleteAllInBackground(final LCUser asAuthenticatedUser,
+                                                         Collection&lt;? extends LCObject&gt; objects) {
+<span class="pc bpc" id="L1347" title="1 of 4 branches missed.">    if (null == objects || objects.isEmpty()) {</span>
+<span class="fc" id="L1348">      return Observable.just(LCNull.getINSTANCE());</span>
+    }
+<span class="fc" id="L1350">    String className = null;</span>
+<span class="fc" id="L1351">    Map&lt;String, Object&gt; ignoreParams = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L1352">    StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L1353" title="All 2 branches covered.">    for (LCObject o : objects) {</span>
+<span class="pc bpc" id="L1354" title="2 of 4 branches missed.">      if (StringUtil.isEmpty(o.getObjectId()) || StringUtil.isEmpty(o.getClassName())) {</span>
+<span class="nc" id="L1355">        return Observable.error(new IllegalArgumentException(&quot;Invalid AVObject, the class name or objectId is blank.&quot;));</span>
+      }
+<span class="fc bfc" id="L1357" title="All 2 branches covered.">      if (className == null) {</span>
+<span class="fc" id="L1358">        className = o.getClassName();</span>
+<span class="fc" id="L1359">        sb.append(o.getObjectId());</span>
+<span class="pc bpc" id="L1360" title="1 of 2 branches missed.">      } else if (className.equals(o.getClassName())) {</span>
+<span class="fc" id="L1361">        sb.append(&quot;,&quot;).append(o.getObjectId());</span>
+      } else {
+<span class="nc" id="L1363">        return Observable.error(new IllegalArgumentException(&quot;The objects class name must be the same.&quot;));</span>
+      }
+<span class="fc" id="L1365">    }</span>
+<span class="fc" id="L1366">    return PaasClient.getStorageClient().deleteObject(asAuthenticatedUser, className, sb.toString(), ignoreParams);</span>
+  }
+
+  /**
+   * Refresh current object in blocking mode.
+   */
+  public void refresh() {
+<span class="fc" id="L1373">    refresh(null);</span>
+<span class="fc" id="L1374">  }</span>
+
+  /**
+   * Refresh current object in blocking mode.
+   * @param includeKeys include keys, which object will be return together.
+   */
+  public void refresh(String includeKeys) {
+<span class="fc" id="L1381">    refreshInBackground(includeKeys).blockingSubscribe();</span>
+<span class="fc" id="L1382">  }</span>
+
+  /**
+   * Refresh current object in blocking mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param includeKeys include keys, which object will be return together.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public void refresh(final LCUser asAuthenticatedUser, String includeKeys) {
+<span class="fc" id="L1392">    refreshInBackground(asAuthenticatedUser, includeKeys).blockingSubscribe();</span>
+<span class="fc" id="L1393">  }</span>
+
+  /**
+   * Refresh current object in async mode.
+   * @return observable instance.
+   */
+  public Observable&lt;LCObject&gt; refreshInBackground() {
+<span class="fc" id="L1400">    return refreshInBackground(null, null);</span>
+  }
+
+  /**
+   * Refresh current object in async mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;LCObject&gt; refreshInBackground(final LCUser asAuthenticatedUser) {
+<span class="nc" id="L1411">    return refreshInBackground(asAuthenticatedUser, null);</span>
+  }
+
+  /**
+   * Refresh current object in async mode.
+   * @param includeKeys include keys, which object will be return together.
+   * @return observable instance.
+   */
+  public Observable&lt;LCObject&gt; refreshInBackground(final String includeKeys) {
+<span class="fc" id="L1420">    return refreshInBackground(null, includeKeys);</span>
+  }
+
+  /**
+   * Refresh current object in async mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param includeKeys include keys, which object will be return together.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;LCObject&gt; refreshInBackground(final LCUser asAuthenticatedUser, final String includeKeys) {
+<span class="fc bfc" id="L1432" title="All 2 branches covered.">    if (totallyOverwrite) {</span>
+<span class="fc" id="L1433">      return PaasClient.getStorageClient().getWholeObject(asAuthenticatedUser, this.endpointClassName, getObjectId(), includeKeys)</span>
+<span class="fc" id="L1434">              .map(new Function&lt;LCObject, LCObject&gt;() {</span>
+                @Override
+                public LCObject apply(LCObject LCObject) throws Exception {
+<span class="fc" id="L1437">                  LCObject.this.serverData.clear();</span>
+<span class="fc" id="L1438">                  LCObject.this.serverData.putAll(LCObject.serverData);</span>
+<span class="fc" id="L1439">                  LCObject.this.onDataSynchronized();</span>
+<span class="fc" id="L1440">                  return LCObject.this;</span>
+                }
+              });
+    }
+<span class="fc" id="L1444">    return PaasClient.getStorageClient().fetchObject(asAuthenticatedUser, this.className, getObjectId(), includeKeys)</span>
+<span class="fc" id="L1445">            .map(new Function&lt;LCObject, LCObject&gt;() {</span>
+              public LCObject apply(LCObject LCObject) throws Exception {
+<span class="fc bfc" id="L1447" title="All 2 branches covered.">                if (StringUtil.isEmpty(includeKeys)) {</span>
+<span class="pc bpc" id="L1448" title="1 of 4 branches missed.">                  if (className.equals(LCUser.CLASS_NAME) || LCObject.this instanceof LCUser) {</span>
+<span class="fc" id="L1449">                    Object userSessionToken = LCObject.this.serverData.get(LCUser.ATTR_SESSION_TOKEN);</span>
+<span class="fc" id="L1450">                    LCObject.this.serverData.clear();</span>
+<span class="fc bfc" id="L1451" title="All 2 branches covered.">                    if (null != userSessionToken){</span>
+<span class="fc" id="L1452">                      LCObject.this.serverData.put(LCUser.ATTR_SESSION_TOKEN, userSessionToken);</span>
+                    }
+<span class="fc" id="L1454">                  } else {</span>
+<span class="fc" id="L1455">                    LCObject.this.serverData.clear();</span>
+                  }
+                }
+<span class="fc" id="L1458">                LCObject.this.serverData.putAll(LCObject.serverData);</span>
+<span class="fc" id="L1459">                LCObject.this.onDataSynchronized();</span>
+<span class="fc" id="L1460">                return LCObject.this;</span>
+              }
+            });
+  }
+
+  /**
+   * Fetch current object in blocking mode.
+   * @return current object.
+   */
+  public LCObject fetch() {
+<span class="fc" id="L1470">    return fetch(null);</span>
+  }
+
+  /**
+   * Fetch current object in blocking mode.
+   * @param includeKeys include keys, which object will be return together.
+   * @return current object.
+   */
+  public LCObject fetch(String includeKeys) {
+<span class="fc" id="L1479">    return fetch(null, includeKeys);</span>
+  }
+
+  /**
+   * Fetch current object in blocking mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param includeKeys include keys, which object will be return together.
+   * @return current object.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public LCObject fetch(LCUser asAuthenticatedUser, String includeKeys) {
+<span class="fc" id="L1491">    refresh(asAuthenticatedUser, includeKeys);</span>
+<span class="fc" id="L1492">    return this;</span>
+  }
+
+  /**
+   * Fetch current object in async mode.
+   * @return observable instance.
+   */
+  public Observable&lt;LCObject&gt; fetchInBackground() {
+<span class="fc" id="L1500">    return refreshInBackground();</span>
+  }
+
+  /**
+   * Fetch current object in async mode.
+   * @param includeKeys include keys, which object will be return together.
+   * @return observable instance.
+   */
+  public Observable&lt;LCObject&gt; fetchInBackground(String includeKeys) {
+<span class="fc" id="L1509">    return fetchInBackground(null, includeKeys);</span>
+  }
+
+  /**
+   * Fetch current object in async mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param includeKeys include keys, which object will be return together.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;LCObject&gt; fetchInBackground(LCUser asAuthenticatedUser, String includeKeys) {
+<span class="fc" id="L1521">    return refreshInBackground(asAuthenticatedUser, includeKeys);</span>
+  }
+
+  /**
+   * Fetch current object if needed in async mode.
+   * @return observable instance.
+   */
+  public Observable&lt;LCObject&gt; fetchIfNeededInBackground() {
+<span class="pc bpc" id="L1529" title="2 of 4 branches missed.">    if (!StringUtil.isEmpty(getObjectId()) &amp;&amp; this.serverData.size() &gt; 1) {</span>
+<span class="nc" id="L1530">      return Observable.just(this);</span>
+    } else {
+<span class="fc" id="L1532">      return refreshInBackground();</span>
+    }
+  }
+
+  /**
+   * Fetch current object if needed in async mode.
+   * @param includeKeys include keys, which object will be return together.
+   * @return observable instance.
+   */
+  public Observable&lt;LCObject&gt; fetchIfNeededInBackground(String includeKeys) {
+<span class="nc" id="L1542">    return fetchIfNeededInBackground(null, includeKeys);</span>
+  }
+
+  /**
+   * Fetch current object if needed in async mode.
+   * @param asAuthenticatedUser explicit user for request authentication.
+   * @param includeKeys include keys, which object will be return together.
+   * @return observable instance.
+   *
+   * in general, this method should be invoked in lean engine.
+   */
+  public Observable&lt;LCObject&gt; fetchIfNeededInBackground(LCUser asAuthenticatedUser, String includeKeys) {
+<span class="nc bnc" id="L1554" title="All 4 branches missed.">    if (!StringUtil.isEmpty(getObjectId()) &amp;&amp; this.serverData.size() &gt; 1) {</span>
+<span class="nc" id="L1555">      return Observable.just(this);</span>
+    } else {
+<span class="nc" id="L1557">      return refreshInBackground(asAuthenticatedUser, includeKeys);</span>
+    }
+  }
+
+  /**
+   * Fetch current object in blocking mode.
+   * @return current object.
+   */
+  public LCObject fetchIfNeeded() {
+<span class="fc" id="L1566">    fetchIfNeededInBackground().blockingSubscribe();</span>
+<span class="fc" id="L1567">    return this;</span>
+  }
+
+  protected void resetAll() {
+<span class="fc" id="L1571">    this.objectId = &quot;&quot;;</span>
+<span class="fc" id="L1572">    this.acl = null;</span>
+<span class="fc" id="L1573">    this.serverData.clear();</span>
+<span class="fc" id="L1574">    this.operations.clear();</span>
+<span class="fc" id="L1575">  }</span>
+
+  protected void resetByRawData(LCObject LCObject) {
+<span class="fc" id="L1578">    resetAll();</span>
+<span class="pc bpc" id="L1579" title="1 of 2 branches missed.">    if (null != LCObject) {</span>
+<span class="fc" id="L1580">      this.serverData.putAll(LCObject.serverData);</span>
+<span class="fc" id="L1581">      this.operations.putAll(LCObject.operations);</span>
+    }
+<span class="fc" id="L1583">  }</span>
+
+  void mergeRawData(LCObject LCObject, boolean fetchServerData) {
+<span class="pc bpc" id="L1586" title="1 of 2 branches missed.">    if (null != LCObject) {</span>
+<span class="fc" id="L1587">      this.serverData.putAll(LCObject.serverData);</span>
+    }
+<span class="fc bfc" id="L1589" title="All 4 branches covered.">    if (!fetchServerData &amp;&amp; AppConfiguration.isAutoMergeOperationDataWhenSave()) {</span>
+<span class="fc bfc" id="L1590" title="All 2 branches covered.">      for (Map.Entry&lt;String, ObjectFieldOperation&gt; entry: operations.entrySet()) {</span>
+<span class="fc" id="L1591">        String attribute = entry.getKey();</span>
+<span class="fc" id="L1592">        Object value = internalGet(attribute);</span>
+<span class="fc bfc" id="L1593" title="All 2 branches covered.">        if (null == value) {</span>
+<span class="fc" id="L1594">          this.serverData.remove(attribute);</span>
+        } else {
+<span class="fc" id="L1596">          this.serverData.put(attribute, value);</span>
+        }
+<span class="fc" id="L1598">      }</span>
+    }
+<span class="fc" id="L1600">  }</span>
+
+  /**
+   * Reset server data with new data.
+   * @param data new data.
+   */
+  public void resetServerData(Map&lt;String, Object&gt; data) {
+<span class="fc" id="L1607">    this.serverData.clear();</span>
+<span class="fc" id="L1608">    LCUtils.mergeConcurrentMap(this.serverData, data);</span>
+<span class="fc" id="L1609">    this.operations.clear();</span>
+<span class="fc" id="L1610">  }</span>
+
+  /**
+   * Get request endpoint.
+   * @return endpoint.
+   */
+  public String getRequestRawEndpoint() {
+<span class="fc bfc" id="L1617" title="All 2 branches covered.">    if (StringUtil.isEmpty(getObjectId())) {</span>
+<span class="fc" id="L1618">      return &quot;/1.1/classes/&quot; + this.getClassName();</span>
+    } else {
+<span class="fc" id="L1620">      return &quot;/1.1/classes/&quot; + this.getClassName() + &quot;/&quot; + getObjectId();</span>
+    }
+  }
+
+  /**
+   * Get request method.
+   * @return http method.
+   */
+  public String getRequestMethod() {
+<span class="fc bfc" id="L1629" title="All 2 branches covered.">    if (StringUtil.isEmpty(getObjectId())) {</span>
+<span class="fc" id="L1630">      return &quot;POST&quot;;</span>
+    } else {
+<span class="fc" id="L1632">      return &quot;PUT&quot;;</span>
+    }
+  }
+
+  /**
+   * Register subclass to AVOSCloud SDK.It must be invocated before AVOSCloud.initialize.
+   *
+   * @param clazz The subclass.
+   * @param &lt;T&gt; template type.
+   * @since 1.3.6
+   */
+  public static &lt;T extends LCObject&gt; void registerSubclass(Class&lt;T&gt; clazz) {
+<span class="fc" id="L1644">    Transformer.registerClass(clazz);</span>
+<span class="fc" id="L1645">  }</span>
+
+  /**
+   * get ACL
+   * @return acl object.
+   */
+  public synchronized LCACL getACL() {
+<span class="fc bfc" id="L1652" title="All 2 branches covered.">    if (null == this.acl) {</span>
+<span class="fc" id="L1653">      this.acl = generateACLFromServerData();</span>
+    }
+<span class="fc" id="L1655">    return this.acl;</span>
+  }
+
+  /**
+   * Set ACL
+   * @param acl acl object.
+   */
+  public synchronized void setACL(LCACL acl) {
+<span class="fc" id="L1663">    this.acl = acl;</span>
+<span class="fc" id="L1664">  }</span>
+
+  protected LCACL generateACLFromServerData() {
+<span class="fc bfc" id="L1667" title="All 2 branches covered.">    if (!this.serverData.containsKey(KEY_ACL)) {</span>
+<span class="fc" id="L1668">      return new LCACL();</span>
+    } else {
+<span class="fc" id="L1670">      Object aclMap = this.serverData.get(KEY_ACL);</span>
+<span class="pc bpc" id="L1671" title="1 of 2 branches missed.">      if (aclMap instanceof HashMap) {</span>
+<span class="fc" id="L1672">        return new LCACL((HashMap) aclMap);</span>
+      } else {
+<span class="nc" id="L1674">        return new LCACL();</span>
+      }
+    }
+  }
+
+  /**
+   * Get query for class.
+   * @param clazz target class.
+   * @param &lt;T&gt; result type.
+   * @return query instance.
+   */
+
+  public static &lt;T extends LCObject&gt; LCQuery&lt;T&gt; getQuery(Class&lt;T&gt; clazz) {
+<span class="fc" id="L1687">    return new LCQuery&lt;T&gt;(Transformer.getSubClassName(clazz), clazz);</span>
+  }
+
+  /**
+   * common methods.
+   */
+  /**
+   * Generate a new json object with server data.
+   * @return json object.
+   */
+  public JSONObject toJSONObject() {
+<span class="nc" id="L1698">    return JSONObject.Builder.create(this.serverData);</span>
+  }
+
+  /**
+   * Generate a json string.
+   * @return json string.
+   */
+  public String toJSONString() {
+<span class="fc" id="L1706">    return JSON.toJSONString(this);</span>
+  }
+
+  /**
+   * Create AVObject instance from json string which generated by AVObject.toString or AVObject.toJSONString.
+   *
+   * @param objectString json string.
+   * @return AVObject instance, null if objectString is null
+   */
+  public static LCObject parseLCObject(String objectString) {
+<span class="pc bpc" id="L1716" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(objectString)) {</span>
+<span class="nc" id="L1717">      return null;</span>
+    }
+    // replace leading type name to compatible with v4.x android sdk serialized json string.
+<span class="fc" id="L1720">    objectString = objectString.replaceAll(&quot;^\\{\\s*\&quot;@type\&quot;:\\s*\&quot;[A-Za-z\\.]+\&quot;,&quot;, &quot;{&quot;);</span>
+//  objectString = objectString.replaceAll(&quot;^\\{\\s*\&quot;@type\&quot;:\\s*\&quot;cn.leancloud.AV(Object|Installation|User|Status|Role|File)\&quot;,&quot;, &quot;{&quot;);
+
+    // replace old AVObject type name.
+<span class="fc" id="L1724">    objectString = objectString.replaceAll(&quot;\&quot;@type\&quot;:\\s*\&quot;com.avos.avoscloud.AVObject\&quot;,&quot;, &quot;\&quot;@type\&quot;:\&quot;cn.leancloud.LCObject\&quot;,&quot;);</span>
+<span class="fc" id="L1725">    objectString = objectString.replaceAll(&quot;\&quot;@type\&quot;:\\s*\&quot;com.avos.avoscloud.AVInstallation\&quot;,&quot;, &quot;\&quot;@type\&quot;:\&quot;cn.leancloud.LCInstallation\&quot;,&quot;);</span>
+<span class="fc" id="L1726">    objectString = objectString.replaceAll(&quot;\&quot;@type\&quot;:\\s*\&quot;com.avos.avoscloud.AVUser\&quot;,&quot;, &quot;\&quot;@type\&quot;:\&quot;cn.leancloud.LCUser\&quot;,&quot;);</span>
+<span class="fc" id="L1727">    objectString = objectString.replaceAll(&quot;\&quot;@type\&quot;:\\s*\&quot;com.avos.avoscloud.AVStatus\&quot;,&quot;, &quot;\&quot;@type\&quot;:\&quot;cn.leancloud.LCStatus\&quot;,&quot;);</span>
+<span class="fc" id="L1728">    objectString = objectString.replaceAll(&quot;\&quot;@type\&quot;:\\s*\&quot;com.avos.avoscloud.AVRole\&quot;,&quot;, &quot;\&quot;@type\&quot;:\&quot;cn.leancloud.LCRole\&quot;,&quot;);</span>
+<span class="fc" id="L1729">    objectString = objectString.replaceAll(&quot;\&quot;@type\&quot;:\\s*\&quot;com.avos.avoscloud.AVFile\&quot;,&quot;, &quot;\&quot;@type\&quot;:\&quot;cn.leancloud.LCFile\&quot;,&quot;);</span>
+
+<span class="fc" id="L1731">    objectString = objectString.replaceAll(&quot;\&quot;@type\&quot;:\\s*\&quot;com.avos.avoscloud.ops.[A-Za-z]+Op\&quot;,&quot;, &quot;&quot;);</span>
+
+<span class="fc" id="L1733">    objectString = StringUtil.replaceFastjsonDateForm(objectString);</span>
+<span class="fc" id="L1734">    return JSON.parseObject(objectString, LCObject.class);</span>
+  }
+
+  /**
+   * Create a new instance with particular classname and objectId.
+   * @param className class name
+   * @param objectId  object id
+   * @return AVObject instance
+   */
+  public static LCObject createWithoutData(String className, String objectId) {
+<span class="fc" id="L1744">    LCObject object = new LCObject(className);</span>
+<span class="fc" id="L1745">    object.setObjectId(objectId);</span>
+<span class="fc" id="L1746">    return object;</span>
+  }
+
+  /**
+   * Create a new instance with particular class and objectId.
+   * @param clazz     class info
+   * @param objectId  object id
+   * @param &lt;T&gt; template type.
+   * @return AVObject instance
+   * @throws LCException error happened.
+   */
+  public static &lt;T extends LCObject&gt; T createWithoutData(Class&lt;T&gt; clazz, String objectId) throws LCException {
+    try {
+<span class="fc" id="L1759">      T obj = clazz.newInstance();</span>
+<span class="fc" id="L1760">      obj.setClassName(Transformer.getSubClassName(clazz));</span>
+<span class="fc" id="L1761">      obj.setObjectId(objectId);</span>
+<span class="fc" id="L1762">      return obj;</span>
+<span class="nc" id="L1763">    } catch (Exception ex) {</span>
+<span class="nc" id="L1764">      throw new LCException(ex);</span>
+    }
+  }
+
+  /**
+   * disable beforeXXX Hooks
+   */
+  public void disableBeforeHook() {
+<span class="nc" id="L1772">    Collections.addAll(ignoreHooks, Hook.beforeSave, Hook.beforeUpdate, Hook.beforeDelete);</span>
+<span class="nc" id="L1773">  }</span>
+
+  /**
+   * disable afterXXX Hooks
+   */
+  public void disableAfterHook() {
+<span class="fc" id="L1779">    Collections.addAll(ignoreHooks, Hook.afterSave, Hook.afterUpdate, Hook.afterDelete);</span>
+<span class="fc" id="L1780">  }</span>
+
+  /**
+   * ignore specified Hook
+   * @param hook target Hook.
+   */
+  public void ignoreHook(Hook hook) {
+<span class="fc" id="L1787">    ignoreHooks.add(hook);</span>
+<span class="fc" id="L1788">  }</span>
+
+  protected static &lt;T extends LCObject&gt; T cast(LCObject object, Class&lt;T&gt; clazz) throws Exception {
+<span class="nc bnc" id="L1791" title="All 2 branches missed.">    if (clazz.getClass().isAssignableFrom(object.getClass())) {</span>
+<span class="nc" id="L1792">      return (T) object;</span>
+    } else {
+<span class="nc" id="L1794">      T newItem = clazz.newInstance();</span>
+<span class="nc" id="L1795">      newItem.className = object.className;</span>
+<span class="nc" id="L1796">      newItem.objectId = object.objectId;</span>
+<span class="nc" id="L1797">      newItem.serverData.putAll(object.serverData);</span>
+<span class="nc" id="L1798">      newItem.operations.putAll(object.operations);</span>
+<span class="nc" id="L1799">      newItem.acl = object.acl;</span>
+<span class="nc" id="L1800">      newItem.endpointClassName = object.endpointClassName;</span>
+<span class="nc" id="L1801">      return newItem;</span>
+    }
+  }
+
+  @Override
+  public String toString() {
+<span class="fc" id="L1807">    return toJSONString();</span>
+  }
+
+  @Override
+  public boolean equals(Object o) {
+<span class="fc bfc" id="L1812" title="All 2 branches covered.">    if (this == o) return true;</span>
+<span class="pc bpc" id="L1813" title="1 of 2 branches missed.">    if (!(o instanceof LCObject)) return false;</span>
+<span class="fc" id="L1814">    LCObject LCObject = (LCObject) o;</span>
+<span class="pc bpc" id="L1815" title="1 of 2 branches missed.">    return isFetchWhenSave() == LCObject.isFetchWhenSave() &amp;&amp;</span>
+<span class="pc bpc" id="L1816" title="1 of 2 branches missed.">            Objects.equals(getClassName(), LCObject.getClassName()) &amp;&amp;</span>
+<span class="pc bpc" id="L1817" title="1 of 2 branches missed.">            Objects.equals(getServerData(), LCObject.getServerData()) &amp;&amp;</span>
+<span class="pc bpc" id="L1818" title="1 of 2 branches missed.">            Objects.equals(operations, LCObject.operations) &amp;&amp;</span>
+<span class="pc bpc" id="L1819" title="1 of 2 branches missed.">            Objects.equals(acl, LCObject.acl);</span>
+  }
+
+  @Override
+  public int hashCode() {
+<span class="fc" id="L1824">    return Objects.hash(getClassName(), getServerData(), operations, acl, isFetchWhenSave());</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

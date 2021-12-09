@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LCQueryResult.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.query</a> &gt; <span class="el_source">LCQueryResult.java</span></div><h1>LCQueryResult.java</h1><pre class="source lang-java linenums">package cn.leancloud.query;
+
+import cn.leancloud.LCObject;
+import cn.leancloud.json.JSON;
+
+import java.util.List;
+
+<span class="fc" id="L8">public class LCQueryResult {</span>
+<span class="fc" id="L9">  private List&lt;LCObject&gt; results = null;</span>
+
+<span class="fc" id="L11">  private int count = 0;</span>
+
+<span class="fc" id="L13">  private String className = &quot;&quot;;</span>
+
+  public List&lt;LCObject&gt; getResults() {
+<span class="fc" id="L16">    return results;</span>
+  }
+
+  public void setResults(List&lt;LCObject&gt; results) {
+<span class="fc" id="L20">    this.results = results;</span>
+<span class="fc" id="L21">  }</span>
+
+  public int getCount() {
+<span class="fc" id="L24">    return count;</span>
+  }
+
+  public void setCount(int count) {
+<span class="fc" id="L28">    this.count = count;</span>
+<span class="fc" id="L29">  }</span>
+
+  public String getClassName() {
+<span class="fc" id="L32">    return className;</span>
+  }
+
+  public void setClassName(String className) {
+<span class="fc" id="L36">    this.className = className;</span>
+<span class="fc" id="L37">  }</span>
+
+  public String toString() {
+<span class="fc" id="L40">    return &quot;{\&quot;count\&quot;:&quot;+ this.count + &quot;, \&quot;results\&quot;:&quot; + this.results + &quot;}&quot;;</span>
+  }
+
+  public String toJSONString() {
+<span class="fc" id="L44">    return JSON.toJSONString(this);</span>
+  }
+
+  public static LCQueryResult fromJSONString(String content) {
+<span class="fc" id="L48">    return JSON.parseObject(content, LCQueryResult.class);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

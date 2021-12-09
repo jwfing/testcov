@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RemoveOperation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.ops</a> &gt; <span class="el_source">RemoveOperation.java</span></div><h1>RemoveOperation.java</h1><pre class="source lang-java linenums">package cn.leancloud.ops;
+
+import cn.leancloud.json.JSONArray;
+
+import java.util.*;
+
+public class RemoveOperation extends BaseOperation {
+  public RemoveOperation(String key, Object value) {
+<span class="fc" id="L9">    super(&quot;Remove&quot;, key, null, false);</span>
+<span class="fc" id="L10">    this.value = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L11" title="1 of 2 branches missed.">    if (null == value) {</span>
+<span class="nc" id="L12">      return;</span>
+    }
+<span class="pc bpc" id="L14" title="1 of 2 branches missed.">    if (!(value instanceof Collection)) {</span>
+<span class="nc" id="L15">      ((List)this.value).add(value);</span>
+    } else {
+<span class="fc" id="L17">      ((List)this.value).addAll((Collection) value);</span>
+    }
+<span class="fc" id="L19">  }</span>
+
+  public Object apply(Object obj) {
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">    if (null == obj) {</span>
+<span class="nc" id="L23">      return null;</span>
+<span class="pc bpc" id="L24" title="3 of 4 branches missed.">    } else if (obj instanceof List || obj instanceof JSONArray) {</span>
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">      if (this.value instanceof List) {</span>
+<span class="fc" id="L26">        ((Collection)obj).removeAll((List)this.value);</span>
+      } else {
+<span class="nc" id="L28">        ((Collection)obj).remove(this.value);</span>
+      }
+    } else {
+<span class="nc" id="L31">      LOGGER.w(&quot;cannot apply AddOperation on non list attribute. targetValueType=&quot; + obj.getClass().getSimpleName());</span>
+    }
+<span class="fc" id="L33">    return obj;</span>
+  }
+
+  protected ObjectFieldOperation mergeWithPrevious(ObjectFieldOperation other) {
+<span class="pc bpc" id="L37" title="2 of 4 branches missed.">    if (other instanceof SetOperation || other instanceof DeleteOperation) {</span>
+<span class="nc" id="L38">      return other;</span>
+<span class="pc bpc" id="L39" title="1 of 4 branches missed.">    } else if (other instanceof AddOperation || other instanceof AddUniqueOperation) {</span>
+<span class="fc" id="L40">      return new CompoundOperation(this.field, other, this);</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">    } else if (other instanceof RemoveOperation) {</span>
+<span class="fc" id="L42">      this.value = concatCollections(this.value, ((RemoveOperation) other).value);</span>
+<span class="fc" id="L43">      return this;</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">    } else if (other instanceof CompoundOperation) {</span>
+<span class="fc" id="L45">      return ((CompoundOperation) other).mergeWithPrevious(this);</span>
+    } else {
+<span class="nc" id="L47">      reportIllegalOperations(this, other);</span>
+    }
+
+<span class="nc" id="L50">    return NullOperation.gInstance;</span>
+  }
+  public Map&lt;String, Object&gt; encode() {
+    //{&quot;attr&quot;:{&quot;__op&quot;:&quot;Remove&quot;, &quot;objects&quot;:[obj1, obj2]}}
+<span class="fc" id="L54">    Map&lt;String, Object&gt; opMap = new HashMap&lt;String, Object&gt;(2);</span>
+<span class="fc" id="L55">    opMap.put(BaseOperation.KEY_OP, this.getOperation());</span>
+<span class="fc" id="L56">    opMap.put(BaseOperation.KEY_OBJECTS, encodeObject(this.getValue()));</span>
+
+<span class="fc" id="L58">    Map&lt;String, Object&gt; result = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L59">    result.put(getField(), opMap);</span>
+<span class="fc" id="L60">    return result;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

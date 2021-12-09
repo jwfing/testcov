@@ -1,0 +1,396 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GsonObject.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.gson</a> &gt; <span class="el_source">GsonObject.java</span></div><h1>GsonObject.java</h1><pre class="source lang-java linenums">package cn.leancloud.gson;
+
+import cn.leancloud.json.JSONArray;
+import cn.leancloud.json.JSONObject;
+import cn.leancloud.json.TypeReference;
+import com.google.gson.JsonElement;
+
+import java.lang.reflect.Type;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.sql.Timestamp;
+import java.util.*;
+
+public class GsonObject extends JSONObject{
+  private com.google.gson.JsonObject gsonObject;
+
+<span class="fc" id="L17">  public GsonObject(com.google.gson.JsonObject object) {</span>
+<span class="fc" id="L18">    this.gsonObject = object;</span>
+<span class="fc" id="L19">  }</span>
+
+<span class="fc" id="L21">  public GsonObject(Map&lt;String, Object&gt; map) {</span>
+<span class="fc" id="L22">    this.gsonObject = new com.google.gson.JsonObject();</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">    if (null != map) {</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">      for (Map.Entry&lt;String, Object&gt; entry : map.entrySet()) {</span>
+<span class="fc" id="L25">        gsonObject.add(entry.getKey(), GsonWrapper.toJsonElement(entry.getValue()));</span>
+<span class="fc" id="L26">      }</span>
+    }
+<span class="fc" id="L28">  }</span>
+
+  static class InnerEntry implements Map.Entry&lt;String, Object&gt; {
+    private String key;
+    private Object value;
+<span class="fc" id="L33">    InnerEntry(String key, JsonElement value) {</span>
+<span class="fc" id="L34">      this.key = key;</span>
+<span class="fc" id="L35">      this.value = GsonWrapper.toJavaObject(value);</span>
+<span class="fc" id="L36">    }</span>
+
+    @Override
+    public String getKey() {
+<span class="fc" id="L40">      return this.key;</span>
+    }
+
+    @Override
+    public Object getValue() {
+<span class="fc" id="L45">      return this.value;</span>
+    }
+
+    @Override
+    public Object setValue(Object value) {
+<span class="nc" id="L50">      this.value = value;</span>
+<span class="nc" id="L51">      return value;</span>
+    }
+  }
+
+<span class="fc" id="L55">  public GsonObject() {</span>
+<span class="fc" id="L56">    this.gsonObject = new com.google.gson.JsonObject();</span>
+<span class="fc" id="L57">  }</span>
+
+  public com.google.gson.JsonObject getRawObject() {
+<span class="fc" id="L60">    return this.gsonObject;</span>
+  }
+
+  public int size() {
+<span class="fc" id="L64">    return this.gsonObject.size();</span>
+  }
+
+  public boolean isEmpty() {
+<span class="nc bnc" id="L68" title="All 2 branches missed.">    return this.gsonObject.size() &lt;= 0;</span>
+  }
+
+  public boolean containsKey(Object key) {
+<span class="fc" id="L72">    return this.gsonObject.has((String)key);</span>
+  }
+
+  public boolean containsValue(Object v) {
+<span class="nc" id="L76">    Collection&lt;Object&gt; values = values();</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">    for (Object obj: values) {</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">      if (obj.equals(v)) {</span>
+<span class="nc" id="L79">        return true;</span>
+      }
+<span class="nc" id="L81">    }</span>
+<span class="nc" id="L82">    return false;</span>
+  }
+
+  public Object get(Object key) {
+<span class="fc" id="L86">    com.google.gson.JsonElement element = this.gsonObject.get((String)key);</span>
+<span class="fc" id="L87">    return GsonWrapper.toJavaObject(element);</span>
+  }
+
+  public JSONObject getJSONObject(String key) {
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">    if (!gsonObject.has(key)) {</span>
+<span class="nc" id="L92">      return null;</span>
+    }
+<span class="fc" id="L94">    com.google.gson.JsonElement element = gsonObject.get(key);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">    if (!element.isJsonObject()) {</span>
+<span class="nc" id="L96">      return null;</span>
+    }
+<span class="fc" id="L98">    return new GsonObject(element.getAsJsonObject());</span>
+  }
+
+  public JSONArray getJSONArray(String key) {
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">    if (!gsonObject.has(key)) {</span>
+<span class="nc" id="L103">      return null;</span>
+    }
+<span class="fc" id="L105">    com.google.gson.JsonElement element = gsonObject.get(key);</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">    if (!element.isJsonArray()) {</span>
+<span class="nc" id="L107">      return null;</span>
+    }
+<span class="fc" id="L109">    return new GsonArray(element.getAsJsonArray());</span>
+  }
+
+  public &lt;T&gt; T getObject(String key, Class&lt;T&gt; clazz) {
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">    if (!gsonObject.has(key)) {</span>
+<span class="nc" id="L114">      return null;</span>
+    }
+<span class="fc" id="L116">    com.google.gson.JsonElement element = this.gsonObject.get(key);</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">    if (element.isJsonNull()) {</span>
+<span class="nc" id="L118">      return null;</span>
+    }
+<span class="fc" id="L120">    return GsonWrapper.toJavaObject(element, clazz);</span>
+  }
+
+  /**
+   * get object value with specified key.
+   * @param key attr key
+   * @param type attr type
+   * @param &lt;T&gt; generic type
+   * @return attr value
+   *
+   * @since 1.8
+   */
+  public &lt;T&gt; T getObject(String key, Type type) {
+    try {
+<span class="nc bnc" id="L134" title="All 2 branches missed.">      if (type instanceof Class) {</span>
+<span class="nc" id="L135">        Class&lt;T&gt; clazz = (Class&lt;T&gt;)type;</span>
+<span class="nc" id="L136">        return getObject(key, clazz);</span>
+      }
+<span class="nc" id="L138">    } catch (Exception ex) {</span>
+
+<span class="nc" id="L140">    }</span>
+<span class="nc" id="L141">    return null;</span>
+  }
+
+  public &lt;T&gt; T getObject(String key, TypeReference typeReference) {
+<span class="nc bnc" id="L145" title="All 2 branches missed.">    return getObject(key, null == typeReference? null : typeReference.getType());</span>
+  }
+
+  public Boolean getBoolean(String key) {
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">    if (!gsonObject.has(key)) {</span>
+<span class="nc" id="L150">      return false;</span>
+    }
+<span class="fc" id="L152">    com.google.gson.JsonElement element = gsonObject.get(key);</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">    if (!element.isJsonPrimitive()) {</span>
+<span class="nc" id="L154">      return false;</span>
+    }
+<span class="fc" id="L156">    return element.getAsBoolean();</span>
+  }
+
+  public byte[] getBytes(String key) {
+<span class="nc" id="L160">    String ret = getString(key);</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">    if (null == ret) {</span>
+<span class="nc" id="L162">      return null;</span>
+    }
+<span class="nc" id="L164">    return ret.getBytes();</span>
+  }
+
+  public boolean getBooleanValue(String key) {
+<span class="nc" id="L168">    return getBoolean(key).booleanValue();</span>
+  }
+
+  public Byte getByte(String key) {
+<span class="nc bnc" id="L172" title="All 2 branches missed.">    if (!gsonObject.has(key)) {</span>
+<span class="nc" id="L173">      return 0;</span>
+    }
+<span class="nc" id="L175">    com.google.gson.JsonElement element = gsonObject.get(key);</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">    if (!element.isJsonPrimitive()) {</span>
+<span class="nc" id="L177">      return 0;</span>
+    }
+<span class="nc" id="L179">    return element.getAsByte();</span>
+  }
+
+  public byte getByteValue(String key) {
+<span class="nc" id="L183">    return getByte(key).byteValue();</span>
+  }
+
+  public Short getShort(String key) {
+<span class="nc bnc" id="L187" title="All 2 branches missed.">    if (!gsonObject.has(key)) {</span>
+<span class="nc" id="L188">      return 0;</span>
+    }
+<span class="nc" id="L190">    com.google.gson.JsonElement element = gsonObject.get(key);</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">    if (!element.isJsonPrimitive()) {</span>
+<span class="nc" id="L192">      return 0;</span>
+    }
+<span class="nc" id="L194">    return element.getAsShort();</span>
+  }
+  public short getShortValue(String key) {
+<span class="nc" id="L197">    return getShort(key).shortValue();</span>
+  }
+
+  public Integer getInteger(String key) {
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">    if (!gsonObject.has(key)) {</span>
+<span class="nc" id="L202">      return 0;</span>
+    }
+<span class="fc" id="L204">    com.google.gson.JsonElement element = gsonObject.get(key);</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">    if (!element.isJsonPrimitive()) {</span>
+<span class="nc" id="L206">      return 0;</span>
+    }
+<span class="fc" id="L208">    return element.getAsInt();</span>
+  }
+
+  public int getIntValue(String key) {
+<span class="fc" id="L212">    return getInteger(key).intValue();</span>
+  }
+
+  public Long getLong(String key) {
+<span class="nc bnc" id="L216" title="All 2 branches missed.">    if (!gsonObject.has(key)) {</span>
+<span class="nc" id="L217">      return 0l;</span>
+    }
+<span class="nc" id="L219">    com.google.gson.JsonElement element = gsonObject.get(key);</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">    if (!element.isJsonPrimitive()) {</span>
+<span class="nc" id="L221">      return 0l;</span>
+    }
+<span class="nc" id="L223">    return element.getAsLong();</span>
+  }
+  public long getLongValue(String key) {
+<span class="nc" id="L226">    return getLong(key).longValue();</span>
+  }
+  public Float getFloat(String key) {
+<span class="nc bnc" id="L229" title="All 2 branches missed.">    if (!gsonObject.has(key)) {</span>
+<span class="nc" id="L230">      return 0f;</span>
+    }
+<span class="nc" id="L232">    com.google.gson.JsonElement element = gsonObject.get(key);</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">    if (!element.isJsonPrimitive()) {</span>
+<span class="nc" id="L234">      return 0f;</span>
+    }
+<span class="nc" id="L236">    return element.getAsFloat();</span>
+  }
+  public float getFloatValue(String key) {
+<span class="nc" id="L239">    return getFloat(key).floatValue();</span>
+  }
+  public Double getDouble(String key) {
+<span class="nc bnc" id="L242" title="All 2 branches missed.">    if (!gsonObject.has(key)) {</span>
+<span class="nc" id="L243">      return 0d;</span>
+    }
+<span class="nc" id="L245">    com.google.gson.JsonElement element = gsonObject.get(key);</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">    if (!element.isJsonPrimitive()) {</span>
+<span class="nc" id="L247">      return 0d;</span>
+    }
+<span class="nc" id="L249">    return element.getAsDouble();</span>
+  }
+  public double getDoubleValue(String key) {
+<span class="nc" id="L252">    return getDouble(key).doubleValue();</span>
+  }
+  public BigDecimal getBigDecimal(String key) {
+<span class="nc bnc" id="L255" title="All 2 branches missed.">    if (!gsonObject.has(key)) {</span>
+<span class="nc" id="L256">      return BigDecimal.ZERO;</span>
+    }
+<span class="nc" id="L258">    com.google.gson.JsonElement element = gsonObject.get(key);</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">    if (!element.isJsonPrimitive()) {</span>
+<span class="nc" id="L260">      return BigDecimal.ZERO;</span>
+    }
+<span class="nc" id="L262">    return element.getAsBigDecimal();</span>
+  }
+  public BigInteger getBigInteger(String key) {
+<span class="nc bnc" id="L265" title="All 2 branches missed.">    if (!gsonObject.has(key)) {</span>
+<span class="nc" id="L266">      return BigInteger.ZERO;</span>
+    }
+<span class="nc" id="L268">    com.google.gson.JsonElement element = gsonObject.get(key);</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">    if (!element.isJsonPrimitive()) {</span>
+<span class="nc" id="L270">      return BigInteger.ZERO;</span>
+    }
+<span class="nc" id="L272">    return element.getAsBigInteger();</span>
+  }
+  public String getString(String key) {
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">    if (!gsonObject.has(key)) {</span>
+<span class="nc" id="L276">      return null;</span>
+    }
+<span class="fc" id="L278">    com.google.gson.JsonElement element = gsonObject.get(key);</span>
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">    if (!element.isJsonPrimitive()) {</span>
+<span class="nc" id="L280">      return null;</span>
+    }
+<span class="fc" id="L282">    return element.getAsString();</span>
+  }
+  public Date getDate(String key) {
+<span class="nc" id="L285">    Object val = getObject(key, Object.class);</span>
+<span class="nc" id="L286">    return GsonWrapper.castToDate(val);</span>
+  }
+
+  public java.sql.Date getSqlDate(String key) {
+<span class="nc" id="L290">    throw new UnsupportedOperationException(&quot;getSqlDate is not supported.&quot;);</span>
+  }
+  public Timestamp getTimestamp(String key) {
+<span class="nc" id="L293">    throw new UnsupportedOperationException(&quot;getTimestamp is not supported.&quot;);</span>
+  }
+
+  public Object put(String key, Object value) {
+<span class="fc bfc" id="L297" title="All 2 branches covered.">    if (value instanceof GsonObject) {</span>
+<span class="fc" id="L298">      this.gsonObject.add(key, ((GsonObject) value).getRawObject());</span>
+    } else {
+<span class="fc" id="L300">      com.google.gson.JsonElement element = GsonWrapper.toJsonElement(value);</span>
+<span class="fc" id="L301">      this.gsonObject.add(key, element);</span>
+    }
+<span class="fc" id="L303">    return value;</span>
+  }
+
+  public JSONObject fluentPut(String key, Object value) {
+<span class="nc" id="L307">    com.google.gson.JsonElement ele = GsonWrapper.toJsonElement(value);</span>
+<span class="nc" id="L308">    this.gsonObject.add(key, ele);</span>
+<span class="nc" id="L309">    return this;</span>
+  }
+
+  public void putAll(Map&lt;? extends String, ? extends Object&gt; m) {
+<span class="nc bnc" id="L313" title="All 2 branches missed.">    for(Map.Entry&lt;? extends String, ? extends Object&gt; entry: m.entrySet()) {</span>
+<span class="nc" id="L314">      put(entry.getKey(), entry.getValue());</span>
+<span class="nc" id="L315">    }</span>
+<span class="nc" id="L316">  }</span>
+
+  public JSONObject fluentPutAll(Map&lt;? extends String, ? extends Object&gt; m) {
+<span class="nc" id="L319">    putAll(m);</span>
+<span class="nc" id="L320">    return this;</span>
+  }
+
+  public void clear() {
+<span class="nc bnc" id="L324" title="All 2 branches missed.">    for (String key : gsonObject.keySet()) {</span>
+<span class="nc" id="L325">      remove(key);</span>
+<span class="nc" id="L326">    }</span>
+<span class="nc" id="L327">  }</span>
+
+  public JSONObject fluentClear() {
+<span class="nc" id="L330">    clear();</span>
+<span class="nc" id="L331">    return this;</span>
+  }
+
+  public Object remove(Object key) {
+<span class="nc" id="L335">    return gsonObject.remove((String)key);</span>
+  }
+
+  public Set&lt;String&gt; keySet() {
+<span class="nc" id="L339">    return gsonObject.keySet();</span>
+  }
+
+  public Collection&lt;Object&gt; values() {
+<span class="nc" id="L343">    List&lt;Object&gt; result = new ArrayList&lt;&gt;(size());</span>
+<span class="nc bnc" id="L344" title="All 2 branches missed.">    for (Map.Entry&lt;String, Object&gt; entry: entrySet()) {</span>
+<span class="nc" id="L345">      result.add(entry.getValue());</span>
+<span class="nc" id="L346">    }</span>
+<span class="nc" id="L347">    return result;</span>
+  }
+  public Set&lt;Map.Entry&lt;String, Object&gt;&gt; entrySet() {
+<span class="fc" id="L350">    Set&lt;Map.Entry&lt;String, com.google.gson.JsonElement&gt;&gt; objects = this.gsonObject.entrySet();</span>
+<span class="fc" id="L351">    Set&lt;Map.Entry&lt;String, Object&gt;&gt; result = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L352" title="All 2 branches covered.">    for (Map.Entry&lt;String, JsonElement&gt; entry: objects) {</span>
+<span class="fc" id="L353">      result.add(new GsonObject.InnerEntry(entry.getKey(), entry.getValue()));</span>
+<span class="fc" id="L354">    }</span>
+<span class="fc" id="L355">    return result;</span>
+  }
+
+  @Override
+  public Object clone() {
+<span class="nc" id="L360">    return new GsonObject(gsonObject.deepCopy());</span>
+  }
+
+  public Map&lt;String, Object&gt; getInnerMap() {
+<span class="fc" id="L364">    Map&lt;String, Object&gt; map = new HashMap&lt;&gt;(this.gsonObject.size());</span>
+<span class="fc" id="L365">    Set&lt;Map.Entry&lt;String, com.google.gson.JsonElement&gt;&gt; objects = this.gsonObject.entrySet();</span>
+<span class="fc bfc" id="L366" title="All 2 branches covered.">    for (Map.Entry&lt;String, JsonElement&gt; entry: objects) {</span>
+<span class="fc" id="L367">      map.put(entry.getKey(), GsonWrapper.toJavaObject(entry.getValue()));</span>
+<span class="fc" id="L368">    }</span>
+<span class="fc" id="L369">    return map;</span>
+  }
+
+  public &lt;T&gt; T toJavaObject(Class&lt;T&gt; clazz) {
+<span class="nc" id="L373">    return GsonWrapper.toJavaObject(gsonObject, clazz);</span>
+  }
+
+  public int hashCode() {
+<span class="nc" id="L377">    return gsonObject.hashCode();</span>
+  }
+  public boolean equals(Object obj) {
+<span class="nc bnc" id="L380" title="All 2 branches missed.">    if (null == obj) {</span>
+<span class="nc" id="L381">      return false;</span>
+    }
+<span class="nc bnc" id="L383" title="All 2 branches missed.">    if (this == obj) {</span>
+<span class="nc" id="L384">      return true;</span>
+    }
+<span class="nc bnc" id="L386" title="All 2 branches missed.">    if (!(obj instanceof GsonObject)) {</span>
+<span class="nc" id="L387">      return false;</span>
+    }
+<span class="nc" id="L389">    return gsonObject.equals(((GsonObject)obj).gsonObject);</span>
+  }
+
+  public String toJSONString() {
+<span class="fc" id="L393">    return this.gsonObject.toString();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

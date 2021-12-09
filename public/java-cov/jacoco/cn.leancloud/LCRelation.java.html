@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LCRelation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud</a> &gt; <span class="el_source">LCRelation.java</span></div><h1>LCRelation.java</h1><pre class="source lang-java linenums">package cn.leancloud;
+
+import cn.leancloud.ops.Utils;
+import cn.leancloud.utils.StringUtil;
+
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+
+public class LCRelation&lt;T extends LCObject&gt; {
+  private String key;
+
+  private transient LCObject parent;
+
+  private String targetClass;
+
+  public LCRelation() {
+<span class="fc" id="L18">    super();</span>
+<span class="fc" id="L19">  }</span>
+  public LCRelation(LCObject parent, String key) {
+<span class="fc" id="L21">    this();</span>
+<span class="fc" id="L22">    this.parent = parent;</span>
+<span class="fc" id="L23">    this.key = key;</span>
+<span class="fc" id="L24">  }</span>
+
+  public LCRelation(String targetClass) {
+<span class="fc" id="L27">    this(null, null);</span>
+<span class="fc" id="L28">    this.targetClass = targetClass;</span>
+<span class="fc" id="L29">  }</span>
+
+  public String getKey() {
+<span class="fc" id="L32">    return key;</span>
+  }
+
+  public void setKey(String key) {
+<span class="fc" id="L36">    this.key = key;</span>
+<span class="fc" id="L37">  }</span>
+
+  public LCObject getParent() {
+<span class="fc" id="L40">    return parent;</span>
+  }
+
+  public void setParent(LCObject parent) {
+<span class="fc" id="L44">    this.parent = parent;</span>
+<span class="fc" id="L45">  }</span>
+
+  public String getTargetClass() {
+<span class="fc" id="L48">    return targetClass;</span>
+  }
+
+  public void setTargetClass(String targetClass) {
+<span class="nc" id="L52">    this.targetClass = targetClass;</span>
+<span class="nc" id="L53">  }</span>
+
+  /**
+   * Adds an object to this relation.
+   *
+   * @param object The object to add to this relation.
+   */
+  public void add(T object) {
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">    if (object == null) throw new IllegalArgumentException(&quot;null AVObject&quot;);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(targetClass)) {</span>
+<span class="nc" id="L63">      targetClass = object.getClassName();</span>
+    }
+<span class="pc bpc" id="L65" title="2 of 4 branches missed.">    if (!StringUtil.isEmpty(targetClass) &amp;&amp; !targetClass.equals(object.getClassName())) {</span>
+<span class="nc" id="L66">      throw new IllegalArgumentException(&quot;Could not add class '&quot; + object.getClassName()</span>
+              + &quot;' to this relation,expect class is '&quot; + targetClass + &quot;'&quot;);
+    }
+<span class="fc" id="L69">    parent.addRelation(object, key);</span>
+<span class="fc" id="L70">  }</span>
+
+  /**
+   * Adds many objects to this relation.
+   *
+   * @param objects The objects to add to this relation.
+   */
+  public void addAll(Collection&lt;T&gt; objects) {
+<span class="nc bnc" id="L78" title="All 2 branches missed.">    if (objects != null) {</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">      for (T obj : objects) {</span>
+<span class="nc" id="L80">        add(obj);</span>
+<span class="nc" id="L81">      }</span>
+    }
+<span class="nc" id="L83">  }</span>
+
+  /**
+   * Removes an object from this relation.
+   *
+   * @param object The object to remove from this relation.
+   */
+  public void remove(LCObject object) {
+<span class="nc" id="L91">    parent.removeRelation(object, key);</span>
+<span class="nc" id="L92">  }</span>
+
+  /**
+   * Gets a query that can be used to query the objects in this relation.
+   *
+   * @return A AVQuery that restricts the results to objects in this relations.
+   */
+  public LCQuery&lt;T&gt; getQuery() {
+<span class="nc" id="L100">    return this.getQuery(null);</span>
+  }
+
+  /**
+   * Gets a query that can be used to query the subclass objects in this relation.
+   *
+   * @param clazz The AVObject subclass.
+   * @return A AVQuery that restricts the results to objects in this relations.
+   */
+  public LCQuery&lt;T&gt; getQuery(Class&lt;T&gt; clazz) {
+<span class="pc bpc" id="L110" title="2 of 4 branches missed.">    if (getParent() == null || StringUtil.isEmpty(getParent().getObjectId())) {</span>
+<span class="nc" id="L111">      throw new IllegalStateException(&quot;unable to encode an association with an unsaved AVObject&quot;);</span>
+    }
+
+<span class="fc" id="L114">    Map&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L115">    map.put(&quot;object&quot;, Utils.mapFromPointerObject(LCRelation.this.getParent()));</span>
+<span class="fc" id="L116">    map.put(&quot;key&quot;, LCRelation.this.getKey());</span>
+
+<span class="fc" id="L118">    String targetClassName = getTargetClass();</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(targetClassName)) {</span>
+<span class="nc" id="L120">      targetClassName = getParent().getClassName();</span>
+    }
+<span class="fc" id="L122">    LCQuery&lt;T&gt; query = new LCQuery&lt;T&gt;(targetClassName, clazz);</span>
+<span class="fc" id="L123">    query.addWhereItem(&quot;$relatedTo&quot;, null, map);</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(getTargetClass())) {</span>
+<span class="nc" id="L125">      query.getParameters().put(&quot;redirectClassNameForKey&quot;, this.getKey());</span>
+    }
+
+<span class="fc" id="L128">    return query;</span>
+  }
+
+  /**
+   * Create a query that can be used to query the parent objects in this relation.
+   *
+   * @param parentClassName The parent class name
+   * @param relationKey The relation field key in parent
+   * @param child The child object.
+   * @param &lt;M&gt; template type.
+   * @return A AVQuery that restricts the results to parent objects in this relations.
+   */
+  public static &lt;M extends LCObject&gt; LCQuery&lt;M&gt; reverseQuery(String parentClassName,
+                                                             String relationKey, LCObject child) {
+<span class="nc" id="L142">    LCQuery&lt;M&gt; query = new LCQuery&lt;M&gt;(parentClassName);</span>
+<span class="nc" id="L143">    query.whereEqualTo(relationKey, Utils.mapFromPointerObject(child));</span>
+<span class="nc" id="L144">    return query;</span>
+  }
+
+  /**
+   * Create a query that can be used to query the parent objects in this relation.
+   *
+   * @param theParentClazz The parent subclass.
+   * @param relationKey The relation field key in parent
+   * @param child The child object.
+   * @param &lt;M&gt; template type.
+   * @return A AVQuery that restricts the results to parent objects in this relations.
+   */
+  public static &lt;M extends LCObject&gt; LCQuery&lt;M&gt; reverseQuery(Class&lt;M&gt; theParentClazz,
+                                                             String relationKey, LCObject child) {
+<span class="nc" id="L158">    LCQuery&lt;M&gt; query = new LCQuery&lt;M&gt;(Transformer.getSubClassName(theParentClazz), theParentClazz);</span>
+<span class="nc" id="L159">    query.whereEqualTo(relationKey, Utils.mapFromPointerObject(child));</span>
+<span class="nc" id="L160">    return query;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

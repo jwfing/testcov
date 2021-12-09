@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>QCloudUploader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.upload</a> &gt; <span class="el_source">QCloudUploader.java</span></div><h1>QCloudUploader.java</h1><pre class="source lang-java linenums">package cn.leancloud.upload;
+
+import cn.leancloud.LCException;
+import cn.leancloud.callback.ProgressCallback;
+import cn.leancloud.codec.SHA1;
+import cn.leancloud.LCFile;
+import cn.leancloud.utils.StringUtil;
+import cn.leancloud.json.JSON;
+import cn.leancloud.json.JSONObject;
+import okhttp3.*;
+
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicReferenceArray;
+
+public class QCloudUploader extends HttpClientUploader {
+  private static final String APPLICATION_OCTET_STREAM = &quot;application/octet-stream&quot;;
+  private static final String FILE_CONTENT = &quot;filecontent&quot;;
+  private static final String PARAM_OP = &quot;op&quot;;
+  private static final String PARAM_SHA = &quot;sha&quot;;
+  private static final String MULTIPART_FORM_DATA = &quot;multipart/form-data&quot;;
+  private static final String HEADER_AUTHORIZATION = &quot;Authorization&quot;;
+  private static final String HEADER_CONTENT_TYPE = &quot;Content-Type&quot;;
+  private static final String PARAM_FILE_SIZE = &quot;filesize&quot;;
+  private static final String PARAM_SLICE_SIZE = &quot;slice_size&quot;;
+  private static final String PARAM_OFFSET = &quot;offset&quot;;
+  private static final String PARAM_SESSION = &quot;session&quot;;
+  private static final String OP_UPLOAD_SLICE = &quot;upload_slice&quot;;
+  private static final String OP_UPLOAD = &quot;upload&quot;;
+  private static final String PARAM_ACCESS_URL = &quot;access_url&quot;;
+  private static final int RETRY_TIMES = 5;
+
+  private AtomicReferenceArray&lt;Future&gt; tasks;
+  private String fileSha;
+  private String fileKey;
+  private String uploadUrl;
+  private String token;
+
+  QCloudUploader(LCFile avFile, String token, String uploadUrl, ProgressCallback progressCallback) {
+<span class="nc" id="L41">    super(avFile, progressCallback);</span>
+
+<span class="nc" id="L43">    this.fileKey = avFile.getKey();</span>
+<span class="nc" id="L44">    this.uploadUrl = uploadUrl;</span>
+<span class="nc" id="L45">    this.token = token;</span>
+<span class="nc" id="L46">  }</span>
+
+  private static final int DEFAULT_SLICE_LEN = 512 * 1024;
+
+  public LCException execute() {
+    try {
+<span class="nc" id="L52">      byte[] bytes = avFile.getData();</span>
+<span class="nc" id="L53">      int sliceCount =</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">              (bytes.length / DEFAULT_SLICE_LEN) + (bytes.length % DEFAULT_SLICE_LEN == 0 ? 0 : 1);</span>
+
+      // 如果文件太小就没必要分片了
+<span class="nc bnc" id="L57" title="All 2 branches missed.">      if (sliceCount &gt; 1) {</span>
+<span class="nc" id="L58">        JSONObject result = uploadControlSlice(token, uploadUrl, bytes);</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        if (null == result) {</span>
+<span class="nc" id="L60">          return new LCException(new RuntimeException(&quot;Exception during file upload&quot;));</span>
+        }
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (result.containsKey(PARAM_ACCESS_URL)) {</span>
+<span class="nc" id="L63">          return null;</span>
+        }
+<span class="nc" id="L65">        String sessionId = result.getString(&quot;session&quot;);</span>
+
+<span class="nc" id="L67">        FileUploader.ProgressCalculator progressCalculator =</span>
+<span class="nc" id="L68">                new FileUploader.ProgressCalculator(sliceCount, new FileUploader.FileUploadProgressCallback() {</span>
+                  @Override
+                  public void onProgress(int progress) {
+<span class="nc" id="L71">                    publishProgress(progress);</span>
+<span class="nc" id="L72">                  }</span>
+                });
+<span class="nc" id="L74">        String sliceUploadResult = &quot;&quot;;</span>
+<span class="nc" id="L75">        int sliceOffset = 0;</span>
+<span class="nc bnc" id="L76" title="All 4 branches missed.">        for (; sliceOffset &lt; sliceCount &amp;&amp; null != sliceUploadResult; sliceOffset++) {</span>
+<span class="nc" id="L77">          sliceUploadResult = new SliceUploadTask(this, fileKey, token, uploadUrl,</span>
+<span class="nc" id="L78">                  bytes, sliceOffset, sessionId, progressCalculator, null).upload();</span>
+        }
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (sliceOffset &lt; sliceCount) {</span>
+<span class="nc" id="L81">          return new LCException(LCException.OTHER_CAUSE, &quot;failed to upload slice.&quot;);</span>
+        }
+<span class="nc" id="L83">      } else {</span>
+<span class="nc" id="L84">        uploadFile(bytes);</span>
+      }
+<span class="nc" id="L86">    } catch (Exception e) {</span>
+<span class="nc" id="L87">      return new LCException(e);</span>
+<span class="nc" id="L88">    }</span>
+
+<span class="nc" id="L90">    return null;</span>
+  }
+
+  private void uploadFile(byte[] bytes) throws LCException {
+
+    try {
+<span class="nc" id="L96">      fileSha = SHA1.compute(bytes);</span>
+<span class="nc" id="L97">      MultipartBody.Builder builder = new MultipartBody.Builder();</span>
+<span class="nc" id="L98">      RequestBody fileBody =</span>
+<span class="nc" id="L99">              RequestBody.create(MediaType.parse(APPLICATION_OCTET_STREAM), bytes, 0,</span>
+<span class="nc" id="L100">                      getCurrentSliceLength(0, bytes.length));</span>
+<span class="nc" id="L101">      builder.addFormDataPart(FILE_CONTENT, fileKey, fileBody);</span>
+<span class="nc" id="L102">      builder.addFormDataPart(PARAM_OP, OP_UPLOAD);</span>
+<span class="nc" id="L103">      builder.addFormDataPart(PARAM_SHA, fileSha);</span>
+
+<span class="nc" id="L105">      MediaType type = MediaType.parse(MULTIPART_FORM_DATA);</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">      if (null != type) {</span>
+<span class="nc" id="L107">        builder.setType(type);</span>
+      }
+
+<span class="nc" id="L110">      Request.Builder requestBuilder = new Request.Builder();</span>
+<span class="nc" id="L111">      requestBuilder.url(uploadUrl);</span>
+<span class="nc" id="L112">      requestBuilder.header(HEADER_AUTHORIZATION, token);</span>
+<span class="nc" id="L113">      requestBuilder.header(HEADER_CONTENT_TYPE, MULTIPART_FORM_DATA);</span>
+
+<span class="nc bnc" id="L115" title="All 2 branches missed.">      for (Map.Entry&lt;String, String&gt; entry: FileUploader.UPLOAD_HEADERS.entrySet()) {</span>
+<span class="nc" id="L116">        requestBuilder.header(entry.getKey(), entry.getValue());</span>
+<span class="nc" id="L117">      }</span>
+
+<span class="nc" id="L119">      requestBuilder.post(builder.build());</span>
+
+<span class="nc" id="L121">      Request request = requestBuilder.build();</span>
+<span class="nc" id="L122">      Response response = executeWithRetry(request, RETRY_TIMES);</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">      if (response.code() != 200) {</span>
+<span class="nc" id="L124">        throw new LCException(LCException.OTHER_CAUSE,</span>
+<span class="nc" id="L125">                StringUtil.stringFromBytes(response.body().bytes()));</span>
+      }
+<span class="nc" id="L127">    } catch (Exception e) {</span>
+
+<span class="nc" id="L129">      throw new LCException(&quot;Exception during file upload&quot;, e);</span>
+<span class="nc" id="L130">    }</span>
+<span class="nc" id="L131">  }</span>
+
+  private static JSONObject parseSliceUploadResponse(String resp) {
+<span class="nc bnc" id="L134" title="All 2 branches missed.">    if (!StringUtil.isEmpty(resp)) {</span>
+      try {
+<span class="nc" id="L136">        JSONObject object = JSON.parseObject(resp);</span>
+<span class="nc" id="L137">        JSONObject data = object.getJSONObject(&quot;data&quot;);</span>
+<span class="nc" id="L138">        return data;</span>
+<span class="nc" id="L139">      } catch (Exception e) {</span>
+        ;
+      }
+    }
+<span class="nc" id="L143">    return null;</span>
+  }
+
+  private static int getCurrentSliceLength(int sliceCount, int totalSize) {
+<span class="nc" id="L147">    int leftSize = totalSize - sliceCount * DEFAULT_SLICE_LEN;</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">    return leftSize &gt;= DEFAULT_SLICE_LEN ? DEFAULT_SLICE_LEN : leftSize;</span>
+  }
+
+  private JSONObject uploadControlSlice(String token, String url, byte[] wholeFile)
+          throws LCException {
+<span class="nc" id="L153">    MultipartBody.Builder builder = new MultipartBody.Builder();</span>
+    try {
+<span class="nc" id="L155">      String fileSha = SHA1.compute(wholeFile);</span>
+<span class="nc" id="L156">      builder.addFormDataPart(PARAM_SHA, fileSha);</span>
+<span class="nc" id="L157">      builder.addFormDataPart(PARAM_OP, OP_UPLOAD_SLICE);</span>
+<span class="nc" id="L158">      builder.addFormDataPart(PARAM_FILE_SIZE, String.valueOf(wholeFile.length));</span>
+<span class="nc" id="L159">      builder.addFormDataPart(PARAM_SLICE_SIZE, String.valueOf(DEFAULT_SLICE_LEN));</span>
+
+<span class="nc" id="L161">      MediaType type = MediaType.parse(MULTIPART_FORM_DATA);</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">      if (null != type) {</span>
+<span class="nc" id="L163">        builder.setType(type);</span>
+      }
+
+<span class="nc" id="L166">      Request.Builder requestBuilder = new Request.Builder();</span>
+<span class="nc" id="L167">      requestBuilder.url(url);</span>
+<span class="nc" id="L168">      requestBuilder.header(HEADER_AUTHORIZATION, token);</span>
+<span class="nc" id="L169">      requestBuilder.header(HEADER_CONTENT_TYPE, MULTIPART_FORM_DATA);</span>
+<span class="nc" id="L170">      requestBuilder.post(builder.build());</span>
+
+<span class="nc" id="L172">      Request request = requestBuilder.build();</span>
+<span class="nc" id="L173">      Response response = executeWithRetry(request, RETRY_TIMES);</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">      if (response != null) {</span>
+<span class="nc" id="L175">        byte[] responseBody = response.body().bytes();</span>
+<span class="nc" id="L176">        return parseSliceUploadResponse(StringUtil.stringFromBytes(responseBody));</span>
+      }
+<span class="nc" id="L178">    } catch (Exception e) {</span>
+<span class="nc" id="L179">      throw new LCException(LCException.OTHER_CAUSE, &quot;Upload file failure&quot;);</span>
+<span class="nc" id="L180">    }</span>
+<span class="nc" id="L181">    return null;</span>
+  }
+
+  public static class SliceUploadTask implements Runnable {
+    byte[] data;
+    int sliceOffset;
+    FileUploader.ProgressCalculator progress;
+    String session;
+    CountDownLatch latch;
+    String token;
+    String url;
+    String key;
+    QCloudUploader parent;
+
+    public SliceUploadTask(QCloudUploader parent, String key, String token, String url, byte[] wholeFile, int sliceOffset,
+<span class="nc" id="L196">                           String session, FileUploader.ProgressCalculator progressCalculator, CountDownLatch latch) {</span>
+<span class="nc" id="L197">      this.data = wholeFile;</span>
+<span class="nc" id="L198">      this.sliceOffset = sliceOffset;</span>
+<span class="nc" id="L199">      this.progress = progressCalculator;</span>
+<span class="nc" id="L200">      this.session = session;</span>
+<span class="nc" id="L201">      this.latch = latch;</span>
+<span class="nc" id="L202">      this.token = token;</span>
+<span class="nc" id="L203">      this.url = url;</span>
+<span class="nc" id="L204">      this.key = key;</span>
+<span class="nc" id="L205">      this.parent = parent;</span>
+<span class="nc" id="L206">    }</span>
+
+    public void run() {
+<span class="nc" id="L209">      this.upload();</span>
+<span class="nc" id="L210">    }</span>
+
+    public String upload() {
+      try {
+<span class="nc" id="L214">        MultipartBody.Builder builder = new MultipartBody.Builder();</span>
+<span class="nc" id="L215">        RequestBody fileBody =</span>
+<span class="nc" id="L216">                RequestBody.create(MediaType.parse(APPLICATION_OCTET_STREAM), data, sliceOffset</span>
+                                * DEFAULT_SLICE_LEN,
+<span class="nc" id="L218">                        getCurrentSliceLength(sliceOffset, data.length));</span>
+<span class="nc" id="L219">        builder.addFormDataPart(FILE_CONTENT, key, fileBody);</span>
+<span class="nc" id="L220">        builder.addFormDataPart(PARAM_OP, OP_UPLOAD_SLICE);</span>
+<span class="nc" id="L221">        builder.addFormDataPart(PARAM_OFFSET,</span>
+<span class="nc" id="L222">                String.valueOf(sliceOffset * DEFAULT_SLICE_LEN));</span>
+<span class="nc" id="L223">        builder.addFormDataPart(PARAM_SESSION, session);</span>
+
+<span class="nc" id="L225">        MediaType type = MediaType.parse(MULTIPART_FORM_DATA);</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        if (null != type) {</span>
+<span class="nc" id="L227">          builder.setType(type);</span>
+        }
+
+<span class="nc" id="L230">        Request.Builder requestBuilder = new Request.Builder();</span>
+<span class="nc" id="L231">        requestBuilder.url(url);</span>
+<span class="nc" id="L232">        requestBuilder.header(HEADER_AUTHORIZATION, token);</span>
+<span class="nc" id="L233">        requestBuilder.header(HEADER_CONTENT_TYPE, MULTIPART_FORM_DATA);</span>
+<span class="nc" id="L234">        requestBuilder.post(builder.build());</span>
+<span class="nc" id="L235">        Request request = requestBuilder.build();</span>
+<span class="nc" id="L236">        Response response = parent.executeWithRetry(request, RETRY_TIMES);</span>
+<span class="nc bnc" id="L237" title="All 4 branches missed.">        if (response != null &amp;&amp; null != response.body()) {</span>
+<span class="nc" id="L238">          byte[] responseBody = response.body().bytes();</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">          if (progress != null) {</span>
+<span class="nc" id="L240">            progress.publishProgress(sliceOffset, 100);</span>
+          }
+<span class="nc bnc" id="L242" title="All 2 branches missed.">          if (null != responseBody) {</span>
+<span class="nc" id="L243">            return StringUtil.stringFromBytes(responseBody);</span>
+          }
+        }
+<span class="nc" id="L246">      } catch (Exception e) {</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">        if (latch != null) {</span>
+<span class="nc" id="L248">          long count = latch.getCount();</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">          for (; count &gt; 0; count--) {</span>
+<span class="nc" id="L250">            latch.countDown();</span>
+          }
+        }
+<span class="nc" id="L253">      }</span>
+<span class="nc" id="L254">      return null;</span>
+    }
+  }
+
+  @Override
+  public void interruptImmediately() {
+<span class="nc" id="L260">    super.interruptImmediately();</span>
+
+<span class="nc bnc" id="L262" title="All 4 branches missed.">    if (tasks != null &amp;&amp; tasks.length() &gt; 0) {</span>
+<span class="nc" id="L263">      synchronized (tasks) {</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">        for (int index = 0; index &lt; tasks.length(); index++) {</span>
+<span class="nc" id="L265">          Future task = tasks.get(index);</span>
+<span class="nc bnc" id="L266" title="All 6 branches missed.">          if (task != null &amp;&amp; !task.isDone() &amp;&amp; !task.isCancelled()) {</span>
+<span class="nc" id="L267">            task.cancel(true);</span>
+          }
+        }
+<span class="nc" id="L270">      }</span>
+    }
+<span class="nc" id="L272">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

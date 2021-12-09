@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>QiniuAccessor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.upload</a> &gt; <span class="el_source">QiniuAccessor.java</span></div><h1>QiniuAccessor.java</h1><pre class="source lang-java linenums">package cn.leancloud.upload;
+
+
+import cn.leancloud.LCException;
+import cn.leancloud.LCLogger;
+import cn.leancloud.codec.Base64;
+import cn.leancloud.utils.LogUtil;
+import cn.leancloud.utils.StringUtil;
+import cn.leancloud.json.JSON;
+
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+
+import java.util.List;
+import java.util.zip.CRC32;
+
+/**
+ * Qiniu REST API client for file uploading.
+ * 1. slicing upload:
+ * following is the architecture of a file which is composed by block and chunk.
+ * ref: https://developer.qiniu.com/kodo/manual/1650/chunked-upload
+ * |----------------------------------------------------------------------------|
+ * | resource                                                                   |
+ * |   |-------------|   |-------------|   |-------------|   |-------------|    |
+ * |   | block1      |   | block2      |   | block3      |   | block4      |    |
+ * |   | |---------| |   | |---------| |   | |---------| |   | |---------| |    |
+ * |   | | chunk1  | |   | | chunk1  | |   | | chunk1  | |   | | chunk1  | |    |
+ * |   | |---------| |   | |---------| |   | |---------| |   | |---------| |    |
+ * |   | | chunk2  | |   | | chunk2  | |   | | chunk2  | |   | | chunk2  | |    |
+ * |   | |---------| |   | |---------| |   | |---------| |   | |---------| |    |
+ * |   | | chunk3  | |   | | chunk3  | |   | | chunk3  | |   | | chunk3  | |    |
+ * |   | |---------| |   | |---------| |   | |---------| |   | |---------| |    |
+ * |   | | chunk4  | |   | | chunk4  | |   | | chunk4  | |   | | chunk4  | |    |
+ * |   | |---------| |   | |---------| |   | |---------| |   | |---------| |    |
+ * |   |-------------|   |-------------|   |-------------|   |-------------|    |
+ * |----------------------------------------------------------------------------|
+ *
+ * 2. main steps
+ *   - 2.1 make block. ref: https://developer.qiniu.com/kodo/api/1286/mkblk
+ *   - 2.2 upload chunks. ref: https://developer.qiniu.com/kodo/api/1251/bput
+ *   - 2.3 merge to file. ref: https://developer.qiniu.com/kodo/api/1287/mkfile
+ *
+ * Created by fengjunwen on 2017/8/15.
+ */
+
+class QiniuAccessor {
+<span class="fc" id="L50">  private static LCLogger LOGGER = LogUtil.getLogger(QiniuAccessor.class);</span>
+
+  static final String QINIU_HOST = &quot;http://upload.qiniu.com&quot;;
+  static final String QINIU_CREATE_BLOCK_EP = &quot;%s/mkblk/%d&quot;;
+  static final String QINIU_BRICK_UPLOAD_EP = &quot;%s/bput/%s/%d&quot;;
+  static final String QINIU_MKFILE_EP = &quot;%s/mkfile/%d/key/%s&quot;;
+
+  static final String HEAD_CONTENT_LENGTH = &quot;Content-Length&quot;;
+  static final String HEAD_CONTENT_TYPE = &quot;Content-Type&quot;;
+  static final String HEAD_AUTHORIZATION = &quot;Authorization&quot;;
+  static final String TEXT_CONTENT_TYPE = &quot;text/plain&quot;;
+  static final String DEFAULT_CONTENT_TYPE = &quot;application/octet-stream&quot;;
+
+  static final int WIFI_CHUNK_SIZE = 256 * 1024;
+  static final int BLOCK_SIZE = 1024 * 1024 * 4;
+  static final int NONWIFI_CHUNK_SIZE = 64 * 1024;
+
+<span class="fc" id="L67">  static class QiniuBlockResponseData {</span>
+    private String ctx;
+    private long crc32;
+    private int offset;
+    private String host;
+    private String checksum;
+
+    public String getCtx() {
+<span class="fc" id="L75">      return ctx;</span>
+    }
+
+    public void setCtx(String ctx) {
+<span class="nc" id="L79">      this.ctx = ctx;</span>
+<span class="nc" id="L80">    }</span>
+
+    public long getCrc32() {
+<span class="nc" id="L83">      return crc32;</span>
+    }
+
+    public void setCrc32(long crc32) {
+<span class="nc" id="L87">      this.crc32 = crc32;</span>
+<span class="nc" id="L88">    }</span>
+
+    public int getOffset() {
+<span class="nc" id="L91">      return offset;</span>
+    }
+
+    public void setOffset(int offset) {
+<span class="nc" id="L95">      this.offset = offset;</span>
+<span class="nc" id="L96">    }</span>
+
+    public String getHost() {
+<span class="nc" id="L99">      return host;</span>
+    }
+
+    public void setHost(String host) {
+<span class="nc" id="L103">      this.host = host;</span>
+<span class="nc" id="L104">    }</span>
+
+    public String getChecksum() {
+<span class="nc" id="L107">      return checksum;</span>
+    }
+
+    public void setChecksum(String checksum) {
+<span class="nc" id="L111">      this.checksum = checksum;</span>
+<span class="nc" id="L112">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L116">      return &quot;QiniuBlockResponseData{&quot; +</span>
+              &quot;ctx='&quot; + ctx + '\'' +
+              &quot;, crc32=&quot; + crc32 +
+              &quot;, offset=&quot; + offset +
+              &quot;, host='&quot; + host + '\'' +
+              &quot;, checksum='&quot; + checksum + '\'' +
+              '}';
+    }
+  }
+
+<span class="fc" id="L126">  static class QiniuMKFileResponseData {</span>
+    public String key;
+    public String hash;
+
+    @Override
+    public String toString() {
+<span class="fc" id="L132">      return &quot;QiniuMKFileResponseData{&quot; +</span>
+              &quot;key='&quot; + key + '\'' +
+              &quot;, hash='&quot; + hash + '\'' +
+              '}';
+    }
+  }
+
+  private OkHttpClient client;
+  private String uploadToken;
+  private String fileKey;
+<span class="fc" id="L142">  private String uploadUrl = QINIU_HOST;</span>
+
+<span class="fc" id="L144">  QiniuAccessor(OkHttpClient client, String uploadToken, String fileKey, String uploadUrl) {</span>
+<span class="fc" id="L145">    this.client = client;</span>
+<span class="fc" id="L146">    this.uploadToken = uploadToken;</span>
+<span class="fc" id="L147">    this.fileKey = fileKey;</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">    if (!StringUtil.isEmpty(uploadUrl)) {</span>
+<span class="fc" id="L149">      this.uploadUrl = uploadUrl;</span>
+    }
+<span class="fc" id="L151">  }</span>
+
+  private static &lt;T&gt; T parseQiniuResponse(Response resp, Class&lt;T&gt; clazz) throws Exception {
+
+<span class="fc" id="L155">    int code = resp.code();</span>
+<span class="fc" id="L156">    String phrase = resp.message();</span>
+
+<span class="fc" id="L158">    String h = resp.header(&quot;X-Log&quot;);</span>
+
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">    if (code == 401) {</span>
+<span class="nc" id="L161">      throw new Exception(&quot;unauthorized to create Qiniu Block&quot;);</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">    } else if (null == resp.body()) {</span>
+<span class="nc" id="L163">      throw new Exception(&quot;invalid response&quot;);</span>
+    }
+<span class="fc" id="L165">    String responseData = StringUtil.stringFromBytes(resp.body().bytes());</span>
+    try {
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">      if (code / 100 == 2) {</span>
+<span class="fc" id="L168">        T data = JSON.parseObject(responseData, clazz);</span>
+<span class="fc" id="L169">        return data;</span>
+      }
+<span class="nc" id="L171">    } catch (Exception e) {</span>
+<span class="nc" id="L172">      LOGGER.w(e);</span>
+<span class="nc" id="L173">    }</span>
+
+<span class="nc bnc" id="L175" title="All 2 branches missed.">    if (responseData.length() &gt; 0) {</span>
+<span class="nc" id="L176">      throw new Exception(code + &quot;:&quot; + responseData);</span>
+    }
+<span class="nc bnc" id="L178" title="All 2 branches missed.">    if (!StringUtil.isEmpty(h)) {</span>
+<span class="nc" id="L179">      throw new Exception(h);</span>
+    }
+<span class="nc" id="L181">    throw new Exception(phrase);</span>
+  }
+
+  /**
+   * REST API:
+   * - POST /mkblk/&lt;blockSize&gt; HTTP/1.1
+   * - Host:           upload.qiniu.com
+   * - Content-Type:   application/octet-stream
+   * - Content-Length: &lt;firstChunkSize&gt;
+   * - Authorization:  UpToken &lt;UploadToken&gt;
+   * - &lt;firstChunkBinary&gt;
+   *
+   * - Response
+   * {
+   *   &quot;ctx&quot;:          &quot;&lt;Ctx           string&gt;&quot;,
+   *   &quot;checksum&quot;:     &quot;&lt;Checksum      string&gt;&quot;,
+   *   &quot;crc32&quot;:         &lt;Crc32         int64&gt;,
+   *   &quot;offset&quot;:        &lt;Offset        int64&gt;,
+   *   &quot;host&quot;:         &quot;&lt;UpHost        string&gt;&quot;
+   * }
+   * @param blockSize
+   * @param firstChunkSize
+   * @param firstChunkData
+   * @param retry
+   * @return
+   */
+  public QiniuBlockResponseData createBlockInQiniu(int blockSize, int firstChunkSize,
+                                                   final byte[] firstChunkData, int retry) {
+    try {
+
+<span class="fc" id="L211">      String endPoint = String.format(QINIU_CREATE_BLOCK_EP, this.uploadUrl, blockSize);</span>
+<span class="fc" id="L212">      Request.Builder builder = new Request.Builder();</span>
+<span class="fc" id="L213">      builder.url(endPoint);</span>
+<span class="fc" id="L214">      builder.addHeader(HEAD_CONTENT_TYPE, DEFAULT_CONTENT_TYPE);</span>
+<span class="fc" id="L215">      builder.addHeader(HEAD_CONTENT_LENGTH, String.valueOf(firstChunkSize));</span>
+<span class="fc" id="L216">      builder.addHeader(HEAD_AUTHORIZATION, &quot;UpToken &quot; + this.uploadToken);</span>
+
+<span class="fc" id="L218">      LOGGER.d(&quot;createBlockInQiniu with uploadUrl: &quot; + endPoint);</span>
+<span class="fc" id="L219">      RequestBody requestBody = RequestBody.create(MediaType.parse(DEFAULT_CONTENT_TYPE), firstChunkData, 0, firstChunkSize);</span>
+<span class="fc" id="L220">      builder = builder.post(requestBody);</span>
+
+<span class="fc" id="L222">      Response response = this.client.newCall(builder.build()).execute();</span>
+<span class="fc" id="L223">      return parseQiniuResponse(response, QiniuBlockResponseData.class);</span>
+<span class="nc" id="L224">    } catch (Exception e) {</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">      if (retry-- &gt; 0) {</span>
+<span class="nc" id="L226">        return createBlockInQiniu(blockSize, firstChunkSize, firstChunkData, retry);</span>
+      } else {
+<span class="nc" id="L228">        LOGGER.w(e);</span>
+      }
+    }
+<span class="nc" id="L231">    return null;</span>
+  }
+
+  /**
+   * REST API:
+   * POST /bput/&lt;ctx&gt;/&lt;nextChunkOffset&gt; HTTP/1.1
+   * Host:           &lt;UpHost&gt;
+   * Content-Type:   application/octet-stream
+   * Content-Length: &lt;nextChunkSize&gt;
+   * Authorization:  UpToken &lt;UploadToken&gt;
+   * &lt;nextChunkBinary&gt;
+   *
+   * Request Params:
+   * - ctx: 前一次上传返回的块级上传控制信息。
+   * - nextChunkOffset: 当前片在整个块中的起始偏移。
+   * - nextChunkSize: 当前片数据大小
+   * - nextChunkBinary: 当前片数据
+   *
+   * Response:
+   * {
+   *   &quot;ctx&quot;:            &quot;&lt;Ctx          string&gt;&quot;,
+   *   &quot;checksum&quot;:       &quot;&lt;Checksum     string&gt;&quot;,
+   *   &quot;crc32&quot;:           &lt;Crc32        int64&gt;,
+   *   &quot;offset&quot;:          &lt;Offset       int64&gt;,
+   *   &quot;host&quot;:           &quot;&lt;UpHost       string&gt;&quot;
+   * }
+   *
+   * @param lastChunk
+   * @param blockOffset
+   * @param currentChunkData
+   * @param currentChunkSize
+   * @param retry
+   * @return
+   */
+  public QiniuBlockResponseData putFileBlocksToQiniu(QiniuBlockResponseData lastChunk,
+                                                     final int blockOffset,
+                                                     final byte[] currentChunkData,
+                                                     int currentChunkSize, int retry) {
+    try {
+<span class="nc" id="L270">      String endPoint = String.format(QINIU_BRICK_UPLOAD_EP, this.uploadUrl, lastChunk.ctx, lastChunk.offset);</span>
+<span class="nc" id="L271">      Request.Builder builder = new Request.Builder();</span>
+<span class="nc" id="L272">      builder.url(endPoint);</span>
+<span class="nc" id="L273">      builder.addHeader(HEAD_CONTENT_TYPE, DEFAULT_CONTENT_TYPE);</span>
+<span class="nc" id="L274">      builder.addHeader(HEAD_CONTENT_LENGTH, String.valueOf(currentChunkSize));</span>
+<span class="nc" id="L275">      builder.addHeader(HEAD_AUTHORIZATION, &quot;UpToken &quot; + this.uploadToken);</span>
+
+<span class="nc" id="L277">      LOGGER.d(&quot;putFileBlocksToQiniu with uploadUrl: &quot; + endPoint);</span>
+
+<span class="nc" id="L279">      RequestBody requestBody = RequestBody.create(MediaType.parse(DEFAULT_CONTENT_TYPE),</span>
+              currentChunkData, 0, currentChunkSize);
+<span class="nc" id="L281">      builder = builder.post(requestBody);</span>
+<span class="nc" id="L282">      Response response = this.client.newCall(builder.build()).execute();</span>
+<span class="nc" id="L283">      QiniuBlockResponseData respData = parseQiniuResponse(response, QiniuBlockResponseData.class);</span>
+<span class="nc" id="L284">      validateCrc32Value(respData, currentChunkData, 0, currentChunkSize);</span>
+<span class="nc" id="L285">      return respData;</span>
+<span class="nc" id="L286">    } catch (Exception e) {</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">      if (retry-- &gt; 0) {</span>
+<span class="nc" id="L288">        return putFileBlocksToQiniu(lastChunk, blockOffset, currentChunkData, currentChunkSize, retry);</span>
+      } else {
+<span class="nc" id="L290">        LOGGER.w(e);</span>
+      }
+    }
+<span class="nc" id="L293">    return null;</span>
+  }
+
+  private void validateCrc32Value(QiniuBlockResponseData respData, byte[] data, int offset, int nextChunkSize)
+          throws LCException {
+<span class="nc" id="L298">    CRC32 crc32 = new CRC32();</span>
+<span class="nc" id="L299">    crc32.update(data,offset,nextChunkSize);</span>
+<span class="nc" id="L300">    long localCRC32 = crc32.getValue();</span>
+<span class="nc bnc" id="L301" title="All 4 branches missed.">    if(respData!=null &amp;&amp; respData.crc32 != localCRC32){</span>
+<span class="nc" id="L302">      throw  new LCException(LCException.OTHER_CAUSE,&quot;CRC32 validation failure for chunk upload&quot;);</span>
+    }
+<span class="nc" id="L304">  }</span>
+
+  /**
+   * REST API
+   * POST /mkfile/&lt;fileSize&gt;/key/&lt;encodedKey&gt;/mimeType/&lt;encodedMimeType&gt;/x:user-var/&lt;encodedUserVars&gt; HTTP/1.1
+   * Host:           &lt;UpHost&gt;
+   * Content-Type:   text/plain
+   * Content-Length: &lt;ctxListSize&gt;
+   * Authorization:  UpToken &lt;UploadToken&gt;
+   * &lt;ctxList&gt;
+   *
+   * Request params:
+   * - fileSize
+   * - encodeKey
+   * - encodedMimeType
+   * - encodedUserVars
+   *
+   * Response:
+   * {
+   *   &quot;hash&quot;: &quot;&lt;ContentHash  string&gt;&quot;,
+   *   &quot;key&quot;:  &quot;&lt;Key          string&gt;&quot;
+   * }
+   *
+   * @param fileTotalSize
+   * @param uploadFileCtxs
+   * @param retry
+   * @return
+   * @throws Exception
+   */
+  public QiniuMKFileResponseData makeFile(int fileTotalSize, List&lt;String&gt; uploadFileCtxs, int retry)
+          throws Exception {
+    try {
+<span class="fc" id="L336">      String endPoint = String.format(QINIU_MKFILE_EP, this.uploadUrl, fileTotalSize,</span>
+<span class="fc" id="L337">              Base64.encodeToString(this.fileKey.getBytes(), Base64.URL_SAFE | Base64.NO_WRAP));</span>
+<span class="fc" id="L338">      final String joinedFileCtx = StringUtil.join(&quot;,&quot;, uploadFileCtxs);</span>
+<span class="fc" id="L339">      Request.Builder builder = new Request.Builder();</span>
+<span class="fc" id="L340">      builder.url(endPoint);</span>
+<span class="fc" id="L341">      builder.addHeader(HEAD_CONTENT_TYPE, TEXT_CONTENT_TYPE);</span>
+<span class="fc" id="L342">      builder.addHeader(HEAD_CONTENT_LENGTH, String.valueOf(joinedFileCtx.length()));</span>
+<span class="fc" id="L343">      builder.addHeader(HEAD_AUTHORIZATION, &quot;UpToken &quot; + this.uploadToken);</span>
+
+<span class="fc" id="L345">      LOGGER.d(&quot;makeFile to qiniu with uploadUrl: &quot; + endPoint);</span>
+<span class="fc" id="L346">      builder = builder.post(RequestBody.create(MediaType.parse(TEXT_CONTENT_TYPE), joinedFileCtx));</span>
+<span class="fc" id="L347">      Response response = this.client.newCall(builder.build()).execute();</span>
+<span class="fc" id="L348">      return parseQiniuResponse(response, QiniuMKFileResponseData.class);</span>
+<span class="nc" id="L349">    } catch (Exception e) {</span>
+<span class="nc bnc" id="L350" title="All 2 branches missed.">      if (retry-- &gt; 0) {</span>
+<span class="nc" id="L351">        return makeFile(fileTotalSize, uploadFileCtxs, retry);</span>
+      } else {
+<span class="nc" id="L353">        LOGGER.w(e);</span>
+      }
+    }
+<span class="nc" id="L356">    return null;</span>
+  }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GsonWrapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.gson</a> &gt; <span class="el_source">GsonWrapper.java</span></div><h1>GsonWrapper.java</h1><pre class="source lang-java linenums">package cn.leancloud.gson;
+
+import cn.leancloud.*;
+import cn.leancloud.json.JSONObject;
+import cn.leancloud.ops.*;
+import cn.leancloud.service.AppAccessEndpoint;
+import cn.leancloud.sms.LCCaptchaDigest;
+import cn.leancloud.sms.LCCaptchaValidateResult;
+import cn.leancloud.upload.FileUploadToken;
+import com.google.gson.*;
+import com.google.gson.internal.Primitives;
+import com.google.gson.reflect.TypeToken;
+
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Type;
+import java.math.BigDecimal;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.*;
+
+<span class="nc" id="L21">public class GsonWrapper {</span>
+<span class="fc" id="L22">  static final ObjectDeserializer objectDeserializer = new ObjectDeserializer();</span>
+<span class="fc" id="L23">  static final BaseOperationAdapter baseOperationAdapter = new BaseOperationAdapter();</span>
+<span class="fc" id="L24">  static final JSONObjectAdapter jsonObjectAdapter = new JSONObjectAdapter();</span>
+<span class="fc" id="L25">  static final JSONArrayAdapter jsonArrayAdapter = new JSONArrayAdapter();</span>
+<span class="fc" id="L26">  static final Gson gson = new GsonBuilder().serializeNulls()</span>
+<span class="fc" id="L27">          .excludeFieldsWithModifiers(Modifier.STATIC, Modifier.TRANSIENT, Modifier.VOLATILE)</span>
+<span class="fc" id="L28">          .registerTypeAdapter(LCObject.class, objectDeserializer)</span>
+<span class="fc" id="L29">          .registerTypeAdapter(LCUser.class, objectDeserializer)</span>
+<span class="fc" id="L30">          .registerTypeAdapter(LCFile.class, objectDeserializer)</span>
+<span class="fc" id="L31">          .registerTypeAdapter(LCRole.class, objectDeserializer)</span>
+<span class="fc" id="L32">          .registerTypeAdapter(LCStatus.class, objectDeserializer)</span>
+<span class="fc" id="L33">          .registerTypeAdapter(LCInstallation.class, objectDeserializer)</span>
+<span class="fc" id="L34">          .registerTypeAdapter(LCFriendshipRequest.class, objectDeserializer)</span>
+<span class="fc" id="L35">          .registerTypeAdapter(LCFriendship.class, objectDeserializer)</span>
+<span class="fc" id="L36">          .registerTypeAdapter(BaseOperation.class, baseOperationAdapter)</span>
+<span class="fc" id="L37">          .registerTypeAdapter(AddOperation.class, baseOperationAdapter)</span>
+<span class="fc" id="L38">          .registerTypeAdapter(AddRelationOperation.class, baseOperationAdapter)</span>
+<span class="fc" id="L39">          .registerTypeAdapter(AddUniqueOperation.class, baseOperationAdapter)</span>
+<span class="fc" id="L40">          .registerTypeAdapter(BitAndOperation.class, baseOperationAdapter)</span>
+<span class="fc" id="L41">          .registerTypeAdapter(BitOrOperation.class, baseOperationAdapter)</span>
+<span class="fc" id="L42">          .registerTypeAdapter(BitXOROperation.class, baseOperationAdapter)</span>
+<span class="fc" id="L43">          .registerTypeAdapter(CompoundOperation.class, baseOperationAdapter)</span>
+<span class="fc" id="L44">          .registerTypeAdapter(DecrementOperation.class, baseOperationAdapter)</span>
+<span class="fc" id="L45">          .registerTypeAdapter(DeleteOperation.class, baseOperationAdapter)</span>
+<span class="fc" id="L46">          .registerTypeAdapter(IncrementOperation.class, baseOperationAdapter)</span>
+<span class="fc" id="L47">          .registerTypeAdapter(NumericOperation.class, baseOperationAdapter)</span>
+<span class="fc" id="L48">          .registerTypeAdapter(RemoveOperation.class, baseOperationAdapter)</span>
+<span class="fc" id="L49">          .registerTypeAdapter(RemoveRelationOperation.class, baseOperationAdapter)</span>
+<span class="fc" id="L50">          .registerTypeAdapter(SetOperation.class, baseOperationAdapter)</span>
+<span class="fc" id="L51">          .registerTypeAdapter(GsonObject.class, jsonObjectAdapter)</span>
+<span class="fc" id="L52">          .registerTypeAdapter(JSONObject.class, jsonObjectAdapter)</span>
+<span class="fc" id="L53">          .registerTypeAdapter(GsonArray.class, jsonArrayAdapter)</span>
+<span class="fc" id="L54">          .registerTypeAdapter(FileUploadToken.class, new FileUploadTokenAdapter())</span>
+<span class="fc" id="L55">          .registerTypeAdapter(AppAccessEndpoint.class,</span>
+                  new GeneralObjectAdapter&lt;&gt;(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES,
+<span class="fc" id="L57">                          TypeToken.get(AppAccessEndpoint.class)))</span>
+<span class="fc" id="L58">          .registerTypeAdapter(LCCaptchaDigest.class,</span>
+                  new GeneralObjectAdapter&lt;&gt;(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES,
+<span class="fc" id="L60">                          TypeToken.get(LCCaptchaDigest.class)))</span>
+<span class="fc" id="L61">          .registerTypeAdapter(LCCaptchaValidateResult.class,</span>
+                  new GeneralObjectAdapter&lt;&gt;(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES,
+<span class="fc" id="L63">                          TypeToken.get(LCCaptchaValidateResult.class)))</span>
+<span class="fc" id="L64">          .registerTypeAdapter(new TypeToken&lt;Map&lt;String, Object&gt;&gt;(){}.getType(),  new MapDeserializerDoubleAsIntFix())</span>
+<span class="fc" id="L65">          .registerTypeAdapter(Map.class,  new MapDeserializerDoubleAsIntFix())</span>
+<span class="fc" id="L66">          .setLenient()</span>
+<span class="fc" id="L67">          .create();</span>
+
+  public static Gson getGsonInstance() {
+<span class="fc" id="L70">    return gson;</span>
+  }
+
+  public static String toJsonString(Map&lt;String, Object&gt; map) {
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">    if (null == map) {</span>
+<span class="nc" id="L75">      return null;</span>
+    }
+<span class="fc" id="L77">    return gson.toJson(map);</span>
+  }
+
+  public static JsonElement toJsonElement(Object object) {
+<span class="fc bfc" id="L81" title="All 2 branches covered.">    if (null == object) {</span>
+<span class="fc" id="L82">      return null;</span>
+    }
+<span class="fc bfc" id="L84" title="All 2 branches covered.">    if (object instanceof GsonObject) {</span>
+<span class="fc" id="L85">      return ((GsonObject) object).getRawObject();</span>
+    }
+<span class="fc bfc" id="L87" title="All 2 branches covered.">    if (object instanceof GsonArray) {</span>
+<span class="fc" id="L88">      return ((GsonArray) object).getRawObject();</span>
+    }
+<span class="fc" id="L90">    return gson.toJsonTree(object);</span>
+  }
+
+
+  public static Object parseObject(String jsonString) {
+    try {
+<span class="fc" id="L96">      return gson.fromJson(jsonString, new TypeToken&lt;Map&lt;String, Object&gt;&gt;() {}.getType());</span>
+<span class="fc" id="L97">    } catch (Exception ex) {</span>
+      // string is not json/map.
+<span class="fc" id="L99">      JsonElement element = gson.toJsonTree(jsonString);</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">      if (element.isJsonPrimitive()) {</span>
+<span class="fc" id="L101">        JsonPrimitive jsonPrimitive = element.getAsJsonPrimitive();</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (jsonPrimitive.isBoolean()) {</span>
+<span class="nc" id="L103">          return jsonPrimitive.getAsBoolean();</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        } else if (jsonPrimitive.isString()) {</span>
+<span class="fc" id="L105">          return jsonPrimitive.getAsString();</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        } else if (jsonPrimitive.isNumber()) {</span>
+<span class="nc" id="L107">          return NumberDeserializerDoubleAsIntFix.parsePrecisionNumber(jsonPrimitive.getAsNumber());</span>
+        } else {
+<span class="nc" id="L109">          return null;</span>
+        }
+<span class="nc bnc" id="L111" title="All 2 branches missed.">      } else if (element.isJsonArray()) {</span>
+<span class="nc" id="L112">        return element.getAsJsonArray();</span>
+      } else {
+<span class="nc" id="L114">        return null;</span>
+      }
+    }
+  }
+
+  public static &lt;T&gt; T parseObject(String jsonString, Class&lt;T&gt; clazz) {
+<span class="pc bpc" id="L120" title="1 of 4 branches missed.">    if (clazz.isPrimitive() || String.class.isAssignableFrom(clazz)) {</span>
+<span class="fc" id="L121">      JsonElement element = gson.toJsonTree(jsonString);</span>
+<span class="fc" id="L122">      return gson.fromJson(element, clazz);</span>
+    } else {
+<span class="fc" id="L124">      return gson.fromJson(jsonString, clazz);</span>
+    }
+  }
+
+  public static &lt;T&gt; T parseObject(String jsonString, Type typeOfT) {
+<span class="pc bpc" id="L129" title="2 of 4 branches missed.">    if (Primitives.isPrimitive(typeOfT)</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">            || (typeOfT instanceof Class &amp;&amp; String.class.isAssignableFrom((Class)typeOfT))) {</span>
+<span class="nc" id="L131">      JsonElement element = gson.toJsonTree(jsonString, typeOfT);</span>
+<span class="nc" id="L132">      return gson.fromJson(element, typeOfT);</span>
+    } else {
+<span class="fc" id="L134">      return gson.fromJson(jsonString, typeOfT);</span>
+    }
+  }
+
+  public static &lt;T&gt; T toJavaObject(JsonElement element, Class&lt;T&gt; clazz) {
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">    if (null == element) {</span>
+<span class="nc" id="L140">      return null;</span>
+    }
+<span class="fc" id="L142">    return gson.fromJson(element, clazz);</span>
+  }
+
+  public static Object toJavaObject(JsonElement element) {
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">    if (null == element) {</span>
+<span class="nc" id="L147">      return null;</span>
+    }
+<span class="fc" id="L149">    return toJavaObject(element, Object.class);</span>
+  }
+
+<span class="fc" id="L152">  public static final TimeZone defaultTimeZone  = TimeZone.getDefault();</span>
+<span class="fc" id="L153">  public static final Locale defaultLocale    = Locale.getDefault();</span>
+
+  public static final String DEFFAULT_DATE_FORMAT = &quot;yyyy-MM-dd HH:mm:ss&quot;;
+
+  public static final Date castToDate(Object value) {
+<span class="nc bnc" id="L158" title="All 2 branches missed.">    if (value == null) {</span>
+<span class="nc" id="L159">      return null;</span>
+    }
+
+<span class="nc bnc" id="L162" title="All 2 branches missed.">    if (value instanceof Calendar) {</span>
+<span class="nc" id="L163">      return ((Calendar) value).getTime();</span>
+    }
+
+<span class="nc bnc" id="L166" title="All 2 branches missed.">    if (value instanceof Date) {</span>
+<span class="nc" id="L167">      return (Date) value;</span>
+    }
+
+<span class="nc" id="L170">    long longValue = -1;</span>
+
+<span class="nc bnc" id="L172" title="All 2 branches missed.">    if (value instanceof BigDecimal) {</span>
+<span class="nc" id="L173">      BigDecimal decimal = (BigDecimal) value;</span>
+<span class="nc" id="L174">      int scale = decimal.scale();</span>
+<span class="nc bnc" id="L175" title="All 4 branches missed.">      if (scale &gt;= -100 &amp;&amp; scale &lt;= 100) {</span>
+<span class="nc" id="L176">        longValue = decimal.longValue();</span>
+      } else {
+<span class="nc" id="L178">        longValue = decimal.longValueExact();</span>
+      }
+<span class="nc bnc" id="L180" title="All 2 branches missed.">    } else if (value instanceof Number) {</span>
+<span class="nc" id="L181">      longValue = ((Number) value).longValue();</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">    } else if (value instanceof String) {</span>
+<span class="nc" id="L183">      String strVal = (String) value;</span>
+
+<span class="nc bnc" id="L185" title="All 2 branches missed.">      if (strVal.indexOf('-') != -1) {</span>
+        String format;
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        if (strVal.length() == DEFFAULT_DATE_FORMAT.length()) {</span>
+<span class="nc" id="L188">          format = DEFFAULT_DATE_FORMAT;</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">        } else if (strVal.length() == 10) {</span>
+<span class="nc" id="L190">          format = &quot;yyyy-MM-dd&quot;;</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        } else if (strVal.length() == &quot;yyyy-MM-dd HH:mm:ss&quot;.length()) {</span>
+<span class="nc" id="L192">          format = &quot;yyyy-MM-dd HH:mm:ss&quot;;</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        } else if (strVal.length() == 29</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">                &amp;&amp; strVal.charAt(26) == ':'</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">                &amp;&amp; strVal.charAt(28) == '0') {</span>
+<span class="nc" id="L196">          format = &quot;yyyy-MM-dd'T'HH:mm:ss.SSSXXX&quot;;</span>
+        } else {
+<span class="nc" id="L198">          format = &quot;yyyy-MM-dd HH:mm:ss.SSS&quot;;</span>
+        }
+
+<span class="nc" id="L201">        SimpleDateFormat dateFormat = new SimpleDateFormat(format, defaultLocale);</span>
+<span class="nc" id="L202">        dateFormat.setTimeZone(defaultTimeZone);</span>
+        try {
+<span class="nc" id="L204">          return (Date) dateFormat.parse(strVal);</span>
+<span class="nc" id="L205">        } catch (ParseException e) {</span>
+<span class="nc" id="L206">          throw new IllegalArgumentException(&quot;can not cast to Date, value : &quot; + strVal);</span>
+        }
+      }
+
+<span class="nc bnc" id="L210" title="All 2 branches missed.">      if (strVal.length() == 0 //</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">              || &quot;null&quot;.equals(strVal)) {</span>
+<span class="nc" id="L212">        return null;</span>
+      }
+
+<span class="nc" id="L215">      longValue = Long.parseLong(strVal);</span>
+    }
+
+<span class="nc bnc" id="L218" title="All 2 branches missed.">    if (longValue &lt; 0) {</span>
+<span class="nc" id="L219">      throw new IllegalArgumentException(&quot;can not cast to Date, value : &quot; + value);</span>
+    }
+
+<span class="nc" id="L222">    return new Date(longValue);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

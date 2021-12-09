@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>QueryResultCache.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.cache</a> &gt; <span class="el_source">QueryResultCache.java</span></div><h1>QueryResultCache.java</h1><pre class="source lang-java linenums">package cn.leancloud.cache;
+
+import cn.leancloud.LCLogger;
+import cn.leancloud.LCObject;
+import cn.leancloud.codec.MDFive;
+import cn.leancloud.core.AppConfiguration;
+import cn.leancloud.query.LCQueryResult;
+import cn.leancloud.utils.LogUtil;
+import cn.leancloud.utils.StringUtil;
+import io.reactivex.Observable;
+import io.reactivex.schedulers.Schedulers;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
+
+public class QueryResultCache extends LocalStorage {
+<span class="fc" id="L24">  private static final LCLogger LOGGER = LogUtil.getLogger(QueryResultCache.class);</span>
+<span class="fc" id="L25">  private static QueryResultCache INSTANCE = null;</span>
+<span class="fc" id="L26">  private ExecutorService executor = Executors.newFixedThreadPool(2);</span>
+
+  public static synchronized QueryResultCache getInstance() {
+<span class="fc bfc" id="L29" title="All 2 branches covered.">    if (null == INSTANCE) {</span>
+<span class="fc" id="L30">      INSTANCE = new QueryResultCache();</span>
+    }
+<span class="fc" id="L32">    return INSTANCE;</span>
+  }
+
+  private QueryResultCache() {
+<span class="fc" id="L36">    super(AppConfiguration.getQueryResultCacheDir());</span>
+<span class="fc" id="L37">  }</span>
+
+  public String cacheResult(String key, String content) {
+<span class="fc" id="L40">    LOGGER.d(&quot;save cache. key=&quot; + key + &quot;, value=&quot; + content);</span>
+<span class="pc bpc" id="L41" title="2 of 4 branches missed.">    if (StringUtil.isEmpty(key) || null == content) {</span>
+<span class="nc" id="L42">      return null;</span>
+    }
+    try {
+<span class="fc" id="L45">      return super.saveData(key, content.getBytes(&quot;UTF-8&quot;));</span>
+<span class="nc" id="L46">    } catch (Exception ex) {</span>
+<span class="nc" id="L47">      LOGGER.w(ex);</span>
+<span class="nc" id="L48">      return null;</span>
+    }
+  }
+
+  public static String generateKeyForQueryCondition(String className, Map&lt;String, String&gt; query) {
+<span class="fc" id="L53">    StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L54">    sb.append(className);</span>
+<span class="fc" id="L55">    sb.append(&quot;:&quot;);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">    for (Map.Entry&lt;String, String&gt; entry: query.entrySet()) {</span>
+<span class="fc" id="L57">      sb.append(entry.getKey());</span>
+<span class="fc" id="L58">      sb.append(&quot;=&quot;);</span>
+<span class="fc" id="L59">      sb.append(entry.getValue());</span>
+<span class="fc" id="L60">      sb.append(&quot;&amp;&quot;);</span>
+<span class="fc" id="L61">    }</span>
+<span class="fc" id="L62">    return MDFive.computeMD5(sb.toString());</span>
+  }
+
+  public static String generateCachedKey(String className, Map&lt;String, Object&gt; params) {
+<span class="fc" id="L66">    StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L67">    sb.append(className);</span>
+<span class="fc" id="L68">    sb.append(&quot;:&quot;);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">    for (Map.Entry&lt;String, Object&gt; entry: params.entrySet()) {</span>
+<span class="fc" id="L70">      sb.append(entry.getKey());</span>
+<span class="fc" id="L71">      sb.append(&quot;=&quot;);</span>
+<span class="fc" id="L72">      sb.append(entry.getValue().toString());</span>
+<span class="fc" id="L73">      sb.append(&quot;&amp;&quot;);</span>
+<span class="fc" id="L74">    }</span>
+<span class="fc" id="L75">    return MDFive.computeMD5(sb.toString());</span>
+  }
+
+  public boolean hasCachedResult(String className, Map&lt;String, String&gt; query, long maxAgeInMilliseconds) {
+<span class="fc" id="L79">    String cacheKey = generateKeyForQueryCondition(className, query);</span>
+<span class="fc" id="L80">    File cacheFile = getCacheFile(cacheKey);</span>
+<span class="pc bpc" id="L81" title="2 of 4 branches missed.">    if (null == cacheFile || !cacheFile.exists()) {</span>
+<span class="nc" id="L82">      LOGGER.d(&quot;cache file(key=&quot; + cacheKey + &quot;) not existed.&quot;);</span>
+<span class="nc" id="L83">      return false;</span>
+    }
+<span class="pc bpc" id="L85" title="3 of 4 branches missed.">    if (maxAgeInMilliseconds &gt; 0 &amp;&amp; (System.currentTimeMillis() - cacheFile.lastModified() &gt; maxAgeInMilliseconds)) {</span>
+<span class="nc" id="L86">      LOGGER.d(&quot;cache file(key=&quot; + cacheKey + &quot;) is expired.&quot;);</span>
+<span class="nc" id="L87">      return false;</span>
+    }
+<span class="fc" id="L89">    return true;</span>
+  }
+
+  public Observable&lt;String&gt; getCacheRawResult(final String className, final Map&lt;String, String&gt; query,
+                                              final long maxAgeInMilliseconds, final boolean isFinal) {
+<span class="nc" id="L94">    LOGGER.d(&quot;try to get cache raw result for class:&quot; + className);</span>
+<span class="nc" id="L95">    String cacheKey = generateKeyForQueryCondition(className, query);</span>
+<span class="nc" id="L96">    return getCacheRawResult(className, cacheKey, maxAgeInMilliseconds, isFinal);</span>
+  }
+
+  public Observable&lt;String&gt; getCacheRawResult(final String className, final String cacheKey,
+                                              final long maxAgeInMilliseconds, final boolean isFinal) {
+<span class="fc" id="L101">    LOGGER.d(&quot;try to get cache raw result for class:&quot; + className);</span>
+<span class="fc" id="L102">    AppConfiguration.SchedulerCreator creator = AppConfiguration.getDefaultScheduler();</span>
+<span class="fc" id="L103">    boolean isAsync = AppConfiguration.isAsynchronized();</span>
+
+<span class="fc" id="L105">    Callable&lt;String&gt; callable = new Callable&lt;String&gt;() {</span>
+      public String call() throws Exception {
+<span class="fc" id="L107">        File cacheFile = getCacheFile(cacheKey);</span>
+<span class="pc bpc" id="L108" title="2 of 4 branches missed.">        if (null == cacheFile || !cacheFile.exists()) {</span>
+<span class="nc" id="L109">          LOGGER.d(&quot;cache file(key=&quot; + cacheKey + &quot;) not existed.&quot;);</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">          if (isFinal) {</span>
+<span class="nc" id="L111">            throw new FileNotFoundException(&quot;cache is not existed.&quot;);</span>
+          } else {
+<span class="nc" id="L113">            return &quot;&quot;;</span>
+          }
+        }
+<span class="pc bpc" id="L116" title="1 of 4 branches missed.">        if (maxAgeInMilliseconds &gt; 0 &amp;&amp; (System.currentTimeMillis() - cacheFile.lastModified() &gt; maxAgeInMilliseconds)) {</span>
+<span class="fc" id="L117">          LOGGER.d(&quot;cache file(key=&quot; + cacheKey + &quot;) is expired.&quot;);</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">          if (isFinal) {</span>
+<span class="fc" id="L119">            throw new FileNotFoundException(&quot;cache file is expired.&quot;);</span>
+          } else {
+<span class="nc" id="L121">            return &quot;&quot;;</span>
+          }
+        }
+<span class="fc" id="L124">        byte[] data = readData(cacheFile);</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (null == data) {</span>
+<span class="nc" id="L126">          LOGGER.d(&quot;cache file(key=&quot; + cacheKey + &quot;) is empty.&quot;);</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">          if (isFinal) {</span>
+<span class="nc" id="L128">            throw new InterruptedException(&quot;failed to read cache file.&quot;);</span>
+          } else {
+<span class="nc" id="L130">            return &quot;&quot;;</span>
+          }
+        }
+<span class="fc" id="L133">        String content = new String(data, 0, data.length, &quot;UTF-8&quot;);</span>
+<span class="fc" id="L134">        LOGGER.d(&quot;cache file(key=&quot; + cacheKey + &quot;), content: &quot; + content);</span>
+<span class="fc" id="L135">        return content;</span>
+      }
+    };
+<span class="fc" id="L138">    FutureTask&lt;String&gt; futureTask = new FutureTask&lt;&gt;(callable);</span>
+<span class="fc" id="L139">    executor.submit(futureTask);</span>
+<span class="fc" id="L140">    Observable result = Observable.fromFuture(futureTask);</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">    if (isAsync) {</span>
+<span class="nc" id="L142">      result = result.subscribeOn(Schedulers.io());</span>
+    }
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">    if (null != creator) {</span>
+<span class="nc" id="L145">      result = result.observeOn(creator.create());</span>
+    }
+<span class="fc" id="L147">    return result;</span>
+  }
+
+  public Observable&lt;List&lt;LCObject&gt;&gt; getCacheResult(final String className, final Map&lt;String, String&gt; query,
+                                                   final long maxAgeInMilliseconds, final boolean isFinal) {
+<span class="fc" id="L152">    LOGGER.d(&quot;try to get cache result for class:&quot; + className);</span>
+<span class="fc" id="L153">    Callable&lt;List&lt;LCObject&gt;&gt; callable = new Callable&lt;List&lt;LCObject&gt;&gt;() {</span>
+      public List&lt;LCObject&gt; call() throws Exception {
+<span class="fc" id="L155">        String cacheKey = generateKeyForQueryCondition(className, query);</span>
+<span class="fc" id="L156">        File cacheFile = getCacheFile(cacheKey);</span>
+<span class="pc bpc" id="L157" title="1 of 4 branches missed.">        if (null == cacheFile || !cacheFile.exists()) {</span>
+<span class="fc" id="L158">          LOGGER.d(&quot;cache file(key=&quot; + cacheKey + &quot;) not existed.&quot;);</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">          if (isFinal) {</span>
+<span class="fc" id="L160">            return new ArrayList&lt;&gt;();</span>
+          } else {
+<span class="fc" id="L162">            throw new FileNotFoundException(&quot;cache is not existed.&quot;);</span>
+          }
+        }
+<span class="pc bpc" id="L165" title="3 of 4 branches missed.">        if (maxAgeInMilliseconds &gt; 0 &amp;&amp; (System.currentTimeMillis() - cacheFile.lastModified() &gt; maxAgeInMilliseconds)) {</span>
+<span class="nc" id="L166">          LOGGER.d(&quot;cache file(key=&quot; + cacheKey + &quot;) is expired.&quot;);</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">          if (isFinal) {</span>
+<span class="nc" id="L168">            return new ArrayList&lt;&gt;();</span>
+          } else {
+<span class="nc" id="L170">            throw new FileNotFoundException(&quot;cache file is expired.&quot;);</span>
+          }
+        }
+<span class="fc" id="L173">        byte[] data = readData(cacheFile);</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (null == data) {</span>
+<span class="nc" id="L175">          LOGGER.d(&quot;cache file(key=&quot; + cacheKey + &quot;) is empty.&quot;);</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">          if (isFinal) {</span>
+<span class="nc" id="L177">            return new ArrayList&lt;&gt;();</span>
+          } else {
+<span class="nc" id="L179">            throw new InterruptedException(&quot;failed to read cache file.&quot;);</span>
+          }
+        }
+<span class="fc" id="L182">        String content = new String(data, 0, data.length, &quot;UTF-8&quot;);</span>
+<span class="fc" id="L183">        LOGGER.d(&quot;cache file(key=&quot; + cacheKey + &quot;), content: &quot; + content);</span>
+<span class="fc" id="L184">        LCQueryResult result = LCQueryResult.fromJSONString(content);</span>
+<span class="fc" id="L185">        return result.getResults();</span>
+      }
+    };
+<span class="fc" id="L188">    FutureTask&lt;List&lt;LCObject&gt;&gt; futureTask = new FutureTask&lt;List&lt;LCObject&gt;&gt;(callable);</span>
+<span class="fc" id="L189">    executor.submit(futureTask);</span>
+<span class="fc" id="L190">    return Observable.fromFuture(futureTask);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

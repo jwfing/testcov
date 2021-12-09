@@ -1,0 +1,46 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <title>TDS Test Coverage</title>
+    <link rel="stylesheet" href="/stylesheets/style.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+  </head>
+  <body>
+    <h1>TDS 客户端项目单元测试覆盖率一览</h1>
+    <p/><p/>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col">module</th>
+                <th scope="col">coverage result</th>
+                <th scope="col">test time</th>
+                <th scope="col">details</th>
+            </tr>
+        </thead>
+        <tbody>
+          <% for(var i=0; i<testReports.length; i++) {%>
+            <tr>
+                <td><%= testReports[i].get('module') %></td>
+                <td><pre><%= testReports[i].get('result') %></pre></td>
+                <td><%= testReports[i].get('createdAt') %></td>
+                <td><% if (testReports[i].get('referenceUrl')) { %>
+                  <a href="<%= testReports[i].get('referenceUrl') %>">
+                  <% } else { %>
+                  <a href="/details?module=<%= testReports[i].get('module') %>">
+                  <% } %>
+                  details</a>
+                </td>
+            </tr>
+          <% } %>
+        </tbody>
+    </table>
+
+    <figure class="text-end">
+      <p class="text-right">Powered by <a href="https://developer.taptap.com/product-intro/cloud-engine">TDS 云引擎</a></p>
+    </figure>
+  </body>
+</html>

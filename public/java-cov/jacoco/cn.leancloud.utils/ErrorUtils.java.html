@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ErrorUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.utils</a> &gt; <span class="el_source">ErrorUtils.java</span></div><h1>ErrorUtils.java</h1><pre class="source lang-java linenums">package cn.leancloud.utils;
+
+import cn.leancloud.LCException;
+import cn.leancloud.json.JSON;
+import cn.leancloud.json.JSONObject;
+import retrofit2.HttpException;
+import retrofit2.Response;
+
+import java.io.IOException;
+
+<span class="nc" id="L11">public class ErrorUtils {</span>
+  public static LCException propagateException(String content) {
+    try {
+<span class="fc" id="L14">      JSONObject object = JSON.parseObject(content);</span>
+<span class="fc" id="L15">      String errorMessage = object.getString(&quot;error&quot;);</span>
+<span class="fc" id="L16">      int code = object.getIntValue(&quot;code&quot;);</span>
+<span class="fc" id="L17">      return new LCException(code, errorMessage);</span>
+<span class="nc" id="L18">    } catch (Exception exception) {</span>
+<span class="nc" id="L19">      return new LCException(LCException.UNKNOWN, content);</span>
+    }
+  }
+
+  public static LCException propagateException(Throwable throwable) {
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">    if (null == throwable) {</span>
+<span class="nc" id="L25">      return null;</span>
+    }
+<span class="fc bfc" id="L27" title="All 2 branches covered.">    if (throwable instanceof HttpException) {</span>
+<span class="fc" id="L28">      HttpException httpException = (HttpException) throwable;</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">      if (null != httpException.response()) {</span>
+<span class="fc" id="L30">        Response response = httpException.response();</span>
+<span class="pc bpc" id="L31" title="2 of 4 branches missed.">        if (null != response &amp;&amp; null != response.errorBody()) {</span>
+          try {
+<span class="fc" id="L33">            String content = response.errorBody().string();</span>
+<span class="fc" id="L34">            LCException exception = ErrorUtils.propagateException(content);</span>
+<span class="fc" id="L35">            return exception;</span>
+<span class="nc" id="L36">          } catch (IOException ex) {</span>
+            ;
+          }
+        }
+      }
+    }
+<span class="fc" id="L42">    return new LCException(LCException.UNKNOWN, throwable.getMessage());</span>
+  };
+
+  public static LCException propagateException(int code, String content) {
+<span class="fc" id="L46">    return new LCException(code, content);</span>
+  }
+
+  public static LCException sessionMissingException() {
+<span class="fc" id="L50">    return ErrorUtils.propagateException(LCException.SESSION_MISSING,</span>
+            &quot;No valid session token, make sure signUp or login has been called.&quot;);
+  }
+
+  public static LCException illegalArgument(String message) {
+<span class="nc" id="L55">    return ErrorUtils.propagateException(LCException.INVALID_PARAMETER, message);</span>
+  }
+
+  public static LCException invalidObjectIdException() {
+<span class="nc" id="L59">    return ErrorUtils.propagateException(LCException.MISSING_OBJECT_ID, &quot;Invalid object id.&quot;);</span>
+  }
+
+  public static LCException invalidStateException() {
+<span class="nc" id="L63">    return ErrorUtils.propagateException(LCException.INVALID_STATE, &quot;Invalid State Exception.&quot;);</span>
+  }
+
+  public static LCException invalidStateException(String message) {
+<span class="fc" id="L67">    return ErrorUtils.propagateException(LCException.INVALID_STATE, message);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

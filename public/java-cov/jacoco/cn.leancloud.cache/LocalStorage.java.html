@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LocalStorage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">storage core library</a> &gt; <a href="index.source.html" class="el_package">cn.leancloud.cache</a> &gt; <span class="el_source">LocalStorage.java</span></div><h1>LocalStorage.java</h1><pre class="source lang-java linenums">package cn.leancloud.cache;
+
+import cn.leancloud.utils.StringUtil;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.InputStream;
+
+public class LocalStorage {
+  private String baseDir;
+<span class="fc" id="L12">  private boolean disableLocalCache = false;</span>
+
+<span class="fc" id="L14">  public LocalStorage(String baseDir) {</span>
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(baseDir)) {</span>
+<span class="nc" id="L16">      disableLocalCache = true;</span>
+    } else {
+<span class="fc bfc" id="L18" title="All 2 branches covered.">      if (!baseDir.endsWith(&quot;/&quot;)) {</span>
+<span class="fc" id="L19">        baseDir += &quot;/&quot;;</span>
+      }
+<span class="fc" id="L21">      File root = new File(baseDir);</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">      if (!root.exists()) {</span>
+<span class="nc" id="L23">        root.mkdirs();</span>
+      }
+
+<span class="fc" id="L26">      this.baseDir = baseDir;</span>
+    }
+<span class="fc" id="L28">  }</span>
+
+  public String saveData(String key, byte[] content) {
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">    if (disableLocalCache) {</span>
+<span class="nc" id="L32">      return null;</span>
+    }
+<span class="pc bpc" id="L34" title="2 of 4 branches missed.">    if (StringUtil.isEmpty(key) || null == content) {</span>
+<span class="nc" id="L35">      return null;</span>
+    }
+<span class="fc" id="L37">    String path = baseDir + key;</span>
+<span class="fc" id="L38">    PersistenceUtil.sharedInstance().saveContentToFile(content, new File(path));</span>
+<span class="fc" id="L39">    return path;</span>
+  }
+
+  public String saveFile(String key, File localFile) {
+<span class="nc bnc" id="L43" title="All 2 branches missed.">    if (disableLocalCache) {</span>
+<span class="nc" id="L44">      return null;</span>
+    }
+<span class="nc bnc" id="L46" title="All 2 branches missed.">    if (StringUtil.isEmpty(key)) {</span>
+<span class="nc" id="L47">      return null;</span>
+    }
+<span class="nc bnc" id="L49" title="All 6 branches missed.">    if (null == localFile || !localFile.exists() || !localFile.isFile()) {</span>
+<span class="nc" id="L50">      return null;</span>
+    }
+<span class="nc" id="L52">    String path = baseDir + key;</span>
+<span class="nc" id="L53">    boolean saveResult = PersistenceUtil.sharedInstance().saveFileToLocal(path, localFile);</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">    if (saveResult) {</span>
+<span class="nc" id="L55">      return path;</span>
+    } else {
+<span class="nc" id="L57">      return null;</span>
+    }
+  }
+
+  public byte[] readData(String key) {
+<span class="nc bnc" id="L62" title="All 2 branches missed.">    if (disableLocalCache) {</span>
+<span class="nc" id="L63">      return null;</span>
+    }
+<span class="nc bnc" id="L65" title="All 2 branches missed.">    if (StringUtil.isEmpty(key)) {</span>
+<span class="nc" id="L66">      return null;</span>
+    }
+<span class="nc" id="L68">    String path = baseDir + key;</span>
+<span class="nc" id="L69">    return readData(new File(path));</span>
+  }
+
+  public byte[] readData(File file) {
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">    if (disableLocalCache) {</span>
+<span class="nc" id="L74">      return null;</span>
+    }
+<span class="fc" id="L76">    return PersistenceUtil.sharedInstance().readContentBytesFromFile(file);</span>
+  }
+
+  public File getCacheFile(String key) {
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">    if (disableLocalCache) {</span>
+<span class="nc" id="L81">      return null;</span>
+    }
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">    if (StringUtil.isEmpty(key)) {</span>
+<span class="nc" id="L84">      return null;</span>
+    }
+<span class="fc" id="L86">    return new File(this.baseDir + key);</span>
+  }
+
+  public InputStream getInputStreamFromFile(File file) throws FileNotFoundException {
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">    if (disableLocalCache) {</span>
+<span class="nc" id="L91">      return null;</span>
+    }
+<span class="fc" id="L93">    return new FileInputStream(file);</span>
+  }
+
+  public void clearCachedFile(String key) {
+<span class="pc bpc" id="L97" title="2 of 4 branches missed.">    if (disableLocalCache || StringUtil.isEmpty(key)) {</span>
+<span class="nc" id="L98">      return;</span>
+    }
+<span class="fc" id="L100">    String path = baseDir + key;</span>
+<span class="fc" id="L101">    PersistenceUtil.sharedInstance().deleteFile(path);</span>
+<span class="fc" id="L102">  }</span>
+
+  public void clearAllCachedFiles() {
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">    if (disableLocalCache) {</span>
+<span class="nc" id="L106">      return;</span>
+    }
+<span class="fc" id="L108">    clearCacheMoreThanDays(0);</span>
+<span class="fc" id="L109">  }</span>
+
+  public void clearCacheMoreThanDays(int days) {
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">    if (disableLocalCache) {</span>
+<span class="nc" id="L113">      return;</span>
+    }
+<span class="fc" id="L115">    long curTime = System.currentTimeMillis();</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">    if ( days &gt; 0) {</span>
+<span class="nc" id="L117">      curTime -= 86400000L * days; // 86400000 is one day.</span>
+    }
+<span class="fc" id="L119">    PersistenceUtil.sharedInstance().clearDir(baseDir, curTime);</span>
+<span class="fc" id="L120">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
