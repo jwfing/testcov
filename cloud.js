@@ -12,6 +12,6 @@ fs.readdirSync(path.join(__dirname, 'functions')).forEach( file => {
 /**
  * A simple cloud function.
  */
-AV.Cloud.define('hello', function(request) {
+AV.Cloud.define('kawai', function(request) {
   return 'Hello world!'
 })

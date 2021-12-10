@@ -26,7 +26,7 @@
             <tr>
                 <td><%= testReports[i].get('module') %></td>
                 <td><pre><%= testReports[i].get('result') %></pre></td>
-                <td><%= testReports[i].get('createdAt') %></td>
+                <td><%= moment(testReports[i].get('createdAt')).format('YYYY-MM-DD HH:mm:ss') %></td>
                 <td><% if (testReports[i].get('referenceUrl')) { %>
                   <a href="<%= testReports[i].get('referenceUrl') %>">
                   <% } else { %>

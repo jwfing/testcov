@@ -21,7 +21,7 @@
         <tbody>
           <% for(var i=0; i<testReports.length; i++) {%>
             <tr>
-                <td><%= testReports[i].get('createdAt') %></td>
+                <td><%= moment(testReports[i].get('createdAt')).format('YYYY-MM-DD HH:mm:ss') %></td>
                 <td><pre><%= testReports[i].get('result') %></pre></td>
             </tr>
           <% } %>

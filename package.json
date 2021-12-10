@@ -15,7 +15,8 @@
     "ejs": "^2.6.1",
     "express": "^4.16.4",
     "leancloud-storage": "^3.11.0",
-    "leanengine": "^3.3.2"
+    "leanengine": "^3.3.2",
+    "moment": "^2.29.1"
   },
   "engines": {
     "node": "12.x"

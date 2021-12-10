@@ -6,6 +6,7 @@ var path = require('path');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var AV = require('leanengine');
+var moment = require('moment');
 
 // Loads cloud function definitions.
 // You can split it into multiple files but do not forget to load them in the main file.
@@ -47,6 +48,7 @@ app.get('/', function(req, res, next) {
   })).then(function(results) {
     res.render('index', {
         currentTime: new Date(),
+        moment: moment,
         testReports: results
       });
   }, function(err) {
@@ -54,6 +56,7 @@ app.get('/', function(req, res, next) {
       // Todo class does not exist in the cloud yet.
       res.render('index', {
         currentTime: new Date(),
+        moment: moment,
         testReports: []
       });
     } else {
@@ -72,6 +75,7 @@ app.get('/details', function(req, res, next) {
   query.find().then(function(results) {
     res.render('details', {
       module: modName,
+      moment: moment,
       testReports: results
     });
   }, function(err) {
@@ -79,6 +83,7 @@ app.get('/details', function(req, res, next) {
       // Todo class does not exist in the cloud yet.
       res.render('details', {
         module: modName,
+        moment: moment,
         testReports: []
       });
     } else {
